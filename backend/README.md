@@ -45,7 +45,9 @@ The FishFarm frontend is a Vite app whose exported config uses port **8443** (`s
 | `/v1/seller/listings` | Seller CRUD plus submit/withdraw/pause/resume |
 | `/v1/admin/listings` | Moderation queue, review detail and approve/reject/request-changes/takedown |
 | `GET /v1/admin/activity` | Recent platform activity log |
-| `/v1/marketplace`, ... | Feature endpoints (see §5 of the requirements) |
+| `GET /v1/marketplace/listings` | Public marketplace search, filters, sorting and pagination |
+| `GET /v1/marketplace/listings/:id` | Public listing detail by `FM-…` code or internal id |
+| `GET /v1/marketplace/sellers/:name` | Public seller page with an approved-listing page |
 
 All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps are ISO 8601 UTC.
 
@@ -87,6 +89,24 @@ All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps
 - Every transition appends a `ListingHistory` row, writes an `Activity` entry, and notifies the
   counterparty (seller ↔ admin) subject to `prefs`. Pre-order listings must have `depositPct` 20–30
   and an `expectedReadyDate`.
+
+### Marketplace
+
+- The three `GET /v1/marketplace/*` routes are public (`@Public()`) and expose only `approved`,
+  non-deleted listings. Pending, paused, rejected and soft-deleted listings return `404`.
+- `GET /v1/marketplace/listings` filters on `q` (name, species, breed, seller, location, region),
+  `species` (repeat the param or comma-separate), `breed`, `priceMax`, `size` (`under15` |
+  `15plus`), `location`, `sellerRating` and `available` (`true` hides sold-out listings and is the
+  default). `sort` is `recommended` (default), `price_asc`, `price_desc` or `newest`; the UI labels
+  for size and sort are accepted too. `page`/`pageSize` are capped at 100.
+- Items use a product projection: id (`FM-…`), name, species, breed, description, size, price,
+  quantity, negotiable, age, gender, origin, health, location, region, shipping, images, a display
+  label (`pre_order` | `new` | `verified`), sale-mode fields, views and the seller summary with
+  aggregate rating/review count.
+- `sellerRating` is computed from `Review` rows; when no seller meets the threshold the response is
+  an empty page.
+- The seller route resolves an active seller by store name or owner name (case-insensitive) and
+  returns the seller profile plus a paginated list of their approved listings.
 
 ## Demo accounts
 
@@ -134,6 +154,7 @@ src/
   auth/                   # login/refresh/OTP, guards, permission matrix
   users/                  # /me profile and notification prefs
   listings/               # seller CRUD, lifecycle state machine, admin moderation
+  marketplace/            # public search, listing detail and seller pages
   common/                 # AppException + API exception filter
   config/                 # env validation
   health/                 # GET /health
@@ -147,6 +168,7 @@ src/
   required. Do not downgrade the CLI below 7.
 - The generated client is ignored by Git and rebuilt by `postinstall` and `prisma:generate`.
 - The schema includes both products: marketplace entities (§3) and batch sponsorship (§11).
-  Auth/users and the listings core are implemented; marketplace read endpoints are next.
+  Auth/users, listings and the public marketplace read endpoints are implemented; ordering and
+  batch sponsorship are next.
 - `pnpm test:e2e` boots the real app against the local database and cleans up the users and listings
   it creates.
