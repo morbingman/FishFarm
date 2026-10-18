@@ -27,8 +27,7 @@ Docker Postgres:
 docker compose up -d
 ```
 
-The API listens on **4000**: 3000 and 3001 are used by the PlotFarm project (frontend and API
-respectively). Change `PORT` in `.env` if needed.
+The API listens on **4000**. Change `PORT` in `.env` if needed.
 
 The FishFarm frontend is a Vite app whose exported config uses port **8443** (`strictPort`).
 `CORS_ORIGINS` therefore allows 8443 and 5173; if you override the frontend port with
@@ -43,11 +42,14 @@ The FishFarm frontend is a Vite app whose exported config uses port **8443** (`s
 | `GET /docs` | Swagger UI (OpenAPI JSON at `/docs-json`) |
 | `POST /v1/auth/*` | register, login, refresh, logout, verify-email, forgot-password, reset-password |
 | `GET/PATCH /v1/me` | Current profile; `GET/PATCH /v1/me/prefs` for notification prefs |
+| `/v1/seller/listings` | Seller CRUD plus submit/withdraw/pause/resume |
+| `/v1/admin/listings` | Moderation queue, review detail and approve/reject/request-changes/takedown |
+| `GET /v1/admin/activity` | Recent platform activity log |
 | `/v1/marketplace`, ... | Feature endpoints (see §5 of the requirements) |
 
 All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps are ISO 8601 UTC.
 
-### Auth (M2)
+### Auth
 
 - `POST /v1/auth/login` returns a short-lived access token in the body. The refresh token is set in
   the httpOnly cookie `fishfarm_refresh` (path `/v1/auth`), rotated on every `/refresh`.
@@ -65,6 +67,26 @@ All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps
 - Capabilities are enforced with the `@RequirePermissions(...)` decorator backed by
   `src/auth/permissions.ts` (the server-side copy of the frontend `MATRIX`). Ordering remains
   Buyer-only.
+
+### Listings
+
+- Sellers manage only their own listings. Public ids are `FM-…` codes; internal cuids are also
+  accepted by the route parameter.
+- `POST /v1/seller/listings` saves a partial draft (the six-step wizard can save at any point).
+  `POST /v1/seller/listings/{id}/submit` enforces completeness: name, species, description ≥ 20
+  chars, age, size, gender, origin, health, price, quantity, at least one image, location, region
+  and shipping.
+- Lifecycle: `draft → pending → approved | changes | rejected`; sellers can withdraw a pending
+  listing back to draft, pause/resume an approved one, and delete only draft/changes/rejected
+  listings (soft delete).
+- Editing an `approved` or `paused` listing immediately returns it to `pending` and hides it from
+  the marketplace until re-approved. Pending listings cannot be edited; withdraw first.
+- Admin queue tabs: `pending`, `approved` (live), `changes` (changes + rejected). Review detail
+  includes completeness checks. Decisions require a fixed reason plus ≥ 10 characters of feedback;
+  takedown is limited to approved/paused listings and records `Policy violation`.
+- Every transition appends a `ListingHistory` row, writes an `Activity` entry, and notifies the
+  counterparty (seller ↔ admin) subject to `prefs`. Pre-order listings must have `depositPct` 20–30
+  and an `expectedReadyDate`.
 
 ## Demo accounts
 
@@ -111,6 +133,7 @@ prisma/
 src/
   auth/                   # login/refresh/OTP, guards, permission matrix
   users/                  # /me profile and notification prefs
+  listings/               # seller CRUD, lifecycle state machine, admin moderation
   common/                 # AppException + API exception filter
   config/                 # env validation
   health/                 # GET /health
@@ -124,5 +147,6 @@ src/
   required. Do not downgrade the CLI below 7.
 - The generated client is ignored by Git and rebuilt by `postinstall` and `prisma:generate`.
 - The schema includes both products: marketplace entities (§3) and batch sponsorship (§11).
-  Implemented so far: M1 scaffolding and M2 auth/users; listings start at M3.
-- `pnpm test:e2e` boots the real app against the local database and cleans up the users it creates.
+  Auth/users and the listings core are implemented; marketplace read endpoints are next.
+- `pnpm test:e2e` boots the real app against the local database and cleans up the users and listings
+  it creates.
