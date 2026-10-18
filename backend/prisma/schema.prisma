@@ -1,0 +1,852 @@
+// FishFarm data model — marketplace (§3) and batch sponsorship (§11).
+// Money is always VND integer đồng. Human-readable codes (FM-…, ORD-…, BATCH-…) are
+// generated from the Sequence table; internal primary keys stay opaque cuids.
+
+generator client {
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  moduleFormat = "esm"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ---------------------------------------------------------------------------
+// Shared / identity
+// ---------------------------------------------------------------------------
+
+enum UserRole {
+  Buyer
+  Seller
+  Admin
+}
+
+enum UserStatus {
+  active
+  suspended
+}
+
+model User {
+  id              String     @id @default(cuid())
+  email           String     @unique
+  passwordHash    String
+  name            String
+  role            UserRole   @default(Buyer)
+  status          UserStatus @default(active)
+  phone           String?
+  location        String?
+  joinedAt        DateTime   @default(now())
+  store           String?
+  prefs           Json       @default("{\"status\":true,\"system\":true,\"reminders\":true}")
+  emailVerifiedAt DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  sessions              Session[]
+  listings              Listing[]
+  listingHistory        ListingHistory[]
+  notifications         Notification[]
+  activities            Activity[]
+  favorites             Favorite[]
+  cartItems             CartItem[]
+  ordersAsBuyer         Order[]            @relation("OrderBuyer")
+  ordersAsSeller        Order[]            @relation("OrderSeller")
+  reviewsWritten        Review[]           @relation("ReviewBuyer")
+  reviewsReceived       Review[]           @relation("ReviewSeller")
+  conversationsAsBuyer  Conversation[]     @relation("ConversationBuyer")
+  conversationsAsSeller Conversation[]     @relation("ConversationSeller")
+  messages              Message[]
+  disputes              Dispute[]
+  uploads               Upload[]
+  growOutBatches        GrowOutBatch[]
+  sponsorships          Sponsorship[]
+  farmVerification      FarmVerification?
+  batchUpdates          BatchUpdate[]
+  verificationCodes     VerificationCode[]
+
+  @@index([role, status])
+}
+
+model Session {
+  id               String    @id @default(cuid())
+  userId           String
+  user             User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  refreshTokenHash String    @unique
+  userAgent        String?
+  ip               String?
+  lastActiveAt     DateTime  @default(now())
+  expiresAt        DateTime
+  revokedAt        DateTime?
+  createdAt        DateTime  @default(now())
+
+  @@index([userId])
+}
+
+enum VerificationPurpose {
+  email_verify
+  password_reset
+}
+
+model VerificationCode {
+  id         String              @id @default(cuid())
+  userId     String
+  user       User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  purpose    VerificationPurpose
+  codeHash   String
+  attempts   Int                 @default(0)
+  expiresAt  DateTime
+  consumedAt DateTime?
+  createdAt  DateTime            @default(now())
+
+  @@index([userId, purpose, createdAt])
+}
+
+// Human-readable id sequences (listing FM-, order ORD-, batch BATCH-).
+model Sequence {
+  name  String @id
+  value BigInt @default(0)
+}
+
+// ---------------------------------------------------------------------------
+// Marketplace — listings (§3.2 / §3.3)
+// ---------------------------------------------------------------------------
+
+enum ListingStatus {
+  draft
+  pending
+  approved
+  changes
+  rejected
+  paused
+}
+
+enum DecisionKind {
+  rejected
+  changes
+}
+
+enum SaleMode {
+  in_stock
+  pre_order
+}
+
+model Listing {
+  id         String        @id @default(cuid())
+  code       String        @unique // "FM-20817"
+  ownerId    String
+  owner      User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
+  sellerName String
+  status     ListingStatus @default(draft)
+
+  // Moderation decision snapshot (null unless changes/rejected).
+  decisionKind     DecisionKind?
+  decisionReason   String?
+  decisionFeedback String?
+  decisionStep     Int?
+  decisionBy       String?
+  decisionAt       DateTime?
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  submittedAt DateTime?
+  views       Int       @default(0)
+  deletedAt   DateTime? // soft delete; codes remain reserved
+
+  draft         ListingDraft?
+  history       ListingHistory[]
+  cartItems     CartItem[]
+  orderItems    OrderItem[]
+  favorites     Favorite[]
+  reviews       Review[]
+  conversations Conversation[]
+
+  @@index([status, deletedAt])
+  @@index([ownerId, status])
+  @@index([createdAt])
+}
+
+model ListingDraft {
+  id        String  @id @default(cuid())
+  listingId String  @unique
+  listing   Listing @relation(fields: [listingId], references: [id], onDelete: Cascade)
+
+  name        String
+  species     String
+  breed       String   @default("")
+  description String   @default("")
+  ageMonths   Int?
+  sizeCm      Int?
+  gender      String?
+  origin      String?
+  health      String?
+  price       Int // VND integer đồng
+  quantity    Int      @default(1)
+  negotiable  Boolean  @default(false)
+  location    String?
+  region      String?
+  shipping    String[] @default([])
+
+  // Pre-order variant (§3.8)
+  saleMode          SaleMode  @default(in_stock)
+  depositPct        Int? // 20–30 for pre_order
+  expectedReadyDate DateTime?
+  preorderPolicy    String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images ListingImage[]
+}
+
+model ListingImage {
+  id        String       @id @default(cuid())
+  draftId   String
+  draft     ListingDraft @relation(fields: [draftId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int          @default(0)
+  isMain    Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  @@index([draftId, position])
+}
+
+model ListingHistory {
+  id         String   @id @default(cuid())
+  listingId  String
+  listing    Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  at         DateTime @default(now())
+  actorId    String?
+  actor      User?    @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorLabel String
+  action     String
+  note       String?
+
+  @@index([listingId, at])
+}
+
+// ---------------------------------------------------------------------------
+// Engagement — notifications, activity, favorites, messaging, uploads
+// ---------------------------------------------------------------------------
+
+enum NotificationType {
+  success
+  error
+  system
+  status
+  approval
+  reminder
+}
+
+model Notification {
+  id            String           @id @default(cuid())
+  recipientId   String?
+  recipient     User?            @relation(fields: [recipientId], references: [id], onDelete: Cascade)
+  recipientRole UserRole? // role broadcast, e.g. Admin
+  type          NotificationType
+  titleKey      String
+  titleParams   Json?
+  bodyKey       String
+  bodyParams    Json?
+  link          String?
+  readAt        DateTime?
+  createdAt     DateTime         @default(now())
+
+  @@index([recipientId, createdAt])
+  @@index([recipientRole, createdAt])
+}
+
+enum ActorRole {
+  Buyer
+  Seller
+  Admin
+  System
+}
+
+model Activity {
+  id         String    @id @default(cuid())
+  actorId    String?
+  actor      User?     @relation(fields: [actorId], references: [id], onDelete: SetNull)
+  actorLabel String
+  role       ActorRole
+  action     String
+  target     String?
+  link       String?
+  createdAt  DateTime  @default(now())
+
+  @@index([createdAt])
+}
+
+model Favorite {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+
+  @@unique([userId, listingId])
+}
+
+model Conversation {
+  id            String   @id @default(cuid())
+  buyerId       String
+  buyer         User     @relation("ConversationBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
+  sellerId      String
+  seller        User     @relation("ConversationSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  listingId     String?
+  listing       Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
+  lastMessageAt DateTime @default(now())
+  createdAt     DateTime @default(now())
+
+  messages Message[]
+
+  @@index([buyerId, lastMessageAt])
+  @@index([sellerId, lastMessageAt])
+}
+
+model Message {
+  id             String       @id @default(cuid())
+  conversationId String
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  senderId       String
+  sender         User         @relation(fields: [senderId], references: [id], onDelete: Cascade)
+  body           String
+  readAt         DateTime?
+  createdAt      DateTime     @default(now())
+
+  @@index([conversationId, createdAt])
+}
+
+model Upload {
+  id        String   @id @default(cuid())
+  ownerId   String
+  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  url       String
+  mimeType  String
+  sizeBytes Int
+  purpose   String // listing_image | dispute_attachment | batch_update | farm_document
+  createdAt DateTime @default(now())
+
+  @@index([ownerId, createdAt])
+}
+
+// ---------------------------------------------------------------------------
+// Commerce — cart, orders, payments, reviews, disputes (§3.7 / §3.8)
+// ---------------------------------------------------------------------------
+
+model CartItem {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  quantity  Int      @default(1)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, listingId])
+}
+
+enum OrderStatus {
+  pending_payment
+  paid
+  ready
+  shipped
+  delivered
+  completed
+  cancelled
+  refunded
+}
+
+enum OrderPaymentStatus {
+  unpaid
+  deposit_paid
+  balance_due
+  paid
+  refunded
+}
+
+model Order {
+  id   String @id @default(cuid())
+  code String @unique // "ORD-10023"
+
+  buyerId  String
+  buyer    User   @relation("OrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  sellerId String
+  seller   User   @relation("OrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+
+  status        OrderStatus        @default(pending_payment)
+  saleMode      SaleMode           @default(in_stock)
+  paymentStatus OrderPaymentStatus @default(unpaid)
+
+  subtotal    Int
+  shippingFee Int @default(0)
+  total       Int
+
+  // Pre-order (§3.8): deposit paid now, balance due after mark-ready.
+  depositAmount Int?
+  balanceAmount Int?
+  balanceDueAt  DateTime?
+
+  // Delivery snapshot.
+  recipientName  String
+  phone          String
+  address        String
+  city           String?
+  province       String?
+  deliveryMethod String?
+
+  placedAt    DateTime  @default(now())
+  paidAt      DateTime?
+  readyAt     DateTime?
+  deliveredAt DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+  refundedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  items    OrderItem[]
+  payments Payment[]
+  review   Review?
+  dispute  Dispute?
+
+  @@index([buyerId, placedAt])
+  @@index([sellerId, status])
+  @@index([status, placedAt])
+}
+
+model OrderItem {
+  id        String   @id @default(cuid())
+  orderId   String
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Restrict)
+  saleMode  SaleMode
+  quantity  Int
+  unitPrice Int
+  lineTotal Int
+
+  @@index([listingId])
+}
+
+enum PaymentPurpose {
+  order_full
+  order_deposit
+  order_balance
+  sponsorship_package
+  delivery_fee
+  refund
+}
+
+enum PaymentMethod {
+  bank_card
+  e_wallet
+  bank_transfer
+}
+
+enum PaymentState {
+  ready
+  paid
+  failed
+  refunded
+}
+
+model Payment {
+  id             String         @id @default(cuid())
+  orderId        String?
+  order          Order?         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sponsorshipId  String?
+  sponsorship    Sponsorship?   @relation(fields: [sponsorshipId], references: [id], onDelete: Cascade)
+  purpose        PaymentPurpose
+  method         PaymentMethod
+  provider       String         @default("simulated")
+  providerRef    String?
+  idempotencyKey String         @unique
+  amount         Int
+  state          PaymentState   @default(ready)
+  failureReason  String?
+  createdAt      DateTime       @default(now())
+  paidAt         DateTime?
+  refundedAt     DateTime?
+
+  @@index([orderId])
+  @@index([sponsorshipId])
+}
+
+model Review {
+  id        String   @id @default(cuid())
+  orderId   String   @unique
+  order     Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  listingId String
+  listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
+  buyerId   String
+  buyer     User     @relation("ReviewBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  sellerId  String
+  seller    User     @relation("ReviewSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  rating    Int
+  text      String?
+  createdAt DateTime @default(now())
+
+  @@index([listingId, createdAt])
+  @@index([sellerId, createdAt])
+}
+
+enum DisputeStatus {
+  open
+  reviewing
+  resolved
+  rejected
+}
+
+model Dispute {
+  id          String        @id @default(cuid())
+  orderId     String        @unique
+  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  buyerId     String
+  buyer       User          @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  reason      String
+  description String
+  status      DisputeStatus @default(open)
+  resolution  String?
+  createdAt   DateTime      @default(now())
+  resolvedAt  DateTime?
+
+  attachments DisputeAttachment[]
+
+  @@index([status, createdAt])
+}
+
+model DisputeAttachment {
+  id        String   @id @default(cuid())
+  disputeId String
+  dispute   Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  url       String
+  createdAt DateTime @default(now())
+}
+
+// ---------------------------------------------------------------------------
+// Batch sponsorship (§11)
+// ---------------------------------------------------------------------------
+
+enum BatchStatus {
+  draft
+  pending_review
+  open
+  fully_sponsored
+  growing
+  harvesting
+  harvested
+  settled
+  cancelled
+}
+
+enum ShareUnitType {
+  weight
+  count
+}
+
+enum BatchStage {
+  nursery
+  fingerling
+  juvenile
+  grow_out
+  pre_harvest
+}
+
+enum CostCategory {
+  equipment
+  feed
+  labour
+  health
+  transport
+  platform_fee
+  contingency
+}
+
+enum CostAllocation {
+  per_share
+  batch_total
+}
+
+model GrowOutBatch {
+  id   String @id @default(cuid())
+  code String @unique // "BATCH-1024"
+
+  sellerId String
+  seller   User   @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+
+  title       String
+  species     String
+  breed       String?
+  description String
+
+  status   BatchStatus @default(draft)
+  location String
+  region   String
+
+  stockingDate        DateTime?
+  expectedHarvestDate DateTime?
+
+  stockCount             Int
+  shareUnitType          ShareUnitType
+  shareUnit              String // "5 kg" or "4 fish"
+  expectedHarvestWeightG Int? // required when shareUnitType = weight
+  totalShares            Int
+  sharesAvailable        Int
+
+  packagePricePerShare Int // full care cost per share, VND
+  contingencyPct       Int    @default(10)
+  riskDisclosure       String
+  termsVersion         String
+
+  // Verification snapshot shown publicly.
+  farmVerified Boolean   @default(false)
+  inspectedAt  DateTime?
+  inspector    String?
+
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  reviewNote  String?
+
+  cancelledAt  DateTime?
+  cancelReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  images        BatchImage[]
+  costBreakdown BatchCostItem[]
+  updates       BatchUpdate[]
+  sponsorships  Sponsorship[]
+  harvest       Harvest?
+
+  @@index([status, createdAt])
+  @@index([sellerId, status])
+}
+
+model BatchImage {
+  id        String       @id @default(cuid())
+  batchId   String
+  batch     GrowOutBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  url       String
+  position  Int          @default(0)
+  isMain    Boolean      @default(false)
+  createdAt DateTime     @default(now())
+
+  @@index([batchId, position])
+}
+
+model BatchCostItem {
+  id         String         @id @default(cuid())
+  batchId    String
+  batch      GrowOutBatch   @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  category   CostCategory
+  label      String
+  amount     Int // VND
+  allocation CostAllocation
+  note       String?
+
+  @@index([batchId, category])
+}
+
+model BatchUpdate {
+  id             String       @id @default(cuid())
+  batchId        String
+  batch          GrowOutBatch @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  stage          BatchStage
+  averageWeightG Int?
+  countAlive     Int?
+  note           String?
+  createdById    String
+  createdBy      User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdAt      DateTime     @default(now())
+
+  photos BatchUpdatePhoto[]
+
+  @@index([batchId, createdAt])
+}
+
+model BatchUpdatePhoto {
+  id            String      @id @default(cuid())
+  batchUpdateId String
+  batchUpdate   BatchUpdate @relation(fields: [batchUpdateId], references: [id], onDelete: Cascade)
+  url           String
+}
+
+enum SponsorshipStatus {
+  pending_payment
+  funded
+  growing
+  ready_for_delivery
+  delivered
+  settled
+  cancelled
+  refunded
+}
+
+model Sponsorship {
+  id String @id @default(cuid())
+
+  batchId   String
+  batch     GrowOutBatch @relation(fields: [batchId], references: [id], onDelete: Restrict)
+  sponsorId String
+  sponsor   User         @relation(fields: [sponsorId], references: [id], onDelete: Restrict)
+
+  shares        Int
+  packageAmount Int
+  deliveryFee   Int               @default(0)
+  totalAmount   Int
+  status        SponsorshipStatus @default(pending_payment)
+
+  // Delivery details captured at reservation.
+  recipientName  String
+  phone          String
+  address        String
+  city           String?
+  province       String?
+  deliveryMethod String?
+
+  termsSnapshot Json // immutable copy of batch terms at reservation
+
+  paidAt      DateTime?
+  growingAt   DateTime?
+  readyAt     DateTime?
+  deliveredAt DateTime?
+  settledAt   DateTime?
+  cancelledAt DateTime?
+  refundedAt  DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  escrowReleases EscrowRelease[]
+  adjustments    Adjustment[]
+  payments       Payment[]
+
+  @@index([batchId, status])
+  @@index([sponsorId, createdAt])
+}
+
+enum EscrowMilestone {
+  stocking
+  mid_growth
+  pre_harvest
+  harvest
+}
+
+enum EscrowState {
+  held
+  released
+  reversed
+}
+
+model EscrowRelease {
+  id            String          @id @default(cuid())
+  sponsorshipId String
+  sponsorship   Sponsorship     @relation(fields: [sponsorshipId], references: [id], onDelete: Cascade)
+  milestone     EscrowMilestone
+  amount        Int
+  state         EscrowState     @default(held)
+  releasedAt    DateTime?
+  createdAt     DateTime        @default(now())
+
+  @@unique([sponsorshipId, milestone])
+  @@index([state])
+}
+
+enum HarvestStatus {
+  draft
+  published
+}
+
+model Harvest {
+  id               String        @id @default(cuid())
+  batchId          String        @unique
+  batch            GrowOutBatch  @relation(fields: [batchId], references: [id], onDelete: Cascade)
+  harvestedAt      DateTime
+  actualCount      Int?
+  actualWeightG    Int?
+  yieldPerShare    String?
+  mortalityRateBps Int? // basis points, e.g. 350 = 3.5%
+  status           HarvestStatus @default(draft)
+  publishedAt      DateTime?
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+}
+
+enum AdjustmentKind {
+  refund
+  shortfall_refund
+  extra_charge
+  escrow_reversal
+}
+
+enum AdjustmentStatus {
+  pending
+  applied
+}
+
+model Adjustment {
+  id            String           @id @default(cuid())
+  sponsorshipId String
+  sponsorship   Sponsorship      @relation(fields: [sponsorshipId], references: [id], onDelete: Cascade)
+  kind          AdjustmentKind
+  amount        Int
+  reason        String
+  status        AdjustmentStatus @default(pending)
+  createdAt     DateTime         @default(now())
+  appliedAt     DateTime?
+
+  @@index([sponsorshipId, status])
+}
+
+// ---------------------------------------------------------------------------
+// Farm verification (§11.11)
+// ---------------------------------------------------------------------------
+
+enum VerificationLevel {
+  none
+  registered
+  inspected
+}
+
+enum VerificationStatus {
+  pending
+  approved
+  rejected
+  revoked
+}
+
+model FarmVerification {
+  id       String @id @default(cuid())
+  sellerId String @unique
+  seller   User   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+
+  level       VerificationLevel  @default(none)
+  status      VerificationStatus @default(pending)
+  inspectedAt DateTime?
+  inspector   String?
+  notes       String?
+  validUntil  DateTime?
+
+  submittedAt DateTime?
+  reviewedAt  DateTime?
+  reviewedBy  String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  documents VerificationDocument[]
+}
+
+model VerificationDocument {
+  id             String           @id @default(cuid())
+  verificationId String
+  verification   FarmVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
+  type           String
+  url            String
+  uploadedAt     DateTime         @default(now())
+
+  @@index([verificationId])
+}

@@ -1,0 +1,8 @@
+.lang-switch { display: inline-flex; align-items: center; gap: 2px; padding: 3px; border-radius: 10px; background: #eaf0f3; border: 1px solid #dce4eb; }
+.lang-switch button { min-width: 38px; height: 30px; padding: 0 10px; border: 0; border-radius: 7px; background: transparent; color: #5b707c; font: 800 12px/1 inherit; letter-spacing: .04em; cursor: pointer; transition: background .18s, color .18s, box-shadow .18s; }
+.lang-switch button:hover { color: #087f79; }
+.lang-switch button[aria-pressed="true"] { background: #fff; color: #087f79; box-shadow: 0 1px 4px #07203026; }
+.lang-switch button:focus-visible { outline: 2px solid #0866a6; outline-offset: 1px; }
+.lang-dark { background: #123149; border-color: #254559; }
+.lang-dark button { color: #9fc0cf; }
+.lang-dark button[aria-pressed="true"] { background: #fff; color: #087f79; }
