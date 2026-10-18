@@ -46,23 +46,62 @@
 
 ## 2. Nhật ký theo ngày
 
-### Ngày 1 — 16/10/2026: Khởi động, hoàn thiện frontend và chốt hợp đồng dữ liệu
+### Ngày 1 — 12/10/2026: Khởi động, nghiên cứu và chốt phạm vi
 
-- Khởi tạo dự án FishFarm, thống nhất phạm vi ba phần: landing page, chợ cá và tài trợ lứa cá.
-- Xác định mô hình kinh doanh: marketplace mua bán trực tiếp, pre-order với cọc 25%, và gói tài trợ trọn đời cá theo share hoặc toàn bộ lứa.
-- Frontend hoàn thiện và được bàn giao dưới dạng SPA React 19 + Vite 8 + Tailwind CSS v4, route lazy-load, điều hướng hash.
-- **Landing page:** hero, tìm kiếm chợ cá, danh mục, tin nổi bật, thống kê, khối uy tín/quy trình, cảm nhận cộng đồng, blog và đăng ký nhận tin.
-- **Xác thực:** đăng nhập, đăng ký Buyer/Seller, xác minh email, quên/đặt lại mật khẩu, màn hình hết phiên, tài khoản demo.
-- **Buyer:** duyệt chợ với bộ lọc, chi tiết tin, yêu thích, giỏ hàng, thanh toán mô phỏng, xác nhận đơn, theo dõi đơn, giao hàng, đánh giá, tranh chấp, tin nhắn, thông báo.
-- **Seller Center:** dashboard KPI, bảng tin theo trạng thái, wizard 6 bước (Thông tin cơ bản → Chi tiết cá → Giá → Hình ảnh → Vị trí → Xem trước), xem trước như Buyer, gửi duyệt/gửi lại/rút/tạm ngưng/mở lại/xóa, nhận phản hồi từ Admin; các mục đơn hàng, khách hàng, tin nhắn, analytics, đánh giá là placeholder.
-- **Admin Console:** dashboard KPI, hàng chờ kiểm duyệt theo tab, duyệt/yêu cầu sửa/từ chối/gỡ tin, quản lý người dùng (tìm kiếm, tạm khóa/mở khóa), nhật ký hoạt động, bảng ma trận phân quyền.
-- **Tài khoản:** sửa hồ sơ, đổi mật khẩu, tùy chọn thông báo, trung tâm thông báo, lịch sử hoạt động.
-- **Hành vi dùng chung:** song ngữ Anh/Việt, tự hết phiên sau 15 phút không hoạt động kèm cảnh báo, dữ liệu demo gồm 7 tài khoản và các tin đăng mẫu.
-- Rà soát `frontend/src/store.ts` để rút ra hợp đồng dữ liệu backend: User, Listing + draft, Notification, Activity, Session.
-- Xác định các thực thể frontend chưa có nhưng backend cần: Order/Payment, Cart, Review, Message, Favorite, Dispute, Upload, seller Customers/Analytics và toàn bộ miền batch sponsorship.
-- Xác nhận frontend chưa có lời gọi API thật, chưa có UI cho batch sponsorship hoặc pre-order/đặt cọc.
+- Kickoff dự án, thống nhất mục tiêu: xây dựng sàn thủy sản cho thị trường Việt Nam với ba phần landing page, chợ cá và tài trợ lứa cá.
+- Phân tích vấn đề của thị trường: người mua thiếu thông tin về nguồn gốc/chất lượng và giá; người bán nhỏ khó tiếp cận khách hàng; giao dịch thiếu cơ chế theo dõi và xử lý tranh chấp.
+- Xác định ba nhóm người dùng **Buyer / Seller / Admin** và hành trình chính của từng nhóm.
+- Chốt mô hình sản phẩm:
+  - Marketplace mua bán trực tiếp, có kiểm duyệt tin đăng.
+  - **Pre-order** với cọc 25%, thanh toán phần còn lại trong 7 ngày kể từ khi người bán báo cá sẵn sàng; quá hạn thì hủy và hoàn cọc.
+  - **Tài trợ lứa cá** theo share hoặc trọn gói, có escrow và cập nhật tiến độ nuôi.
+- Chốt các nguyên tắc kỹ thuật sẽ áp dụng xuyên suốt:
+  - Tiền là số nguyên VND, không dùng số thực.
+  - Chỉ Buyer được tạo đơn hàng.
+  - Sửa tin đang bán phải đưa tin về trạng thái chờ duyệt.
+  - Thông báo và lỗi dùng message key i18n, không hard-code chuỗi.
+- Phác thảo phạm vi MVP và chia milestone từ M1 đến M11 (marketplace trước, batch sponsorship sau).
 
-### Ngày 2 — 17/10/2026: Chốt yêu cầu v1.0 và hoàn thành M1
+### Ngày 2 — 13/10/2026: Thiết kế luồng người dùng và design system
+
+- Vẽ luồng chính cho landing page, đăng ký/đăng nhập, hành trình mua hàng, đăng bán và kiểm duyệt.
+- Xác định kiến trúc thông tin và hệ thống route bằng hash: `home`, `login`, `marketplace`, `seller`, `admin`, `account`, `expired`, `notfound`.
+- Xây dựng design system dùng chung: bảng màu, typography, khoảng cách, nút, form, card, badge trạng thái và các component UI.
+- Dựng prototype trên Figma Make cho các màn hình chính: landing page, chợ cá, dashboard Seller và hàng chờ kiểm duyệt của Admin.
+- Thiết kế giao diện song ngữ Anh/Việt, ưu tiên desktop và kiểm tra khả năng hiển thị trên màn hình nhỏ.
+- Chốt cấu trúc điều hướng và các trạng thái rỗng/lỗi/đang tải để frontend và backend dùng cùng một mô hình.
+
+### Ngày 3 — 14/10/2026: Frontend nền tảng
+
+- Khởi tạo ứng dụng SPA với React 19, Vite 8, TypeScript và Tailwind CSS v4; route lazy-load để giảm thời gian tải ban đầu.
+- Hoàn thiện **landing page**: hero, tìm kiếm chợ cá, danh mục, tin nổi bật, thống kê, khối uy tín/quy trình, cảm nhận cộng đồng, blog và đăng ký nhận tin.
+- Xây dựng **luồng xác thực**: đăng nhập, đăng ký Buyer/Seller, xác minh email, quên/đặt lại mật khẩu, màn hình hết phiên và tài khoản demo.
+- Thêm session phía client với thời gian sống 15 phút, cảnh báo trước khi hết phiên và tự đăng xuất khi không hoạt động.
+- Hoàn thiện các thành phần dùng chung: header, footer, modal, toast, form validation và i18n Anh/Việt.
+- Tạo lớp dữ liệu mô phỏng bằng localStorage, có độ trễ và lỗi mạng giả lập để kiểm tra trạng thái tải/thất bại.
+
+### Ngày 4 — 15/10/2026: Frontend nghiệp vụ Buyer, Seller, Admin
+
+- **Buyer:** duyệt chợ với bộ lọc, xem chi tiết tin, yêu thích, giỏ hàng, thanh toán mô phỏng, xác nhận đơn, theo dõi đơn, giao hàng, đánh giá, tranh chấp, tin nhắn và thông báo.
+- **Seller Center:** dashboard KPI, bảng tin theo trạng thái, wizard đăng bán 6 bước (thông tin cơ bản → chi tiết cá → giá → hình ảnh → vị trí → xem trước), xem trước như Buyer.
+- Hoàn thiện vòng đời tin đăng phía Seller: gửi duyệt, gửi lại, rút, tạm ngưng, mở lại, xóa và nhận phản hồi từ Admin.
+- **Admin Console:** dashboard KPI, hàng chờ kiểm duyệt theo tab, duyệt/yêu cầu sửa/từ chối/gỡ tin, quản lý người dùng, nhật ký hoạt động và bảng ma trận phân quyền.
+- **Tài khoản:** sửa hồ sơ, đổi mật khẩu, tùy chọn thông báo, trung tâm thông báo và lịch sử hoạt động.
+- Tạo dữ liệu demo gồm 7 tài khoản (có tài khoản bị khóa) và các tin đăng mẫu ở nhiều trạng thái.
+- Kiểm tra chéo các luồng chính, sửa lỗi hiển thị và thống nhất hành vi giữa ba vai trò.
+
+### Ngày 5 — 16/10/2026: Bàn giao frontend, chốt hợp đồng dữ liệu và kiến trúc backend
+
+- Rà soát toàn bộ frontend, sửa các lỗi còn lại và bàn giao bản prototype chạy được.
+- Đọc `frontend/src/store.ts` để rút ra hợp đồng dữ liệu cho backend: **User, Listing + Draft, Notification, Activity, Session**.
+- Lập danh sách thực thể frontend chưa có nhưng backend cần: Order/Payment, Cart, Review, Message, Favorite, Dispute, Upload, seller Customers/Analytics và toàn bộ miền batch sponsorship.
+- Xác nhận frontend chưa có lời gọi API thật; toàn bộ dữ liệu đang nằm trong localStorage.
+- Chốt kiến trúc backend: NestJS 12 (ESM), Prisma, PostgreSQL 17, REST + Swagger, prefix `/v1`, cổng 4000 để tránh xung đột với PlotFarm.
+- Chốt mô hình xác thực: access token ngắn hạn trong bộ nhớ, refresh token httpOnly cookie, session lưu hash và idle timeout phía server.
+- Chốt hợp đồng lỗi thống nhất và cơ chế phân quyền theo permission key.
+- Soạn bản nháp yêu cầu backend cho marketplace và phác thảo phần batch sponsorship.
+
+### Ngày 6 — 17/10/2026: Chốt yêu cầu v1.0 và hoàn thành M1
 
 - Chốt `backend/REQUIREMENTS.md` phiên bản 1.0, bao gồm marketplace (§1–§10) và batch sponsorship (§11).
 - Khóa các quyết định: VND số nguyên, chỉ Buyer đặt hàng, sửa tin đang bán phải duyệt lại, JWT + refresh cookie httpOnly, idle timeout phía server, i18n message key.
@@ -73,7 +112,7 @@
 - Cấu hình CORS cho các cổng Vite của frontend (8443 và 5173).
 - Xử lý các ràng buộc công cụ: ghim Prisma 7.10.1, thêm driver adapter `@prisma/adapter-pg`, cấu hình phê duyệt build cho pnpm 12.
 
-### Ngày 3 — 18/10/2026: Hoàn thành M2, kiểm thử và bàn giao
+### Ngày 7 — 18/10/2026: Hoàn thành M2, kiểm thử và bàn giao
 
 - **M2 — xác thực và người dùng:**
   - Đăng ký, đăng nhập, refresh, đăng xuất.
