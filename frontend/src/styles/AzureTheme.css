@@ -1,0 +1,100 @@
+/* Shared brand layer: every role uses Dark Azure #003152 + Soft Blue #ADDEF1.
+   Imported by the single SiteHeader so it is present on every route. */
+:root,
+html body .sl-app,
+html body .buyer-app,
+html body .auth-app,
+html body .workspace-frame {
+  --brand-dark: #003152;
+  --brand-soft: #addef1;
+  --primary: #003152;
+  --foreground: #003152;
+  --navy: #003152;
+  --ocean: #003152;
+  --teal: #003152;
+  --teal-dark: #164e70;
+  --teal-soft: #eaf6fc;
+  --ice: #f6fbfe;
+  --line: #d4e9f3;
+  --text: #003152;
+  --muted: #46667b;
+  --buy-blue: #003152;
+  --buy-teal: #003152;
+  --color-primary: #003152;
+  --color-primary-foreground: #fff;
+  --color-secondary: #addef1;
+  --color-accent: #eaf6fc;
+  --color-accent-foreground: #003152;
+  --color-ring: #003152;
+  --color-market-navy: #003152;
+  --color-market-ocean: #003152;
+}
+html body .ribbon-header {
+  background: #f6fbfeed;
+}
+html body .ribbon-header .ds-header-in {
+  box-shadow:
+    0 6px 0 #addef1,
+    0 12px 30px #0031520c;
+}
+html body .ribbon-header .ds-brand {
+  color: #003152;
+}
+html body .ribbon-header .ds-brand > span {
+  background: #003152;
+  color: white;
+}
+html body .ribbon-header .ds-brand::after {
+  background: linear-gradient(135deg, #eaf6fc, #addef1);
+}
+html body .ribbon-header .nav-indicator {
+  background: #addef1;
+  border-color: #003152;
+  z-index: 0;
+}
+html body .ribbon-header .ds-nav > a,
+html body .ribbon-header .nav-more {
+  position: relative;
+  z-index: 1;
+}
+html body .ribbon-header .ds-nav a.on,
+html body .ribbon-header .nav-more {
+  color: #003152;
+}
+html body .ribbon-header .ds-nav .farm-nav-cta,
+html body .ribbon-header .sl-btn-primary {
+  background: #003152;
+  color: #fff;
+  box-shadow: 0 4px 10px #00315226;
+}
+html body .ribbon-header .ds-nav .farm-nav-cta:hover,
+html body .ribbon-header .sl-btn-primary:hover {
+  background: #164e70;
+  color: #fff;
+}
+html body .workspace-sidebar {
+  background: #003152;
+}
+html body .workspace-indicator {
+  background: #addef1;
+  box-shadow: inset 3px 0 #fff;
+}
+html body .workspace-nav a {
+  color: #addef1;
+}
+html body .workspace-nav a[aria-current] {
+  color: #003152;
+}
+html body .workspace-toggle {
+  color: #003152;
+  border-color: #d4e9f3;
+}
+html body .workspace-toggle[aria-expanded="true"] {
+  background: #addef1;
+  color: #003152;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ribbon-inline-menu {
+    animation: none !important;
+  }
+}

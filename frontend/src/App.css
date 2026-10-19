@@ -1,0 +1,29 @@
+@reference "@/styles/global.css";
+/* Styles for App.tsx */
+.app-view-1 {
+  @apply grid min-h-screen place-items-center bg-white text-market-navy;
+}
+.app-layout-2 {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 90;
+  max-width: 340px;
+}
+.app-view-3 {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  z-index: 90;
+  max-width: 340px;
+}
+.app-layout-4 {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}
+.app-view-5 {
+  margin: 4px 0 12px;
+  font-size: 13px;
+  color: var(--muted);
+}

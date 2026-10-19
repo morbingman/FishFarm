@@ -1,0 +1,63 @@
+@reference "@/styles/global.css";
+/* Styles for OrderList.tsx */
+.order-list-layout-1 {
+  overflow-x: auto;
+}
+.order-list-view-2 {
+  overflow-x: auto;
+}
+.order-list-layout-3 {
+  opacity: 0.6;
+}
+.order-list-view-4 {
+  opacity: 0.6;
+}
+.order-list-layout-5 {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+.order-list-view-6 {
+  padding: 20px;
+  display: grid;
+  gap: 14px;
+}
+.order-list-layout-7 {
+  height: 22px;
+}
+.order-list-view-8 {
+  height: 22px;
+}
+.order-list-layout-9 {
+  min-width: 900px;
+}
+.order-list-view-10 {
+  min-width: 900px;
+}
+.order-list-layout-11 {
+  position: absolute;
+  left: var(--order-list-layout-11-left);
+}
+.order-list-view-12 {
+  @apply sr-only;
+  position: absolute;
+  left: var(--order-list-layout-11-left);
+}
+.order-list-layout-13 {
+  color: var(--navy);
+}
+.order-list-view-14 {
+  color: var(--navy);
+}
+.order-list-layout-15 {
+  color: var(--muted);
+}
+.order-list-view-16 {
+  color: var(--muted);
+}
+.order-list-layout-17 {
+  margin-top: 12px;
+}
+.order-list-view-18 {
+  margin-top: 12px;
+}

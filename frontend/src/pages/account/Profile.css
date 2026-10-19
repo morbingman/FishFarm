@@ -1,0 +1,22 @@
+@reference "@/styles/global.css";
+/* Styles for Profile.tsx */
+.profile-layout-1 {
+  text-align: left;
+}
+.profile-view-2 {
+  text-align: left;
+}
+.profile-layout-3 {
+  text-align: left;
+}
+.profile-view-4 {
+  text-align: left;
+}
+.profile-layout-5 {
+  display: flex;
+  gap: 10px;
+}
+.profile-view-6 {
+  display: flex;
+  gap: 10px;
+}

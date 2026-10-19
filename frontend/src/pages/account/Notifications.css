@@ -1,0 +1,46 @@
+@reference "@/styles/global.css";
+/* Styles for Notifications.tsx */
+.notifications-layout-1 {
+  display: flex;
+  align-items: stretch;
+}
+.notifications-view-2 {
+  display: flex;
+  align-items: stretch;
+}
+.notifications-layout-3 {
+  flex: 1;
+}
+.notifications-view-4 {
+  flex: 1;
+}
+.notifications-layout-5 {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid #eaf6fc;
+}
+.notifications-view-6 {
+  display: flex;
+  gap: 4px;
+  align-items: center;
+  padding: 0 14px;
+  border-bottom: 1px solid #eaf6fc;
+}
+.notifications-layout-7 {
+  width: 34px;
+  height: 34px;
+}
+.notifications-view-8 {
+  width: 34px;
+  height: 34px;
+}
+.notifications-layout-9 {
+  width: 34px;
+  height: 34px;
+}
+.notifications-view-10 {
+  width: 34px;
+  height: 34px;
+}

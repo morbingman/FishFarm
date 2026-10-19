@@ -1,0 +1,28 @@
+@reference "@/styles/global.css";
+/* Styles for FishCard.tsx */
+.fish-card-layout-1 {
+  color: inherit;
+  text-decoration: none;
+}
+.fish-card-view-2 {
+  color: inherit;
+  text-decoration: none;
+}
+.fish-card-layout-3 {
+  text-align: right;
+}
+.fish-card-view-4 {
+  text-align: right;
+}
+.fish-card-layout-5 {
+  color: var(--navy);
+}
+.fish-card-view-6 {
+  color: var(--navy);
+}
+.fish-card-layout-7 {
+  width: var(--fish-card-layout-7-width);
+}
+.fish-card-view-8 {
+  width: var(--fish-card-layout-7-width);
+}

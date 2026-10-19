@@ -1,0 +1,42 @@
+@reference "@/styles/global.css";
+/* Styles for Review.tsx */
+.review-view-1 {
+}
+.review-layout-2 {
+  color: var(--danger);
+  margin-bottom: 10px;
+}
+.review-view-3 {
+  color: var(--danger);
+  margin-bottom: 10px;
+}
+.review-layout-4 {
+  margin-top: 14px;
+}
+.review-view-5 {
+  margin-top: 14px;
+}
+.review-layout-6 {
+  margin-bottom: 12px;
+}
+.review-view-7 {
+  margin-bottom: 12px;
+}
+.review-layout-8 {
+  margin-top: 12px;
+}
+.review-view-9 {
+  margin-top: 12px;
+}
+.review-layout-10 {
+  margin-top: 14px;
+}
+.review-view-11 {
+  margin-top: 14px;
+}
+.review-layout-12 {
+  margin-top: 20px;
+}
+.review-view-13 {
+  margin-top: 20px;
+}

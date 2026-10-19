@@ -1,0 +1,187 @@
+@import url("https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap");
+@import "tailwindcss";
+@plugin "tailwindcss-animate";
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--background);
+  --color-popover-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: #ffffff;
+  --color-secondary: #eaf6fc;
+  --color-secondary-foreground: #003152;
+  --color-muted: #f6fbfe;
+  --color-muted-foreground: #46667b;
+  --color-accent: #eaf6fc;
+  --color-accent-foreground: #003152;
+  --color-destructive: #d92d20;
+  --color-destructive-foreground: #ffffff;
+  --color-border: #d4e9f3;
+  --color-input: #d4e9f3;
+  --color-ring: #003152;
+}
+:root {
+  --brand-dark: #003152;
+  --brand-soft: #addef1;
+  --background: #fff;
+  --foreground: #003152;
+  --card: #fff;
+  --primary: #003152;
+}
+
+@theme {
+  --color-market-navy: #003152;
+  --color-market-ocean: #003152;
+  --color-market-ice: #f6fbfe;
+  --color-market-line: #d4e9f3;
+  --color-market-muted: #97bbcd;
+}
+
+:root {
+  font-family: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  color: #003152;
+  background: #ffffff;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  background: #ffffff;
+}
+
+button,
+a,
+select,
+input {
+  font: inherit;
+}
+
+button,
+a {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::selection {
+  color: #ffffff;
+  background: #003152;
+}
+
+.market-header button,
+.market-header a,
+.market-listing button {
+  border-radius: var(--radius-md);
+}
+
+.market-hero {
+  background: var(--color-market-navy);
+}
+
+.market-hero .hero-copy h1,
+.market-hero .hero-copy h1 span {
+  color: var(--color-white);
+}
+
+.market-hero .hero-copy > p,
+.market-hero .hero-copy > div:last-child > span {
+  color: var(--color-market-muted);
+}
+
+.market-hero .hero-copy > span {
+  color: var(--color-white);
+  background: transparent;
+  border-color: color-mix(in srgb, var(--color-white) 25%, transparent);
+  border-radius: var(--radius-sm);
+  box-shadow: none;
+}
+
+.market-hero .hero-copy > div:last-child {
+  border-color: color-mix(in srgb, var(--color-white) 18%, transparent);
+}
+
+.market-hero .hero-copy button,
+.market-hero form,
+.market-hero form label,
+.market-hero form button {
+  border-radius: var(--radius-md);
+}
+
+.market-hero .hero-copy button:first-child,
+.market-hero form button {
+  background: var(--color-market-ocean);
+}
+
+.market-hero .hero-copy button:first-child:hover,
+.market-hero form button:hover {
+  background: color-mix(
+    in srgb,
+    var(--color-market-ocean) 85%,
+    var(--color-white)
+  );
+}
+
+.market-listing {
+  border-radius: var(--radius-md);
+  border-color: var(--color-market-line);
+}
+
+.market-listing > div:first-child {
+  background: var(--color-market-ice);
+}
+
+.market-listing > div:last-child > p:first-of-type {
+  margin-top: calc(var(--spacing) * 4);
+  color: var(--color-market-ocean);
+}
+
+.market-listing > div:last-child > span:first-child {
+  border-radius: var(--radius-sm);
+  background: var(--color-market-ice);
+  color: var(--color-market-ocean);
+}
+
+.market-listing > div:last-child > button {
+  border-color: var(--color-market-navy);
+  color: var(--color-market-navy);
+}
+
+.market-listing > div:last-child > button:hover {
+  background: var(--color-market-navy);
+  color: var(--color-white);
+}
+
+:where(button, a, input, select):focus-visible {
+  outline: solid var(--color-market-ocean);
+  outline-offset: calc(var(--spacing) * 1);
+}
+
+section[id] {
+  scroll-margin-top: calc(var(--spacing) * 24);
+}
+
+@media (min-width: 1280px) {
+  .market-hero > div:first-child > div:first-child {
+    padding-left: max(
+      calc(var(--spacing) * 10),
+      calc((min(100vw, 1440px) - 1220px) / 2)
+    );
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+  }
+}

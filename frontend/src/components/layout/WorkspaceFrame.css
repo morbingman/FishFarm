@@ -1,0 +1,191 @@
+.workspace-frame {
+  --workspace-width: 72px;
+  --workspace-header: 104px;
+  min-height: 100dvh;
+  background: #f6fbfe;
+}
+.workspace-frame.workspace-expanded {
+  --workspace-width: 248px;
+}
+.workspace-body {
+  display: flex;
+  align-items: stretch;
+}
+.workspace-content {
+  flex: 1;
+  min-width: 0;
+}
+.workspace-sidebar {
+  position: sticky;
+  border-radius: 0 16px 16px 0;
+  top: var(--workspace-header);
+  flex: 0 0 var(--workspace-width);
+  width: var(--workspace-width);
+  height: calc(100dvh - var(--workspace-header));
+  padding: 18px 10px;
+  box-sizing: border-box;
+  overflow-x: hidden;
+  overflow-y: auto;
+  background: #003152;
+  transition:
+    width 0.32s ease,
+    flex-basis 0.32s ease;
+  z-index: 45;
+}
+.workspace-nav {
+  position: relative;
+  display: grid;
+  gap: 5px;
+  font-family: var(--font);
+}
+.workspace-nav a {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 45px;
+  padding: 0 15px;
+  box-sizing: border-box;
+  text-decoration: none;
+  color: #97bbcd;
+  border-radius: 12px;
+  white-space: nowrap;
+  transition:
+    color 0.2s,
+    background 0.2s;
+}
+.workspace-nav a svg {
+  flex-shrink: 0;
+}
+.workspace-nav a:hover {
+  color: white;
+  background: #ffffff0a;
+}
+.workspace-nav a[aria-current] {
+  color: #fff;
+}
+.workspace-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  background: #003152;
+  box-shadow: inset 3px 0 #addef1;
+  border-radius: 12px;
+  pointer-events: none;
+  transition:
+    transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.32s,
+    height 0.32s,
+    opacity 0.2s;
+}
+.workspace-label {
+  opacity: 0;
+  transition: opacity 0.15s;
+  font-size: 13px;
+  font-weight: 600;
+}
+.workspace-expanded .workspace-label {
+  opacity: 1;
+  transition-delay: 0.1s;
+}
+.workspace-toggle,
+.section-menu-toggle {
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  width: 39px;
+  height: 39px;
+  border: 1px solid #d4e9f3;
+  border-radius: 12px;
+  background: #fff;
+  color: #46667b;
+  cursor: pointer;
+  transition:
+    background 0.2s,
+    color 0.2s;
+}
+.workspace-toggle[aria-expanded="true"] {
+  background: #eaf6fc;
+  color: #003152;
+}
+.section-menu-toggle,
+.workspace-scrim {
+  display: none;
+}
+.workspace-content .pt-fullpage {
+  min-height: calc(100dvh - var(--workspace-header));
+}
+.workspace-content .auth-main {
+  min-height: calc(100dvh - var(--workspace-header));
+}
+html {
+  scroll-padding-top: 0;
+}
+.home-view-1 section,
+.home-view-1 footer {
+  scroll-margin-top: 124px;
+}
+@media (max-width: 760px) {
+  .workspace-frame {
+    --workspace-header: 88px;
+  }
+  .workspace-sidebar {
+    display: none;
+  }
+  .workspace-expanded .workspace-sidebar {
+    display: block;
+    position: fixed;
+    top: var(--workspace-header);
+    bottom: 0;
+    left: 0;
+    width: min(280px, 84vw);
+    height: calc(100dvh - var(--workspace-header));
+    z-index: 80;
+    box-shadow: 10px 0 35px #00315224;
+    animation: workspace-open 0.25s ease;
+  }
+  .workspace-scrim {
+    display: block;
+    position: fixed;
+    inset: var(--workspace-header) 0 0;
+    background: #00315266;
+    border: 0;
+    z-index: 75;
+  }
+
+  .home-view-1 section,
+  .home-view-1 footer {
+    scroll-margin-top: 108px;
+  }
+}
+@keyframes workspace-open {
+  from {
+    transform: translateX(-100%);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .workspace-frame *,
+  .workspace-frame *::before,
+  .workspace-frame *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+.workspace-indicator {
+  will-change: transform;
+  transition:
+    transform 0.44s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.32s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.32s,
+    opacity 0.18s;
+}
+.workspace-sidebar {
+  transition: flex-basis 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.workspace-indicator { background: #addef1; box-shadow: inset 3px 0 #fff; }
+.workspace-nav a[aria-current] { color: #003152; }
+.workspace-nav a { color: #addef1; }
