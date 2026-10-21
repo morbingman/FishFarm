@@ -1,15 +1,24 @@
 import 'reflect-metadata';
+import { mkdirSync } from 'node:fs';
 import { ValidationPipe } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { NestFactory } from '@nestjs/core';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import cookieParser from 'cookie-parser';
+import type { Request, Response } from 'express';
 import { AppModule } from './app.module.js';
 import { REFRESH_COOKIE } from './auth/auth.controller.js';
 import { ApiExceptionFilter } from './common/filters/api-exception.filter.js';
+import {
+  PRIVATE_UPLOAD_DIRECTORY,
+  resolvePrivateUploadDir,
+  resolveUploadDir,
+  UPLOAD_URL_PREFIX,
+} from './uploads/upload.config.js';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create<NestExpressApplication>(AppModule);
   const config = app.get(ConfigService);
 
   const port = config.get<number>('PORT', 4000);
@@ -19,6 +28,14 @@ async function bootstrap() {
     .filter(Boolean);
 
   app.use(cookieParser());
+  const uploadDir = resolveUploadDir(config.get<string>('UPLOAD_DIR'));
+  mkdirSync(uploadDir, { recursive: true });
+  mkdirSync(resolvePrivateUploadDir(config.get<string>('UPLOAD_DIR')), { recursive: true });
+  // Private documents live under /uploads/private and are never served publicly.
+  app.use(`${UPLOAD_URL_PREFIX}/${PRIVATE_UPLOAD_DIRECTORY}`, (_req: Request, res: Response) =>
+    res.sendStatus(404),
+  );
+  app.useStaticAssets(uploadDir, { prefix: UPLOAD_URL_PREFIX });
   app.setGlobalPrefix('v1', { exclude: ['health'] });
   app.useGlobalPipes(
     new ValidationPipe({

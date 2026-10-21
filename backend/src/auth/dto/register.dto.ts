@@ -2,7 +2,6 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
 import {
   IsEmail,
-  IsIn,
   IsOptional,
   IsString,
   Matches,
@@ -32,10 +31,6 @@ export class RegisterDto {
   @MaxLength(80, { message: 'validation.nameLength' })
   name!: string;
 
-  @ApiProperty({ enum: ['Buyer', 'Seller'] })
-  @IsIn(['Buyer', 'Seller'], { message: 'validation.role' })
-  role!: 'Buyer' | 'Seller';
-
   @ApiPropertyOptional({ example: '+84 90 123 4567' })
   @IsOptional()
   @IsString()
@@ -47,10 +42,4 @@ export class RegisterDto {
   @IsString()
   @MaxLength(120, { message: 'validation.tooLong' })
   location?: string;
-
-  @ApiPropertyOptional({ example: 'Golden Koi Farm', description: 'Sellers only.' })
-  @IsOptional()
-  @IsString()
-  @MaxLength(80, { message: 'validation.tooLong' })
-  store?: string;
 }

@@ -35,18 +35,14 @@ describe('Auth and users (e2e)', () => {
     await app.close();
   });
 
-  async function register(
-    overrides: Partial<{ email: string; role: 'Buyer' | 'Seller'; store: string }> = {},
-  ) {
-    const email = overrides.email ?? uniqueEmail('buyer');
+  async function register(overrides: Partial<{ email: string; name: string }> = {}) {
+    const email = overrides.email ?? uniqueEmail('user');
     const response = await request(app.getHttpServer())
       .post('/v1/auth/register')
       .send({
         email,
         password: PASSWORD,
-        name: 'E2E Buyer',
-        role: overrides.role ?? 'Buyer',
-        ...(overrides.store ? { store: overrides.store } : {}),
+        name: overrides.name ?? 'E2E User',
       });
     if (response.status === 201) createdEmails.push(email);
     return { email, response };
@@ -66,7 +62,7 @@ describe('Auth and users (e2e)', () => {
       firstCookie = refreshCookieValue(response);
     });
 
-    it('registers a buyer and starts a session', async () => {
+    it('registers a user and starts a session', async () => {
       expect(accessToken).toBeTruthy();
       expect(firstCookie).toMatch(new RegExp(`^${REFRESH_COOKIE}=`));
 
@@ -77,7 +73,7 @@ describe('Auth and users (e2e)', () => {
 
       expect(me.body).toMatchObject({
         email,
-        role: 'Buyer',
+        role: 'User',
         status: 'active',
         prefs: { status: true, system: true, reminders: true },
       });
@@ -87,31 +83,33 @@ describe('Auth and users (e2e)', () => {
     it('rejects a duplicate email', async () => {
       const response = await request(app.getHttpServer())
         .post('/v1/auth/register')
-        .send({ email, password: PASSWORD, name: 'Duplicate', role: 'Buyer' })
+        .send({ email, password: PASSWORD, name: 'Duplicate' })
         .expect(409);
 
       expect(response.body).toMatchObject({ code: 'auth.emailTaken' });
     });
 
-    it('rejects a store on a buyer account', async () => {
+    it('cannot self-assign a role at registration', async () => {
       const response = await request(app.getHttpServer())
         .post('/v1/auth/register')
         .send({
-          email: uniqueEmail('store'),
+          email: uniqueEmail('privileged'),
           password: PASSWORD,
-          name: 'Store Buyer',
-          role: 'Buyer',
-          store: 'Not allowed',
+          name: 'Privileged User',
+          role: 'Admin',
         })
         .expect(400);
 
-      expect(response.body).toMatchObject({ code: 'profile.storeRequiresSeller' });
+      expect(response.body.code).toBe('validation.failed');
+      expect(response.body.details).toEqual(
+        expect.arrayContaining([expect.stringContaining('role')]),
+      );
     });
 
     it('rejects malformed registration input with i18n keys', async () => {
       const response = await request(app.getHttpServer())
         .post('/v1/auth/register')
-        .send({ email: 'not-an-email', password: 'short', name: '', role: 'Admin' })
+        .send({ email: 'not-an-email', password: 'short', name: '' })
         .expect(400);
 
       expect(response.body.code).toBe('validation.failed');
@@ -120,7 +118,6 @@ describe('Auth and users (e2e)', () => {
           'validation.email',
           'validation.passwordLength',
           'validation.nameLength',
-          'validation.role',
         ]),
       );
     });
@@ -139,14 +136,17 @@ describe('Auth and users (e2e)', () => {
       });
     });
 
-    it('rejects a store update on a buyer profile', async () => {
+    it('rejects unknown profile fields', async () => {
       const response = await request(app.getHttpServer())
         .patch('/v1/me')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ store: 'Buyer Store' })
+        .send({ store: 'Not a profile field' })
         .expect(400);
 
-      expect(response.body).toMatchObject({ code: 'profile.storeRequiresSeller' });
+      expect(response.body.code).toBe('validation.failed');
+      expect(response.body.details).toEqual(
+        expect.arrayContaining([expect.stringContaining('store')]),
+      );
     });
 
     it('partially updates notification prefs', async () => {

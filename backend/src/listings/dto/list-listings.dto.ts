@@ -1,7 +1,7 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { IsIn, IsOptional } from 'class-validator';
 
-export const SELLER_LISTING_FILTERS = [
+export const COMPANY_LISTING_FILTERS = [
   'all',
   'draft',
   'pending',
@@ -12,13 +12,13 @@ export const SELLER_LISTING_FILTERS = [
   'attention',
 ] as const;
 
-export type SellerListingFilter = (typeof SELLER_LISTING_FILTERS)[number];
+export type CompanyListingFilter = (typeof COMPANY_LISTING_FILTERS)[number];
 
-export class ListSellerListingsDto {
-  @ApiPropertyOptional({ enum: SELLER_LISTING_FILTERS, default: 'all' })
+export class ListCompanyListingsDto {
+  @ApiPropertyOptional({ enum: COMPANY_LISTING_FILTERS, default: 'all' })
   @IsOptional()
-  @IsIn(SELLER_LISTING_FILTERS)
-  status?: SellerListingFilter;
+  @IsIn(COMPANY_LISTING_FILTERS)
+  status?: CompanyListingFilter;
 }
 
 export const ADMIN_QUEUE_TABS = ['pending', 'approved', 'changes'] as const;

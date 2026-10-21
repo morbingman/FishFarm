@@ -24,7 +24,7 @@ export class AdminListingsController {
 
   @Get()
   @RequirePermissions('queue.view')
-  @ApiOperation({ summary: 'Moderation queue: pending, live approved, or sent-back listings' })
+  @ApiOperation({ summary: 'Internal review queue: pending, live approved, or sent-back listings' })
   queue(@Query() query: AdminQueueDto) {
     return this.listings.queue(query.tab);
   }
@@ -59,7 +59,7 @@ export class AdminListingsController {
   @Post(':id/request-changes')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('listing.reject')
-  @ApiOperation({ summary: 'Send a pending listing back to the seller for changes' })
+  @ApiOperation({ summary: 'Send a pending listing back for changes (internal check)' })
   requestChanges(
     @CurrentUser() admin: AuthenticatedUser,
     @Param('id') id: string,

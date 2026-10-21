@@ -42,12 +42,13 @@ The FishFarm frontend is a Vite app whose exported config uses port **8443** (`s
 | `GET /docs` | Swagger UI (OpenAPI JSON at `/docs-json`) |
 | `POST /v1/auth/*` | register, login, refresh, logout, verify-email, forgot-password, reset-password |
 | `GET/PATCH /v1/me` | Current profile; `GET/PATCH /v1/me/prefs` for notification prefs |
-| `/v1/seller/listings` | Seller CRUD plus submit/withdraw/pause/resume |
-| `/v1/admin/listings` | Moderation queue, review detail and approve/reject/request-changes/takedown |
+| `/v1/company/listings` | Company catalog CRUD, publish and submit/withdraw/pause/resume (Admin only) |
+| `/v1/admin/listings` | Internal review queue, review detail and approve/reject/request-changes/takedown |
 | `GET /v1/admin/activity` | Recent platform activity log |
 | `GET /v1/marketplace/listings` | Public marketplace search, filters, sorting and pagination |
 | `GET /v1/marketplace/listings/:id` | Public listing detail by `FM-…` code or internal id |
-| `GET /v1/marketplace/sellers/:name` | Public seller page with an approved-listing page |
+| `GET /v1/marketplace/store` | The company store profile with rating and catalog summary |
+| `POST /v1/uploads` | Multipart upload (`file` + `purpose`); private purposes stay off the public path |
 
 All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps are ISO 8601 UTC.
 
@@ -67,61 +68,89 @@ All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps
 - Errors use the i18n contract `{ statusCode, code, params, details?, path, timestamp }`, where
   `code`/`details` are message keys (e.g. `auth.invalidCredentials`, `validation.email`).
 - Capabilities are enforced with the `@RequirePermissions(...)` decorator backed by
-  `src/auth/permissions.ts` (the server-side copy of the frontend `MATRIX`). Ordering remains
-  Buyer-only.
+  `src/auth/permissions.ts`. There are exactly two roles: `User` (customer) and `Admin` (company
+  staff). Registration always creates a `User`; Admins are provisioned internally. Ordering and
+  batch sponsorship are User-only.
+
+### Roles and company scope
+
+FishFarm is operated by a single company that owns every listing, order, batch and facility. There
+are no per-user stores and no independent sellers.
+
+- `User` — browses the catalog and batches, orders, sponsors, reviews, manages their own profile.
+- `Admin` — runs the company's commercial side (catalog, inventory, orders, batches, harvest,
+  settlements) plus platform administration (users, activity, disputes, compliance).
+
+Every Admin can operate every company resource; `createdBy` on a listing or batch records which
+Admin created it for audit only. The review stages (`pending`, `changes`, `rejected`) still exist
+as an optional internal quality gate between Admins — `publish` moves a draft straight to `approved`.
 
 ### Listings
 
-- Sellers manage only their own listings. Public ids are `FM-…` codes; internal cuids are also
-  accepted by the route parameter.
-- `POST /v1/seller/listings` saves a partial draft (the six-step wizard can save at any point).
-  `POST /v1/seller/listings/{id}/submit` enforces completeness: name, species, description ≥ 20
-  chars, age, size, gender, origin, health, price, quantity, at least one image, location, region
-  and shipping.
-- Lifecycle: `draft → pending → approved | changes | rejected`; sellers can withdraw a pending
-  listing back to draft, pause/resume an approved one, and delete only draft/changes/rejected
-  listings (soft delete).
-- Editing an `approved` or `paused` listing immediately returns it to `pending` and hides it from
-  the marketplace until re-approved. Pending listings cannot be edited; withdraw first.
+- The company catalog lives at `/v1/company/listings`. Public ids are `FM-…` codes; internal cuids
+  are also accepted by the route parameter.
+- `POST /v1/company/listings` saves a partial draft (the six-step wizard can save at any point).
+  `POST /v1/company/listings/{id}/publish` validates completeness and publishes directly:
+  name, species, description ≥ 20 chars, age, size, gender, origin, health, price, quantity, at
+  least one image, location, region and shipping.
+- Lifecycle: `draft → approved` via `publish`, or `draft → pending → approved | changes | rejected`
+  when an internal check is wanted. `withdraw` returns a pending listing to draft, `pause`/`resume`
+  toggles catalog visibility, and only draft/changes/rejected listings can be deleted (soft delete).
+- Editing an approved or paused listing keeps it live; only a listing that is `pending` is locked.
 - Admin queue tabs: `pending`, `approved` (live), `changes` (changes + rejected). Review detail
   includes completeness checks. Decisions require a fixed reason plus ≥ 10 characters of feedback;
   takedown is limited to approved/paused listings and records `Policy violation`.
-- Every transition appends a `ListingHistory` row, writes an `Activity` entry, and notifies the
-  counterparty (seller ↔ admin) subject to `prefs`. Pre-order listings must have `depositPct` 20–30
-  and an `expectedReadyDate`.
+- Every transition appends a `ListingHistory` row and an `Activity` entry attributed to the acting
+  Admin. Submitting for internal review also broadcasts a notification to the `Admin` role.
+  Pre-order listings must have `depositPct` 20–30 and an `expectedReadyDate`.
 
 ### Marketplace
 
 - The three `GET /v1/marketplace/*` routes are public (`@Public()`) and expose only `approved`,
   non-deleted listings. Pending, paused, rejected and soft-deleted listings return `404`.
-- `GET /v1/marketplace/listings` filters on `q` (name, species, breed, seller, location, region),
+- `GET /v1/marketplace/listings` filters on `q` (name, species, breed, company, location, region),
   `species` (repeat the param or comma-separate), `breed`, `priceMax`, `size` (`under15` |
-  `15plus`), `location`, `sellerRating` and `available` (`true` hides sold-out listings and is the
+  `15plus`), `location`, `rating` and `available` (`true` hides sold-out listings and is the
   default). `sort` is `recommended` (default), `price_asc`, `price_desc` or `newest`; the UI labels
   for size and sort are accepted too. `page`/`pageSize` are capped at 100.
 - Items use a product projection: id (`FM-…`), name, species, breed, description, size, price,
   quantity, negotiable, age, gender, origin, health, location, region, shipping, images, a display
-  label (`pre_order` | `new` | `verified`), sale-mode fields, views and the seller summary with
-  aggregate rating/review count.
-- `sellerRating` is computed from `Review` rows; when no seller meets the threshold the response is
-  an empty page.
-- The seller route resolves an active seller by store name or owner name (case-insensitive) and
-  returns the seller profile plus a paginated list of their approved listings.
+  label (`pre_order` | `new` | `verified`), sale-mode fields, views and the company summary with the
+  company-level rating and review count.
+- `rating` is the single company rating aggregated from `Review` rows. Because one company sells
+  everything, a rating floor either matches the whole catalog or returns an empty page.
+- `GET /v1/marketplace/store` returns the company profile (about, location, contact, join date),
+  aggregate rating and a catalog summary (approved listing count and distinct species).
+
+### Uploads
+
+- `POST /v1/uploads` takes multipart fields `file` and `purpose` and is available to authenticated
+  users. Purposes are `listing_image` and `batch_update` (Admin, images only), `farm_document`
+  (Admin, images or PDF) and `dispute_attachment` (User, images or PDF).
+- Files are stored on local disk under `UPLOAD_DIR` (default `backend/uploads`, gitignored) with
+  random UUID names. The endpoint returns `{ id, url, mimeType, sizeBytes, purpose, isPrivate }`.
+- `listing_image` and `batch_update` files are served publicly from `/uploads/<file>`.
+  `farm_document` and `dispute_attachment` files are moved to `uploads/private` and that path
+  returns `404` before the static middleware, so private evidence is never publicly reachable.
+- Default limit is `UPLOAD_MAX_BYTES` (10 MB); oversized files return `413 uploads.fileTooLarge` and
+  unsupported types return `415 uploads.unsupportedType`.
+- Listing images may reference an uploaded file or an external `http(s)` URL. Uploaded URLs must
+  exist for the `listing_image` purpose; since the catalog is company-owned any Admin may attach
+  media another Admin uploaded. Non-http(s) schemes are rejected.
 
 ## Demo accounts
 
 | Email | Password | Role |
 | --- | --- | --- |
-| `buyer@fishmarket.demo` | `Buyer123` | Buyer |
-| `seller@fishmarket.demo` | `Seller123` | Seller (Golden Koi Farm) |
+| `buyer@fishmarket.demo` | `Buyer123` | User |
 | `admin@fishmarket.demo` | `Admin123` | Admin |
-| `lagoon@fishmarket.demo` | `Demo1234` | Seller |
-| `mekong@fishmarket.demo` | `Demo1234` | Seller |
-| `linh@fishmarket.demo` | `Demo1234` | Buyer |
-| `minh@fishmarket.demo` | `Demo1234` | Buyer (suspended) |
+| `ops@fishmarket.demo` | `Ops12345` | Admin |
+| `linh@fishmarket.demo` | `Demo1234` | User |
+| `minh@fishmarket.demo` | `Demo1234` | User (suspended) |
 
-Seeded data includes seven listings (one pre-order example at `FM-20761`), a live grow-out batch
-(`BATCH-1024`) and one funded sponsorship with escrow tranches.
+Seeded data includes the single company (`fishfarm`), its main facility, seven company-owned
+listings (one pre-order example at `FM-20761`), a live grow-out batch (`BATCH-1024`) and one funded
+sponsorship with escrow tranches.
 
 `pnpm db:seed` **resets demo data** and is guarded against `NODE_ENV=production` unless
 `ALLOW_DEMO_SEED=1` is set.
@@ -153,8 +182,10 @@ prisma/
 src/
   auth/                   # login/refresh/OTP, guards, permission matrix
   users/                  # /me profile and notification prefs
-  listings/               # seller CRUD, lifecycle state machine, admin moderation
-  marketplace/            # public search, listing detail and seller pages
+  company/                # the single company scope used by every Admin
+  listings/               # company catalog CRUD, lifecycle state machine, internal review
+  marketplace/            # public search, listing detail and the company store page
+  uploads/                # multipart file storage, purpose/role rules, private files
   common/                 # AppException + API exception filter
   config/                 # env validation
   health/                 # GET /health
@@ -168,7 +199,7 @@ src/
   required. Do not downgrade the CLI below 7.
 - The generated client is ignored by Git and rebuilt by `postinstall` and `prisma:generate`.
 - The schema includes both products: marketplace entities (§3) and batch sponsorship (§11).
-  Auth/users, listings and the public marketplace read endpoints are implemented; ordering and
-  batch sponsorship are next.
+  Auth/users, listings, the public marketplace and uploads are implemented; cart, checkout and
+  orders are next.
 - `pnpm test:e2e` boots the real app against the local database and cleans up the users and listings
   it creates.

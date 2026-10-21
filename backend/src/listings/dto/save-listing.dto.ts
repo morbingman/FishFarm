@@ -36,8 +36,8 @@ export class ListingImageDto {
 }
 
 /**
- * Draft content. Every field is optional so the six-step seller wizard can save
- * progress; completeness is enforced on submit, not on save.
+ * Draft content. Every field is optional so the six-step catalog wizard can save
+ * progress; completeness is enforced on publish or submit, not on save.
  */
 export class SaveListingDto {
   @ApiPropertyOptional({ example: 'Kohaku Koi, 40 cm' })

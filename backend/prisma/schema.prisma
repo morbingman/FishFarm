@@ -17,8 +17,7 @@ datasource db {
 // ---------------------------------------------------------------------------
 
 enum UserRole {
-  Buyer
-  Seller
+  User
   Admin
 }
 
@@ -32,40 +31,73 @@ model User {
   email           String     @unique
   passwordHash    String
   name            String
-  role            UserRole   @default(Buyer)
+  role            UserRole   @default(User)
   status          UserStatus @default(active)
   phone           String?
   location        String?
   joinedAt        DateTime   @default(now())
-  store           String?
   prefs           Json       @default("{\"status\":true,\"system\":true,\"reminders\":true}")
   emailVerifiedAt DateTime?
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
   sessions              Session[]
-  listings              Listing[]
+  listings              Listing[]          @relation("ListingCreator")
   listingHistory        ListingHistory[]
   notifications         Notification[]
   activities            Activity[]
   favorites             Favorite[]
   cartItems             CartItem[]
   ordersAsBuyer         Order[]            @relation("OrderBuyer")
-  ordersAsSeller        Order[]            @relation("OrderSeller")
   reviewsWritten        Review[]           @relation("ReviewBuyer")
-  reviewsReceived       Review[]           @relation("ReviewSeller")
   conversationsAsBuyer  Conversation[]     @relation("ConversationBuyer")
-  conversationsAsSeller Conversation[]     @relation("ConversationSeller")
   messages              Message[]
   disputes              Dispute[]
   uploads               Upload[]
-  growOutBatches        GrowOutBatch[]
   sponsorships          Sponsorship[]
-  farmVerification      FarmVerification?
-  batchUpdates          BatchUpdate[]
+  batches               GrowOutBatch[]     @relation("BatchCreator")
+  batchUpdates          BatchUpdate[]      @relation("BatchUpdateAuthor")
   verificationCodes     VerificationCode[]
 
   @@index([role, status])
+}
+
+// The single company operating FishFarm. All commercial inventory, batches
+// and facilities belong to it, so Admins always operate company-scope data
+// rather than records owned by their own account.
+model Company {
+  id        String   @id
+  name      String
+  about     String   @default("")
+  location  String?
+  phone     String?
+  email     String?
+  joinedAt  DateTime @default(now())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  listings      Listing[]
+  orders        Order[]
+  reviews       Review[]
+  conversations Conversation[]
+  batches       GrowOutBatch[]
+  facilities    Facility[]
+}
+
+model Facility {
+  id        String   @id @default(cuid())
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
+  name      String
+  location  String
+  region    String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  verification FarmVerification?
+  batches      GrowOutBatch[]
+
+  @@index([companyId])
 }
 
 model Session {
@@ -132,12 +164,14 @@ enum SaleMode {
 }
 
 model Listing {
-  id         String        @id @default(cuid())
-  code       String        @unique // "FM-20817"
-  ownerId    String
-  owner      User          @relation(fields: [ownerId], references: [id], onDelete: Restrict)
-  sellerName String
-  status     ListingStatus @default(draft)
+  id          String        @id @default(cuid())
+  code        String        @unique // "FM-20817"
+  companyId   String
+  company     Company       @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  createdById String?
+  createdBy   User?         @relation("ListingCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  companyName String
+  status      ListingStatus @default(draft)
 
   // Moderation decision snapshot (null unless changes/rejected).
   decisionKind     DecisionKind?
@@ -162,7 +196,7 @@ model Listing {
   conversations Conversation[]
 
   @@index([status, deletedAt])
-  @@index([ownerId, status])
+  @@index([companyId, status])
   @@index([createdAt])
 }
 
@@ -257,8 +291,7 @@ model Notification {
 }
 
 enum ActorRole {
-  Buyer
-  Seller
+  User
   Admin
   System
 }
@@ -292,8 +325,8 @@ model Conversation {
   id            String   @id @default(cuid())
   buyerId       String
   buyer         User     @relation("ConversationBuyer", fields: [buyerId], references: [id], onDelete: Cascade)
-  sellerId      String
-  seller        User     @relation("ConversationSeller", fields: [sellerId], references: [id], onDelete: Cascade)
+  companyId     String
+  company       Company  @relation(fields: [companyId], references: [id], onDelete: Cascade)
   listingId     String?
   listing       Listing? @relation(fields: [listingId], references: [id], onDelete: SetNull)
   lastMessageAt DateTime @default(now())
@@ -302,7 +335,7 @@ model Conversation {
   messages Message[]
 
   @@index([buyerId, lastMessageAt])
-  @@index([sellerId, lastMessageAt])
+  @@index([companyId, lastMessageAt])
 }
 
 model Message {
@@ -371,10 +404,10 @@ model Order {
   id   String @id @default(cuid())
   code String @unique // "ORD-10023"
 
-  buyerId  String
-  buyer    User   @relation("OrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
-  sellerId String
-  seller   User   @relation("OrderSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  buyerId   String
+  buyer     User    @relation("OrderBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
+  companyId String
+  company   Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
 
   status        OrderStatus        @default(pending_payment)
   saleMode      SaleMode           @default(in_stock)
@@ -413,7 +446,7 @@ model Order {
   dispute  Dispute?
 
   @@index([buyerId, placedAt])
-  @@index([sellerId, status])
+  @@index([companyId, status])
   @@index([status, placedAt])
 }
 
@@ -483,14 +516,14 @@ model Review {
   listing   Listing  @relation(fields: [listingId], references: [id], onDelete: Cascade)
   buyerId   String
   buyer     User     @relation("ReviewBuyer", fields: [buyerId], references: [id], onDelete: Restrict)
-  sellerId  String
-  seller    User     @relation("ReviewSeller", fields: [sellerId], references: [id], onDelete: Restrict)
+  companyId String
+  company   Company  @relation(fields: [companyId], references: [id], onDelete: Restrict)
   rating    Int
   text      String?
   createdAt DateTime @default(now())
 
   @@index([listingId, createdAt])
-  @@index([sellerId, createdAt])
+  @@index([companyId, createdAt])
 }
 
 enum DisputeStatus {
@@ -574,8 +607,12 @@ model GrowOutBatch {
   id   String @id @default(cuid())
   code String @unique // "BATCH-1024"
 
-  sellerId String
-  seller   User   @relation(fields: [sellerId], references: [id], onDelete: Restrict)
+  companyId   String
+  company     Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  facilityId  String?
+  facility    Facility? @relation(fields: [facilityId], references: [id], onDelete: SetNull)
+  createdById String?
+  createdBy   User?    @relation("BatchCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   title       String
   species     String
@@ -624,7 +661,8 @@ model GrowOutBatch {
   harvest       Harvest?
 
   @@index([status, createdAt])
-  @@index([sellerId, status])
+  @@index([companyId, status])
+  @@index([facilityId])
 }
 
 model BatchImage {
@@ -661,7 +699,7 @@ model BatchUpdate {
   countAlive     Int?
   note           String?
   createdById    String
-  createdBy      User         @relation(fields: [createdById], references: [id], onDelete: Restrict)
+  createdBy      User         @relation("BatchUpdateAuthor", fields: [createdById], references: [id], onDelete: Restrict)
   createdAt      DateTime     @default(now())
 
   photos BatchUpdatePhoto[]
@@ -820,9 +858,9 @@ enum VerificationStatus {
 }
 
 model FarmVerification {
-  id       String @id @default(cuid())
-  sellerId String @unique
-  seller   User   @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  id         String   @id @default(cuid())
+  facilityId String   @unique
+  facility   Facility @relation(fields: [facilityId], references: [id], onDelete: Cascade)
 
   level       VerificationLevel  @default(none)
   status      VerificationStatus @default(pending)

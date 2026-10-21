@@ -56,10 +56,6 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<AuthResult> {
-    if (dto.store && dto.role !== 'Seller') {
-      throw new AppException('profile.storeRequiresSeller', HttpStatus.BAD_REQUEST);
-    }
-
     if (await this.users.findByEmail(dto.email)) {
       throw new AppException('auth.emailTaken', HttpStatus.CONFLICT);
     }
@@ -68,15 +64,16 @@ export class AuthService {
     let user;
     try {
       user = await this.prisma.$transaction(async (tx) => {
+        // Public registration always creates a customer account. Admin accounts
+        // are provisioned internally, never through this endpoint.
         const created = await tx.user.create({
           data: {
             email: dto.email,
             passwordHash,
             name: dto.name,
-            role: dto.role,
+            role: 'User',
             phone: dto.phone,
             location: dto.location,
-            store: dto.role === 'Seller' ? dto.store : null,
           },
         });
 
@@ -86,7 +83,7 @@ export class AuthService {
             type: 'system',
             titleKey: 'notifications.welcome.title',
             bodyKey: 'notifications.welcome.body',
-            link: created.role === 'Seller' ? '#seller' : '#marketplace',
+            link: '#marketplace',
           },
         });
 
@@ -94,7 +91,7 @@ export class AuthService {
           data: {
             actorId: created.id,
             actorLabel: created.name,
-            role: created.role,
+            role: 'User',
             action: 'user.registered',
             target: created.email,
           },

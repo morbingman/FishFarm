@@ -15,7 +15,6 @@ export interface UserRecord {
   status: UserStatus;
   phone: string | null;
   location: string | null;
-  store: string | null;
   joinedAt: Date;
   emailVerifiedAt: Date | null;
   prefs: unknown;
@@ -42,7 +41,6 @@ export class UsersService {
       status: user.status,
       phone: user.phone,
       location: user.location,
-      store: user.store,
       joinedAt: user.joinedAt,
       emailVerifiedAt: user.emailVerifiedAt,
       prefs: normalizePrefs(user.prefs),
@@ -53,17 +51,12 @@ export class UsersService {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppException('error.notFound', HttpStatus.NOT_FOUND);
 
-    if (dto.store !== undefined && user.role !== 'Seller') {
-      throw new AppException('profile.storeRequiresSeller', HttpStatus.BAD_REQUEST);
-    }
-
     const updated = await this.prisma.user.update({
       where: { id: userId },
       data: {
         ...(dto.name !== undefined ? { name: dto.name } : {}),
         ...(dto.phone !== undefined ? { phone: dto.phone } : {}),
         ...(dto.location !== undefined ? { location: dto.location } : {}),
-        ...(dto.store !== undefined ? { store: dto.store } : {}),
       },
     });
 

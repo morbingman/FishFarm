@@ -8,3 +8,6 @@ node_modules
 dist
 coverage
 *.log
+
+# Local uploads are runtime data
+/uploads

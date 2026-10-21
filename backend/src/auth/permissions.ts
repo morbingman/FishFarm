@@ -1,6 +1,9 @@
 /**
- * Server-side counterpart of the frontend's `MATRIX` (REQUIREMENTS.md §2).
- * The API is the enforcement point; these keys are the contract.
+ * Server-side permission matrix (REQUIREMENTS.md §2, revised v2.0).
+ *
+ * Two roles only. `User` is the customer: browse, order, sponsor, review.
+ * `Admin` is company staff operating the single company that owns all
+ * inventory and batches, plus platform administration.
  */
 export const PERMISSIONS = [
   'market.view',
@@ -10,12 +13,16 @@ export const PERMISSIONS = [
   'listing.create',
   'listing.update',
   'listing.delete',
+  'listing.publish',
   'listing.submit',
   'listing.pause',
   'queue.view',
   'listing.approve',
   'listing.reject',
   'listing.takedown',
+  'review.create',
+  'dispute.create',
+  'dispute.manage',
   'user.view',
   'user.manage',
   'activity.view',
@@ -30,49 +37,46 @@ export const PERMISSIONS = [
 
 export type Permission = (typeof PERMISSIONS)[number];
 
-export type Role = 'Buyer' | 'Seller' | 'Admin';
+export type Role = 'User' | 'Admin';
 
-const BUYER: readonly Permission[] = [
+const USER: readonly Permission[] = [
   'market.view',
   'order.create',
   'order.view',
   'profile.update',
+  'review.create',
+  'dispute.create',
   'batch.browse',
   'batch.sponsor',
 ];
 
-const SELLER: readonly Permission[] = [
+const ADMIN: readonly Permission[] = [
   'market.view',
+  'order.fulfill',
   'listing.create',
   'listing.update',
   'listing.delete',
+  'listing.publish',
   'listing.submit',
   'listing.pause',
-  'order.fulfill',
-  'profile.update',
-  'batch.browse',
-  'batch.create',
-  'batch.update',
-];
-
-const ADMIN: readonly Permission[] = [
-  'market.view',
   'queue.view',
   'listing.approve',
   'listing.reject',
   'listing.takedown',
+  'dispute.manage',
   'user.view',
   'user.manage',
   'activity.view',
   'profile.update',
   'batch.browse',
+  'batch.create',
+  'batch.update',
   'batch.review',
   'batch.settle',
 ];
 
 export const ROLE_PERMISSIONS: Record<Role, ReadonlySet<Permission>> = {
-  Buyer: new Set(BUYER),
-  Seller: new Set(SELLER),
+  User: new Set(USER),
   Admin: new Set(ADMIN),
 };
 

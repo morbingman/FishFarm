@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types.js';
 import { AppException } from '../common/exceptions/app.exception.js';
+import { CompanyService } from '../company/company.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import {
   DecisionKind,
@@ -11,7 +12,8 @@ import {
 } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { normalizePrefs } from '../users/users.service.js';
-import type { AdminQueueTab, SellerListingFilter } from './dto/list-listings.dto.js';
+import { UPLOAD_URL_PREFIX } from '../uploads/upload.config.js';
+import type { AdminQueueTab, CompanyListingFilter } from './dto/list-listings.dto.js';
 import type {
   ListingImageDto,
   ModerateListingDto,
@@ -20,7 +22,8 @@ import type {
 } from './dto/save-listing.dto.js';
 
 const LISTING_INCLUDE = {
-  owner: { select: { id: true, email: true, name: true, store: true } },
+  company: { select: { id: true, name: true, location: true } },
+  createdBy: { select: { id: true, email: true, name: true } },
   draft: { include: { images: { orderBy: { position: 'asc' } } } },
   history: { orderBy: { at: 'asc' } },
 } satisfies Prisma.ListingInclude;
@@ -38,18 +41,28 @@ type NotificationInput = {
   link?: string;
 };
 
-type ActivityRole = 'Seller' | 'Admin';
-
+/**
+ * Catalog management for the company's Admins.
+ *
+ * Listings belong to the company, not to the Admin who created them, so any
+ * Admin can read and operate every listing. Moderation (`approve`, `reject`,
+ * `request-changes`) still exists, but it is an optional internal quality check
+ * between Admins rather than a trust boundary with third-party sellers. An
+ * Admin can publish a listing directly with `publish`.
+ */
 @Injectable()
 export class ListingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly company: CompanyService,
+  ) {}
 
   // -------------------------------------------------------------------------
-  // Seller
+  // Company catalog
   // -------------------------------------------------------------------------
 
-  async listSeller(user: AuthenticatedUser, filter: SellerListingFilter = 'all') {
-    const where: Prisma.ListingWhereInput = { ownerId: user.id, deletedAt: null };
+  async list(filter: CompanyListingFilter = 'all') {
+    const where: Prisma.ListingWhereInput = { deletedAt: null };
 
     if (filter === 'attention') {
       where.status = { in: [ListingStatus.changes, ListingStatus.rejected] };
@@ -66,31 +79,29 @@ export class ListingsService {
     return listings.map((listing) => this.toView(listing));
   }
 
-  async getSeller(user: AuthenticatedUser, id: string) {
-    const listing = await this.findOwned(user.id, id);
+  async get(id: string) {
+    const listing = await this.findAny(id);
     return this.toView(listing);
   }
 
-  async create(user: AuthenticatedUser, dto: SaveListingDto) {
-    return this.prisma.$transaction(async (tx) => {
-      const owner = await tx.user.findUnique({
-        where: { id: user.id },
-        select: { name: true, store: true },
-      });
-      if (!owner) throw new AppException('error.notFound', HttpStatus.NOT_FOUND);
+  async create(admin: AuthenticatedUser, dto: SaveListingDto) {
+    await this.assertImageSources(dto.images);
+    const company = await this.company.current();
 
+    return this.prisma.$transaction(async (tx) => {
       const code = await this.nextListingCode(tx);
       const listing = await tx.listing.create({
         data: {
           code,
-          ownerId: user.id,
-          sellerName: owner.store ?? owner.name,
+          companyId: company.id,
+          companyName: company.name,
+          createdById: admin.id,
           status: ListingStatus.draft,
           draft: { create: this.draftCreate(dto) },
           history: {
             create: {
-              actorId: user.id,
-              actorLabel: user.name,
+              actorId: admin.id,
+              actorLabel: admin.name,
               action: 'Created draft',
             },
           },
@@ -98,40 +109,34 @@ export class ListingsService {
         include: LISTING_INCLUDE,
       });
 
-      await this.log(tx, user, 'Seller', 'Created listing', listing.draft?.name || code, `#seller/listing/${code}`);
+      await this.log(
+        tx,
+        admin,
+        'Created listing',
+        listing.draft?.name || code,
+        `#company/listing/${code}`,
+      );
       return this.toView(listing);
     });
   }
 
-  async update(user: AuthenticatedUser, id: string, dto: SaveListingDto) {
+  async update(admin: AuthenticatedUser, id: string, dto: SaveListingDto) {
+    await this.assertImageSources(dto.images);
     return this.prisma.$transaction(async (tx) => {
-      const listing = await this.findOwned(user.id, id, tx);
+      const listing = await this.findAny(id, tx);
       if (!listing.draft) throw new AppException('listing.notFound', HttpStatus.NOT_FOUND);
       if (listing.status === ListingStatus.pending) {
         throw new AppException('listing.underReview', HttpStatus.CONFLICT);
       }
 
-      // Editing a live listing changes the canonical content, so it must go
-      // back through review and disappear from the marketplace until approved.
+      // The company owns the content, so editing a live listing keeps it live;
+      // only listings already in the internal review queue are locked.
       const editedLive =
         listing.status === ListingStatus.approved || listing.status === ListingStatus.paused;
-      const now = new Date();
 
       const updated = await tx.listing.update({
         where: { id: listing.id },
         data: {
-          ...(editedLive
-            ? {
-                status: ListingStatus.pending,
-                submittedAt: now,
-                decisionKind: null,
-                decisionReason: null,
-                decisionFeedback: null,
-                decisionStep: null,
-                decisionBy: null,
-                decisionAt: null,
-              }
-            : {}),
           draft: {
             update: {
               ...this.draftUpdate(dto, listing.draft),
@@ -142,9 +147,9 @@ export class ListingsService {
           },
           history: {
             create: {
-              actorId: user.id,
-              actorLabel: user.name,
-              action: editedLive ? 'Edited — resubmitted for review' : 'Updated draft',
+              actorId: admin.id,
+              actorLabel: admin.name,
+              action: editedLive ? 'Edited live listing' : 'Updated draft',
             },
           },
         },
@@ -153,36 +158,19 @@ export class ListingsService {
 
       await this.log(
         tx,
-        user,
-        'Seller',
-        editedLive ? 'Edited live listing (sent for review)' : 'Updated listing draft',
+        admin,
+        editedLive ? 'Edited live listing' : 'Updated listing draft',
         updated.draft?.name || updated.code,
-        `#seller/listing/${updated.code}`,
+        `#company/listing/${updated.code}`,
       );
-
-      if (editedLive) {
-        await this.notify(tx, {
-          role: 'Admin',
-          type: NotificationType.status,
-          titleKey: 'notifications.admin.listingResubmitted.title',
-          titleParams: { name: updated.draft?.name ?? updated.code },
-          bodyKey: 'notifications.admin.listingResubmitted.body',
-          bodyParams: {
-            seller: updated.sellerName,
-            name: updated.draft?.name ?? updated.code,
-            code: updated.code,
-          },
-          link: `#admin/review/${updated.code}`,
-        });
-      }
 
       return this.toView(updated);
     });
   }
 
-  async remove(user: AuthenticatedUser, id: string) {
+  async remove(admin: AuthenticatedUser, id: string) {
     return this.prisma.$transaction(async (tx) => {
-      const listing = await this.findOwned(user.id, id, tx);
+      const listing = await this.findAny(id, tx);
       if (
         listing.status === ListingStatus.pending ||
         listing.status === ListingStatus.approved ||
@@ -199,30 +187,77 @@ export class ListingsService {
           deletedAt: new Date(),
           history: {
             create: {
-              actorId: user.id,
-              actorLabel: user.name,
+              actorId: admin.id,
+              actorLabel: admin.name,
               action: 'Deleted listing',
             },
           },
         },
       });
 
-      await this.log(
-        tx,
-        user,
-        'Seller',
-        'Deleted listing',
-        listing.draft?.name ?? listing.code,
-        `#seller/listing/${listing.code}`,
-      );
+      await this.log(tx, admin, 'Deleted listing', listing.draft?.name ?? listing.code);
 
       return { id: listing.code, deleted: true };
     });
   }
 
-  async submit(user: AuthenticatedUser, id: string) {
+  /**
+   * Direct draft → approved. The company does not need a second Admin to sell
+   * its own inventory; `submit` remains available when an internal check is
+   * wanted instead.
+   */
+  async publish(admin: AuthenticatedUser, id: string) {
     return this.prisma.$transaction(async (tx) => {
-      const listing = await this.findOwned(user.id, id, tx);
+      const listing = await this.findAny(id, tx);
+      const allowed: ListingStatus[] = [
+        ListingStatus.draft,
+        ListingStatus.changes,
+        ListingStatus.rejected,
+        ListingStatus.paused,
+      ];
+      if (!allowed.includes(listing.status)) {
+        throw this.invalidTransition(listing.status, 'publish');
+      }
+
+      this.assertSubmittable(listing);
+
+      const updated = await tx.listing.update({
+        where: { id: listing.id },
+        data: {
+          status: ListingStatus.approved,
+          submittedAt: listing.submittedAt ?? new Date(),
+          decisionKind: null,
+          decisionReason: null,
+          decisionFeedback: null,
+          decisionStep: null,
+          decisionBy: null,
+          decisionAt: null,
+          history: {
+            create: {
+              actorId: admin.id,
+              actorLabel: admin.name,
+              action: 'Published',
+            },
+          },
+        },
+        include: LISTING_INCLUDE,
+      });
+
+      await this.log(
+        tx,
+        admin,
+        'Published listing',
+        updated.draft?.name ?? updated.code,
+        `#company/listing/${updated.code}`,
+      );
+
+      return this.toView(updated);
+    });
+  }
+
+  async submit(admin: AuthenticatedUser, id: string) {
+    return this.prisma.$transaction(async (tx) => {
+      const listing = await this.findAny(id, tx);
       const allowed: ListingStatus[] = [
         ListingStatus.draft,
         ListingStatus.changes,
@@ -249,24 +284,17 @@ export class ListingsService {
           decisionAt: null,
           history: {
             create: {
-              actorId: user.id,
-              actorLabel: user.name,
-              action: resubmit ? 'Resubmitted for review' : 'Submitted for review',
+              actorId: admin.id,
+              actorLabel: admin.name,
+              action: resubmit
+                ? 'Resubmitted for internal review'
+                : 'Submitted for internal review',
             },
           },
         },
         include: LISTING_INCLUDE,
       });
 
-      await this.notify(tx, {
-        userId: user.id,
-        type: NotificationType.success,
-        titleKey: 'notifications.listing.submitted.title',
-        titleParams: { name: updated.draft?.name ?? updated.code },
-        bodyKey: 'notifications.listing.submitted.body',
-        bodyParams: { name: updated.draft?.name ?? updated.code },
-        link: `#seller/listing/${updated.code}`,
-      });
       await this.notify(tx, {
         role: 'Admin',
         type: NotificationType.status,
@@ -278,7 +306,7 @@ export class ListingsService {
           ? 'notifications.admin.listingResubmitted.body'
           : 'notifications.admin.listingSubmitted.body',
         bodyParams: {
-          seller: updated.sellerName,
+          company: updated.companyName,
           name: updated.draft?.name ?? updated.code,
           code: updated.code,
         },
@@ -286,20 +314,19 @@ export class ListingsService {
       });
       await this.log(
         tx,
-        user,
-        'Seller',
-        resubmit ? 'Resubmitted listing' : 'Submitted listing for review',
+        admin,
+        resubmit ? 'Resubmitted listing for review' : 'Submitted listing for review',
         updated.draft?.name ?? updated.code,
-        `#seller/listing/${updated.code}`,
+        `#company/listing/${updated.code}`,
       );
 
       return this.toView(updated);
     });
   }
 
-  async withdraw(user: AuthenticatedUser, id: string) {
+  async withdraw(admin: AuthenticatedUser, id: string) {
     return this.prisma.$transaction(async (tx) => {
-      const listing = await this.findOwned(user.id, id, tx);
+      const listing = await this.findAny(id, tx);
       if (listing.status !== ListingStatus.pending) {
         throw this.invalidTransition(listing.status, 'withdraw');
       }
@@ -311,8 +338,8 @@ export class ListingsService {
           submittedAt: null,
           history: {
             create: {
-              actorId: user.id,
-              actorLabel: user.name,
+              actorId: admin.id,
+              actorLabel: admin.name,
               action: 'Withdrawn from review',
             },
           },
@@ -320,43 +347,29 @@ export class ListingsService {
         include: LISTING_INCLUDE,
       });
 
-      await this.notify(tx, {
-        role: 'Admin',
-        type: NotificationType.status,
-        titleKey: 'notifications.admin.listingWithdrawn.title',
-        titleParams: { name: updated.draft?.name ?? updated.code },
-        bodyKey: 'notifications.admin.listingWithdrawn.body',
-        bodyParams: {
-          seller: updated.sellerName,
-          name: updated.draft?.name ?? updated.code,
-          code: updated.code,
-        },
-        link: '#admin/queue',
-      });
       await this.log(
         tx,
-        user,
-        'Seller',
+        admin,
         'Withdrew listing from review',
         updated.draft?.name ?? updated.code,
-        `#seller/listing/${updated.code}`,
+        `#company/listing/${updated.code}`,
       );
 
       return this.toView(updated);
     });
   }
 
-  async pause(user: AuthenticatedUser, id: string) {
-    return this.setPaused(user, id, true);
+  async pause(admin: AuthenticatedUser, id: string) {
+    return this.setPaused(admin, id, true);
   }
 
-  async resume(user: AuthenticatedUser, id: string) {
-    return this.setPaused(user, id, false);
+  async resume(admin: AuthenticatedUser, id: string) {
+    return this.setPaused(admin, id, false);
   }
 
-  private async setPaused(user: AuthenticatedUser, id: string, paused: boolean) {
+  private async setPaused(admin: AuthenticatedUser, id: string, paused: boolean) {
     return this.prisma.$transaction(async (tx) => {
-      const listing = await this.findOwned(user.id, id, tx);
+      const listing = await this.findAny(id, tx);
       const required = paused ? ListingStatus.approved : ListingStatus.paused;
       if (listing.status !== required) {
         throw this.invalidTransition(listing.status, paused ? 'pause' : 'resume');
@@ -368,9 +381,9 @@ export class ListingsService {
           status: paused ? ListingStatus.paused : ListingStatus.approved,
           history: {
             create: {
-              actorId: user.id,
-              actorLabel: user.name,
-              action: paused ? 'Paused (hidden from marketplace)' : 'Resumed (live again)',
+              actorId: admin.id,
+              actorLabel: admin.name,
+              action: paused ? 'Paused (hidden from catalog)' : 'Resumed (live again)',
             },
           },
         },
@@ -379,11 +392,10 @@ export class ListingsService {
 
       await this.log(
         tx,
-        user,
-        'Seller',
+        admin,
         paused ? 'Paused listing' : 'Resumed listing',
         updated.draft?.name ?? updated.code,
-        `#seller/listing/${updated.code}`,
+        `#company/listing/${updated.code}`,
       );
 
       return this.toView(updated);
@@ -391,7 +403,7 @@ export class ListingsService {
   }
 
   // -------------------------------------------------------------------------
-  // Admin
+  // Internal review (optional second-Admin check)
   // -------------------------------------------------------------------------
 
   async queue(tab: AdminQueueTab = 'pending') {
@@ -482,51 +494,15 @@ export class ListingsService {
         include: LISTING_INCLUDE,
       });
 
-      const name = updated.draft?.name ?? updated.code;
-      const link = `#seller/listing/${updated.code}`;
-
-      if (approved) {
-        await this.notify(tx, {
-          userId: updated.ownerId,
-          type: NotificationType.approval,
-          titleKey: 'notifications.listing.approved.title',
-          titleParams: { name },
-          bodyKey: 'notifications.listing.approved.body',
-          bodyParams: { name },
-          link,
-        });
-      } else if (kind === ListingStatus.changes) {
-        await this.notify(tx, {
-          userId: updated.ownerId,
-          type: NotificationType.approval,
-          titleKey: 'notifications.listing.changes.title',
-          titleParams: { name },
-          bodyKey: 'notifications.listing.changes.body',
-          bodyParams: { name, reason: dto!.reason, feedback: dto!.feedback },
-          link,
-        });
-      } else {
-        await this.notify(tx, {
-          userId: updated.ownerId,
-          type: NotificationType.error,
-          titleKey: 'notifications.listing.rejected.title',
-          titleParams: { name },
-          bodyKey: 'notifications.listing.rejected.body',
-          bodyParams: { name, reason: dto!.reason, feedback: dto!.feedback },
-          link,
-        });
-      }
-
       await this.log(
         tx,
         admin,
-        'Admin',
         approved
           ? 'Approved listing'
           : kind === ListingStatus.changes
             ? 'Requested changes'
             : 'Rejected listing',
-        name,
+        updated.draft?.name ?? updated.code,
         `#admin/review/${updated.code}`,
       );
 
@@ -537,10 +513,7 @@ export class ListingsService {
   async takedown(admin: AuthenticatedUser, id: string, dto: TakedownListingDto) {
     return this.prisma.$transaction(async (tx) => {
       const listing = await this.findAny(id, tx);
-      if (
-        listing.status !== ListingStatus.approved &&
-        listing.status !== ListingStatus.paused
-      ) {
+      if (listing.status !== ListingStatus.approved && listing.status !== ListingStatus.paused) {
         throw this.invalidTransition(listing.status, 'takedown');
       }
 
@@ -566,22 +539,11 @@ export class ListingsService {
         include: LISTING_INCLUDE,
       });
 
-      const name = updated.draft?.name ?? updated.code;
-      await this.notify(tx, {
-        userId: updated.ownerId,
-        type: NotificationType.error,
-        titleKey: 'notifications.listing.takedown.title',
-        titleParams: { name },
-        bodyKey: 'notifications.listing.takedown.body',
-        bodyParams: { name, reason: dto.reason },
-        link: `#seller/listing/${updated.code}`,
-      });
       await this.log(
         tx,
         admin,
-        'Admin',
         'Took down listing',
-        name,
+        updated.draft?.name ?? updated.code,
         `#admin/review/${updated.code}`,
       );
 
@@ -600,23 +562,6 @@ export class ListingsService {
   // -------------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------------
-
-  private async findOwned(
-    ownerId: string,
-    id: string,
-    tx: Prisma.TransactionClient | PrismaService = this.prisma,
-  ): Promise<ListingRecord> {
-    const listing = await tx.listing.findFirst({
-      where: {
-        ownerId,
-        deletedAt: null,
-        OR: [{ id }, { code: id }],
-      },
-      include: LISTING_INCLUDE,
-    });
-    if (!listing) throw new AppException('listing.notFound', HttpStatus.NOT_FOUND);
-    return listing;
-  }
 
   private async findAny(
     id: string,
@@ -737,6 +682,34 @@ export class ListingsService {
     }));
   }
 
+  /**
+   * Listing media is either an external http(s) URL or a file uploaded for the
+   * company catalog. Uploads are company-scope: every Admin may attach a file
+   * another Admin uploaded, because the catalog is shared inventory.
+   */
+  private async assertImageSources(images?: ListingImageDto[]): Promise<void> {
+    if (!images?.length) return;
+
+    const uploaded = new Set<string>();
+    for (const image of images) {
+      if (image.url.startsWith(`${UPLOAD_URL_PREFIX}/`)) {
+        uploaded.add(image.url);
+      } else if (!/^https?:\/\//i.test(image.url)) {
+        throw new AppException('listing.invalidImageUrl', HttpStatus.BAD_REQUEST);
+      }
+    }
+
+    if (uploaded.size === 0) return;
+
+    const urls = [...uploaded];
+    const count = await this.prisma.upload.count({
+      where: { purpose: 'listing_image', url: { in: urls } },
+    });
+    if (count !== urls.length) {
+      throw new AppException('uploads.notFound', HttpStatus.BAD_REQUEST);
+    }
+  }
+
   private assertSubmittable(listing: ListingRecord): void {
     const draft = listing.draft;
     if (!draft) {
@@ -812,8 +785,12 @@ export class ListingsService {
     const draft = listing.draft;
     return {
       id: listing.code,
-      owner: listing.owner.email,
-      sellerName: listing.sellerName,
+      company: {
+        id: listing.company.id,
+        name: listing.company.name,
+        location: listing.company.location,
+      },
+      createdBy: listing.createdBy?.email ?? null,
       status: listing.status,
       draft: draft
         ? {
@@ -901,7 +878,6 @@ export class ListingsService {
   private async log(
     tx: Prisma.TransactionClient,
     actor: AuthenticatedUser,
-    role: ActivityRole,
     action: string,
     target?: string,
     link?: string,
@@ -910,7 +886,7 @@ export class ListingsService {
       data: {
         actorId: actor.id,
         actorLabel: actor.name,
-        role,
+        role: 'Admin',
         action,
         target,
         link,

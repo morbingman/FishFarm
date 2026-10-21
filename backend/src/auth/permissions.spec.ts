@@ -1,75 +1,72 @@
 import { hasPermission, PERMISSIONS, permissionsFor, ROLE_PERMISSIONS } from './permissions.js';
 
 describe('permission matrix (REQUIREMENTS.md §2)', () => {
-  it('grants buyers ordering but not self-managed listings', () => {
-    expect(hasPermission('Buyer', 'order.create')).toBe(true);
-    expect(hasPermission('Buyer', 'order.view')).toBe(true);
-    expect(hasPermission('Buyer', 'listing.create')).toBe(false);
-    expect(hasPermission('Buyer', 'listing.approve')).toBe(false);
-    expect(hasPermission('Buyer', 'user.manage')).toBe(false);
-  });
-
-  it('keeps ordering buyer-only', () => {
-    expect(hasPermission('Seller', 'order.create')).toBe(false);
-    expect(hasPermission('Admin', 'order.create')).toBe(false);
-    expect(hasPermission('Seller', 'order.fulfill')).toBe(true);
-  });
-
-  it('gives sellers their listing lifecycle but no moderation powers', () => {
+  it('lets users order, sponsor and review but not manage company inventory', () => {
+    for (const permission of [
+      'market.view',
+      'order.create',
+      'order.view',
+      'batch.browse',
+      'batch.sponsor',
+      'review.create',
+      'dispute.create',
+      'profile.update',
+    ] as const) {
+      expect(hasPermission('User', permission)).toBe(true);
+    }
     for (const permission of [
       'listing.create',
       'listing.update',
-      'listing.delete',
-      'listing.submit',
-      'listing.pause',
+      'listing.publish',
+      'listing.approve',
+      'batch.create',
+      'batch.settle',
+      'user.manage',
+      'activity.view',
+      'order.fulfill',
     ] as const) {
-      expect(hasPermission('Seller', permission)).toBe(true);
+      expect(hasPermission('User', permission)).toBe(false);
     }
-    expect(hasPermission('Seller', 'queue.view')).toBe(false);
-    expect(hasPermission('Seller', 'listing.approve')).toBe(false);
-    expect(hasPermission('Seller', 'listing.reject')).toBe(false);
-    expect(hasPermission('Seller', 'listing.takedown')).toBe(false);
-    expect(hasPermission('Seller', 'user.manage')).toBe(false);
   });
 
-  it('gives admins moderation and user management, not seller or buyer actions', () => {
+  it('gives admins the company commercial side and platform management', () => {
     for (const permission of [
+      'market.view',
+      'order.fulfill',
+      'listing.create',
+      'listing.update',
+      'listing.delete',
+      'listing.publish',
       'queue.view',
       'listing.approve',
       'listing.reject',
       'listing.takedown',
+      'batch.create',
+      'batch.update',
+      'batch.review',
+      'batch.settle',
       'user.view',
       'user.manage',
       'activity.view',
+      'dispute.manage',
       'profile.update',
     ] as const) {
       expect(hasPermission('Admin', permission)).toBe(true);
     }
-    expect(hasPermission('Admin', 'listing.create')).toBe(false);
+  });
+
+  it('keeps ordering and sponsorship user-only', () => {
     expect(hasPermission('Admin', 'order.create')).toBe(false);
+    expect(hasPermission('Admin', 'order.view')).toBe(false);
     expect(hasPermission('Admin', 'batch.sponsor')).toBe(false);
+    expect(hasPermission('Admin', 'review.create')).toBe(false);
+    expect(hasPermission('Admin', 'dispute.create')).toBe(false);
   });
 
-  it('scopes batch actions by role', () => {
-    expect(hasPermission('Buyer', 'batch.browse')).toBe(true);
-    expect(hasPermission('Buyer', 'batch.sponsor')).toBe(true);
-    expect(hasPermission('Buyer', 'batch.create')).toBe(false);
-
-    expect(hasPermission('Seller', 'batch.create')).toBe(true);
-    expect(hasPermission('Seller', 'batch.update')).toBe(true);
-    expect(hasPermission('Seller', 'batch.sponsor')).toBe(false);
-    expect(hasPermission('Seller', 'batch.review')).toBe(false);
-
-    expect(hasPermission('Admin', 'batch.review')).toBe(true);
-    expect(hasPermission('Admin', 'batch.settle')).toBe(true);
-    expect(hasPermission('Admin', 'batch.create')).toBe(false);
-  });
-
-  it('lets every role browse the market and edit their profile', () => {
-    for (const role of ['Buyer', 'Seller', 'Admin'] as const) {
-      expect(hasPermission(role, 'market.view')).toBe(true);
-      expect(hasPermission(role, 'profile.update')).toBe(true);
-    }
+  it('only exposes the two roles', () => {
+    expect(Object.keys(ROLE_PERMISSIONS).sort()).toEqual(['Admin', 'User']);
+    expect(hasPermission('Seller' as never, 'listing.create')).toBe(false);
+    expect(hasPermission('Buyer' as never, 'order.create')).toBe(false);
   });
 
   it('only contains known permission keys', () => {
@@ -82,9 +79,9 @@ describe('permission matrix (REQUIREMENTS.md §2)', () => {
   });
 
   it('returns a copy from permissionsFor', () => {
-    const permissions = permissionsFor('Buyer');
+    const permissions = permissionsFor('User');
     permissions.push('listing.approve');
-    expect(hasPermission('Buyer', 'listing.approve')).toBe(false);
+    expect(hasPermission('User', 'listing.approve')).toBe(false);
   });
 
   it('denies unknown roles (default-deny)', () => {

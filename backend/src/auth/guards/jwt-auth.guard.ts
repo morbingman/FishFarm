@@ -78,7 +78,6 @@ export class JwtAuthGuard implements CanActivate {
       name: session.user.name,
       role: session.user.role,
       status: session.user.status,
-      store: session.user.store,
       sessionId: session.id,
     };
 

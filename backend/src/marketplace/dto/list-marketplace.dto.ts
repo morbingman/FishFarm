@@ -56,7 +56,9 @@ export const MARKETPLACE_SIZES = ['under15', '15plus'] as const;
 export const MARKETPLACE_SORTS = ['recommended', 'price_asc', 'price_desc', 'newest'] as const;
 
 export class ListMarketplaceDto {
-  @ApiPropertyOptional({ description: 'Free-text search across name, species, breed, seller, location.' })
+  @ApiPropertyOptional({
+    description: 'Free-text search across name, species, breed, company, location.',
+  })
   @IsOptional()
   @IsString()
   q?: string;
@@ -97,7 +99,7 @@ export class ListMarketplaceDto {
   @IsNumber()
   @Min(0)
   @Max(5)
-  sellerRating?: number;
+  rating?: number;
 
   @ApiPropertyOptional({ default: true, description: 'Only listings with quantity > 0.' })
   @IsOptional()
@@ -111,23 +113,6 @@ export class ListMarketplaceDto {
   @IsIn(MARKETPLACE_SORTS)
   sort?: (typeof MARKETPLACE_SORTS)[number];
 
-  @ApiPropertyOptional({ default: 1, minimum: 1 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  page?: number;
-
-  @ApiPropertyOptional({ default: 20, minimum: 1, maximum: 100 })
-  @IsOptional()
-  @Type(() => Number)
-  @IsInt()
-  @Min(1)
-  @Max(100)
-  pageSize?: number;
-}
-
-export class SellerPageDto {
   @ApiPropertyOptional({ default: 1, minimum: 1 })
   @IsOptional()
   @Type(() => Number)

@@ -2,8 +2,11 @@ import request from 'supertest';
 import { PrismaService } from '../src/prisma/prisma.service.js';
 import { createTestApp } from './test-app.js';
 
-const PASSWORD = 'SecurePass123';
-const STORE = `E2E Market Farm ${Date.now()}`;
+const COMPANY_ID = 'fishfarm';
+const COMPANY_NAME = 'FishFarm';
+// Listings are company-owned, so each run tags its rows with a unique catalog
+// name to keep search totals independent of seed data and parallel test files.
+const CATALOG = `E2E Market Catalog ${Date.now()}`;
 
 const DAY = 24 * 60 * 60 * 1000;
 const daysAgo = (days: number) => new Date(Date.now() - days * DAY);
@@ -11,26 +14,21 @@ const daysAgo = (days: number) => new Date(Date.now() - days * DAY);
 describe('Marketplace read (e2e)', () => {
   let app: Awaited<ReturnType<typeof createTestApp>>;
   let prisma: PrismaService;
-  let sellerId: string;
-  let sellerEmail: string;
+  let companyId: string;
   let sequence = 0;
+  const createdCodes: string[] = [];
 
   beforeAll(async () => {
     app = await createTestApp();
     prisma = app.get(PrismaService);
 
-    sellerEmail = `market.seller.${Date.now()}@example.com`;
-    const registration = await request(app.getHttpServer())
-      .post('/v1/auth/register')
-      .send({
-        email: sellerEmail,
-        password: PASSWORD,
-        name: 'E2E Market Seller',
-        role: 'Seller',
-        store: STORE,
-      });
-    expect(registration.status).toBe(201);
-    sellerId = registration.body.user.id as string;
+    // Keep any pre-existing company intact and use it as the catalog owner.
+    const company = await prisma.company.upsert({
+      where: { id: COMPANY_ID },
+      create: { id: COMPANY_ID, name: COMPANY_NAME, about: 'E2E catalog owner.' },
+      update: {},
+    });
+    companyId = company.id;
 
     await createListing('Kohaku Koi', {
       species: 'Koi',
@@ -95,9 +93,8 @@ describe('Marketplace read (e2e)', () => {
   });
 
   afterAll(async () => {
-    if (sellerId) {
-      await prisma.listing.deleteMany({ where: { ownerId: sellerId } });
-      await prisma.user.deleteMany({ where: { id: sellerId } });
+    if (createdCodes.length > 0) {
+      await prisma.listing.deleteMany({ where: { code: { in: createdCodes } } });
     }
     await app.close();
   });
@@ -117,11 +114,13 @@ describe('Marketplace read (e2e)', () => {
     },
   ) {
     sequence += 1;
+    const code = `FM-9${String(Date.now()).slice(-6)}${sequence}`;
+    createdCodes.push(code);
     return prisma.listing.create({
       data: {
-        code: `FM-9${String(Date.now()).slice(-6)}${sequence}`,
-        ownerId: sellerId,
-        sellerName: STORE,
+        code,
+        companyId,
+        companyName: CATALOG,
         status: overrides.status ?? 'approved',
         views: overrides.views ?? 0,
         createdAt: overrides.createdAt,
@@ -158,7 +157,7 @@ describe('Marketplace read (e2e)', () => {
   }
 
   function path(query: string) {
-    return `/v1/marketplace/listings?q=${encodeURIComponent(STORE)}&${query}`;
+    return `/v1/marketplace/listings?q=${encodeURIComponent(CATALOG)}&${query}`;
   }
 
   it('lists approved listings publicly and hides pending/deleted ones', async () => {
@@ -177,15 +176,18 @@ describe('Marketplace read (e2e)', () => {
     expect(first).toMatchObject({
       species: expect.any(String),
       price: expect.any(Number),
-      seller: { name: STORE },
+      company: { id: companyId, name: CATALOG },
+      reviewCount: expect.any(Number),
     });
+    expect(first.rating === null || typeof first.rating === 'number').toBe(true);
     expect(first.name).toBeTruthy();
     expect(first.image).toContain('https://images.example.com/');
+    expect(first).not.toHaveProperty('seller');
   });
 
   it('filters by search text, species, breed, price, size and location', async () => {
     const species = await request(app.getHttpServer())
-      .get(`/v1/marketplace/listings?q=${encodeURIComponent(STORE)}&species=Koi,Betta&available=false`)
+      .get(`/v1/marketplace/listings?q=${encodeURIComponent(CATALOG)}&species=Koi,Betta&available=false`)
       .expect(200);
     expect(species.body.total).toBe(3);
 
@@ -269,12 +271,12 @@ describe('Marketplace read (e2e)', () => {
       region: 'Ho Chi Minh City',
       saleMode: 'in_stock',
       label: expect.any(String),
-      seller: { name: STORE, rating: null, reviewCount: 0 },
+      company: { id: companyId, name: CATALOG },
     });
     expect(detail.body.images).toHaveLength(1);
 
     const pending = await prisma.listing.findFirstOrThrow({
-      where: { ownerId: sellerId, status: 'pending' },
+      where: { companyId, companyName: CATALOG, status: 'pending' },
     });
     await request(app.getHttpServer())
       .get(`/v1/marketplace/listings/${pending.code}`)
@@ -283,33 +285,50 @@ describe('Marketplace read (e2e)', () => {
     await request(app.getHttpServer()).get('/v1/marketplace/listings/FM-00000').expect(404);
   });
 
-  it('returns a public seller page with only approved listings', async () => {
-    const response = await request(app.getHttpServer())
-      .get(`/v1/marketplace/sellers/${encodeURIComponent(STORE)}`)
-      .expect(200);
+  it('returns the company store page', async () => {
+    const response = await request(app.getHttpServer()).get('/v1/marketplace/store').expect(200);
 
-    expect(response.body.seller).toMatchObject({
-      name: STORE,
-      ownerName: 'E2E Market Seller',
-      rating: null,
-      reviewCount: 0,
+    expect(response.body).toMatchObject({
+      id: companyId,
+      name: expect.any(String),
     });
-    expect(response.body.listings.total).toBe(4);
-    expect(
-      response.body.listings.items.map((item: { name: string }) => item.name),
-    ).not.toContain('Pending Fish');
-    expect(
-      response.body.listings.items.map((item: { name: string }) => item.name),
-    ).not.toContain('Deleted Fish');
+    expect(response.body.listings).toBeGreaterThanOrEqual(4);
+    expect(response.body.species).toEqual(
+      expect.arrayContaining(['Betta', 'Goldfish', 'Koi']),
+    );
+    expect(response.body).not.toHaveProperty('seller');
+  });
 
-    await request(app.getHttpServer())
-      .get(`/v1/marketplace/sellers/${encodeURIComponent('No Such Farm')}`)
-      .expect(404);
+  it('applies the company rating floor to the whole catalog', async () => {
+    const store = await request(app.getHttpServer()).get('/v1/marketplace/store').expect(200);
+    const rating = store.body.rating as number | null;
+
+    if (rating === null) {
+      const excluded = await request(app.getHttpServer())
+        .get(path('available=false&rating=0.5'))
+        .expect(200);
+      expect(excluded.body.total).toBe(0);
+    } else {
+      const included = await request(app.getHttpServer())
+        .get(path(`available=false&rating=${Math.floor(rating)}`))
+        .expect(200);
+      expect(included.body.total).toBe(4);
+
+      if (rating < 5) {
+        const excluded = await request(app.getHttpServer())
+          .get(path(`available=false&rating=${Math.min(5, Math.round((rating + 0.1) * 10) / 10)}`))
+          .expect(200);
+        expect(excluded.body.total).toBe(0);
+      }
+    }
   });
 
   it('validates marketplace query parameters', async () => {
     await request(app.getHttpServer())
-      .get('/v1/marketplace/listings?sellerRating=9')
+      .get('/v1/marketplace/listings?rating=9')
+      .expect(400);
+    await request(app.getHttpServer())
+      .get('/v1/marketplace/listings?sellerRating=4')
       .expect(400);
     await request(app.getHttpServer())
       .get('/v1/marketplace/listings?sort=not-a-sort')

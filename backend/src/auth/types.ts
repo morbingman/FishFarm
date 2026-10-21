@@ -7,7 +7,6 @@ export interface AuthenticatedUser {
   name: string;
   role: UserRole;
   status: UserStatus;
-  store: string | null;
   sessionId: string;
 }
 
@@ -26,7 +25,6 @@ export interface PublicUser {
   status: UserStatus;
   phone: string | null;
   location: string | null;
-  store: string | null;
   joinedAt: Date;
   emailVerifiedAt: Date | null;
   prefs: NotificationPrefs;

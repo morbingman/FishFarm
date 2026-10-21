@@ -36,11 +36,19 @@ export function validateEnv(config: RawEnv): RawEnv {
     );
   }
 
+  const uploadBytes = Number(config.UPLOAD_MAX_BYTES ?? 10 * 1024 * 1024);
+  if (!Number.isInteger(uploadBytes) || uploadBytes < 1) {
+    throw new Error(
+      `UPLOAD_MAX_BYTES must be a positive integer, received: ${String(config.UPLOAD_MAX_BYTES)}`,
+    );
+  }
+
   return {
     ...config,
     PORT: port,
     SESSION_IDLE_MINUTES: idleMinutes,
     JWT_ACCESS_TTL_SECONDS: accessTtl,
     REFRESH_TOKEN_TTL_DAYS: refreshDays,
+    UPLOAD_MAX_BYTES: uploadBytes,
   };
 }
