@@ -1,0 +1,39 @@
+@reference "@/styles/global.css";
+/* Styles for button.tsx */
+.button-view-1 {
+  @apply inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0;
+}
+.button-view-2 {
+  @apply bg-primary text-primary-foreground shadow hover:bg-primary/90;
+}
+.button-view-3 {
+  @apply bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90;
+}
+.button-view-4 {
+  @apply border border-input bg-background shadow-sm hover:bg-accent hover:text-accent-foreground;
+}
+.button-view-5 {
+  @apply bg-secondary text-secondary-foreground shadow-sm hover:bg-secondary/80;
+}
+.button-view-6 {
+  @apply hover:bg-accent hover:text-accent-foreground;
+}
+.button-view-7 {
+  @apply text-primary underline-offset-4 hover:underline;
+}
+.button-view-8 {
+  @apply h-9 px-4 py-2;
+}
+.button-view-9 {
+  @apply h-8 rounded-md px-3 text-xs;
+}
+.button-view-10 {
+  @apply h-10 rounded-md px-8;
+}
+.button-view-11 {
+  @apply h-9 w-9;
+}
+.button-view-12 {
+  cursor: pointer;
+  font: inherit;
+}

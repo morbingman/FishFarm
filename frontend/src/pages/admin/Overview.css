@@ -1,0 +1,8 @@
+@reference "@/styles/global.css";
+/* Styles for Overview.tsx */
+.overview-layout-1 {
+  padding: 12px 24px 8px;
+}
+.overview-view-2 {
+  padding: 12px 24px 8px;
+}

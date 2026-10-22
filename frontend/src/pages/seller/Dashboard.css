@@ -1,0 +1,50 @@
+@reference "@/styles/global.css";
+/* Styles for Dashboard.tsx */
+.dashboard-layout-1 {
+  text-decoration: none;
+}
+.dashboard-view-2 {
+  text-decoration: none;
+}
+.dashboard-layout-3 {
+  text-decoration: none;
+  color: inherit;
+}
+.dashboard-view-4 {
+  text-decoration: none;
+  color: inherit;
+}
+.dashboard-layout-5 {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+.dashboard-view-6 {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 12px;
+  display: grid;
+  gap: 8px;
+}
+.dashboard-layout-7 {
+  color: #fff;
+  font-weight: 700;
+}
+.dashboard-view-8 {
+  color: #fff;
+  font-weight: 700;
+}
+.dashboard-layout-9 {
+  opacity: 0.8;
+}
+.dashboard-view-10 {
+  opacity: 0.8;
+}
+.dashboard-layout-11 {
+  text-decoration: none;
+}
+.dashboard-view-12 {
+  text-decoration: none;
+}

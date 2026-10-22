@@ -1,0 +1,20 @@
+@reference "@/styles/global.css";
+/* Styles for Catalog.tsx */
+.catalog-layout-1 {
+  border-radius: 0;
+}
+.catalog-view-2 {
+  border-radius: 0;
+}
+.catalog-layout-3 {
+  width: 60%;
+}
+.catalog-view-4 {
+  width: 60%;
+}
+.catalog-layout-5 {
+  width: 80%;
+}
+.catalog-view-6 {
+  width: 80%;
+}

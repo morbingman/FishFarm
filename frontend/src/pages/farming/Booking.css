@@ -1,0 +1,98 @@
+@reference "@/styles/global.css";
+/* Styles for Booking.tsx */
+.booking-layout-1 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 24px;
+}
+.booking-view-2 {
+  margin: 0;
+  color: var(--navy);
+  font-size: 24px;
+}
+.booking-layout-3 {
+  margin: 0;
+  color: var(--muted);
+  max-width: 480px;
+}
+.booking-view-4 {
+  margin: 0;
+  color: var(--muted);
+  max-width: 480px;
+}
+.booking-layout-5 {
+  justify-content: center;
+  margin-top: 8px;
+}
+.booking-view-6 {
+  justify-content: center;
+  margin-top: 8px;
+}
+.booking-layout-7 {
+  scroll-margin-top: 80px;
+}
+.booking-view-8 {
+  scroll-margin-top: 80px;
+}
+.booking-layout-9 {
+  color: var(--teal-dark);
+}
+.booking-view-10 {
+  color: var(--teal-dark);
+}
+.booking-layout-11 {
+  margin-top: 0;
+}
+.booking-view-12 {
+  margin-top: 0;
+}
+.booking-layout-13 {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.booking-view-14 {
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.booking-layout-15 {
+  margin-bottom: 8px;
+}
+.booking-view-16 {
+  margin-bottom: 8px;
+}
+.booking-layout-17 {
+  opacity: 0.6;
+  cursor: default;
+}
+.booking-view-18 {
+  opacity: 0.6;
+  cursor: default;
+}
+.booking-layout-19 {
+  font-size: 15px;
+}
+.booking-view-20 {
+  font-size: 15px;
+}
+.booking-layout-21 {
+  margin-top: 12px;
+  border-color: var(--booking-layout-21-border-color);
+}
+.booking-layout-22 {
+  margin-top: 6px;
+}
+.booking-view-23 {
+  margin-top: 6px;
+}
+.booking-layout-24 {
+  padding: 16px;
+  background: var(--ice);
+  box-shadow: none;
+}
+.booking-view-25 {
+  padding: 16px;
+  background: var(--ice);
+  box-shadow: none;
+}

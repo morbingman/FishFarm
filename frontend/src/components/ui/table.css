@@ -1,0 +1,29 @@
+@reference "@/styles/global.css";
+/* Styles for table.tsx */
+.table-view-1 {
+  @apply relative w-full overflow-auto;
+}
+.table-view-2 {
+  @apply w-full caption-bottom text-sm;
+}
+.table-view-3 {
+  @apply [&_tr]:border-b;
+}
+.table-view-4 {
+  @apply [&_tr:last-child]:border-0;
+}
+.table-view-5 {
+  @apply border-t bg-muted/50 font-medium [&>tr]:last:border-b-0;
+}
+.table-view-6 {
+  @apply border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted;
+}
+.table-view-7 {
+  @apply h-10 px-2 text-left align-middle font-medium text-muted-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px];
+}
+.table-view-8 {
+  @apply p-2 align-middle [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px];
+}
+.table-view-9 {
+  @apply mt-4 text-sm text-muted-foreground;
+}

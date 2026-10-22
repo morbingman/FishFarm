@@ -1,0 +1,12 @@
+@reference "@/styles/global.css";
+/* Styles for SellerParts.tsx */
+.seller-parts-layout-1 {
+  font-weight: 500;
+  opacity: 0.6;
+}
+.seller-parts-view-2 {
+  font-weight: 500;
+  opacity: 0.6;
+}
+.seller-parts-view-3 {
+}

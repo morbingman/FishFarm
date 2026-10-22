@@ -1,0 +1,5 @@
+@reference "@/styles/global.css";
+/* Styles for Users.tsx */
+.users-layout-1 {
+  height: 36px;
+}

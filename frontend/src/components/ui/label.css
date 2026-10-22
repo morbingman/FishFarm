@@ -1,0 +1,5 @@
+@reference "@/styles/global.css";
+/* Styles for label.tsx */
+.label-view-1 {
+  @apply text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70;
+}

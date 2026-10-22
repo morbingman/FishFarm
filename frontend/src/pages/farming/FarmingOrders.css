@@ -1,0 +1,18 @@
+@reference "@/styles/global.css";
+/* Styles for FarmingOrders.tsx */
+.farming-orders-layout-1 {
+  display: grid;
+  gap: 14px;
+}
+.farming-orders-view-2 {
+  display: grid;
+  gap: 14px;
+}
+.farming-orders-layout-3 {
+  width: var(--farming-orders-layout-3-width);
+  height: 18px;
+}
+.farming-orders-view-4 {
+  width: var(--farming-orders-layout-3-width);
+  height: 18px;
+}

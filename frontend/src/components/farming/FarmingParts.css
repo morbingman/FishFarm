@@ -1,0 +1,39 @@
+@reference "@/styles/global.css";
+/* Styles for FarmingParts.tsx */
+.farming-parts-layout-1 {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.farming-parts-view-2 {
+  border: 0;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: 10px;
+}
+.farming-parts-layout-3 {
+  margin-bottom: 8px;
+}
+.farming-parts-view-4 {
+  margin-bottom: 8px;
+}
+.farming-parts-layout-5 {
+  background: #f6fbfe;
+  border-style: dashed;
+}
+.farming-parts-view-6 {
+  background: #f6fbfe;
+  border-style: dashed;
+}
+.farming-parts-layout-7 {
+  width: 100%;
+}
+.farming-parts-layout-8 {
+  margin: 0;
+}
+.farming-parts-view-9 {
+  margin: 0;
+}

@@ -1,0 +1,36 @@
+@reference "@/styles/global.css";
+/* Styles for Settings.tsx */
+.settings-layout-1 {
+  display: grid;
+  gap: 20px;
+}
+.settings-view-2 {
+  display: grid;
+  gap: 20px;
+}
+.settings-layout-3 {
+  margin-top: 12px;
+}
+.settings-view-4 {
+  margin-top: 12px;
+}
+.settings-layout-5 {
+  border-bottom: 0;
+}
+.settings-view-6 {
+  border-bottom: 0;
+}
+.settings-layout-7 {
+  margin: 0 0 6px;
+  color: var(--danger);
+}
+.settings-view-8 {
+  margin: 0 0 6px;
+  color: var(--danger);
+}
+.settings-layout-9 {
+  margin-bottom: 14px;
+}
+.settings-view-10 {
+  margin-bottom: 14px;
+}

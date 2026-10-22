@@ -1,0 +1,350 @@
+@reference "@/styles/global.css";
+/* Styles for HomeParts.tsx */
+.home-parts-view-1 {
+  @apply h-5 w-5;
+}
+.home-parts-view-2 {
+  @apply flex items-center gap-2.5;
+}
+.home-parts-view-3 {
+  @apply h-6 w-6;
+}
+.home-parts-view-4 {
+  @apply inline-flex items-center gap-1 rounded-full bg-[#E9F8F0] px-2.5 py-1 text-[11px] font-bold text-[#168653];
+}
+.home-parts-view-5 {
+  @apply h-3.5 w-3.5;
+}
+.home-parts-view-6 {
+  @apply inline-flex items-center gap-1 text-xs font-bold text-[#003152];
+}
+.home-parts-view-7 {
+  @apply h-3.5 w-3.5 fill-[#F4B740] stroke-[#F4B740];
+}
+.home-parts-view-8 {
+  @apply mb-9 flex items-end justify-between gap-6;
+}
+.home-parts-view-9 {
+  @apply mb-3 text-xs font-extrabold uppercase tracking-[0.18em] text-[#003152];
+}
+.home-parts-view-10 {
+  @apply text-3xl font-extrabold tracking-[-0.035em] text-[#003152] md:text-[40px] md:leading-[1.15];
+}
+.home-parts-view-11 {
+  @apply mt-3 text-[15px] text-[#46667b];
+}
+.home-parts-view-12 {
+  @apply relative z-10 mx-auto -mt-8 max-w-[1220px] rounded-2xl border border-[#d4e9f3] bg-white p-3 shadow-[0_20px_60px_rgba(4,41,58,.14)] md:p-4;
+}
+.home-parts-view-13 {
+  @apply grid items-center gap-2 md:grid-cols-[1.7fr_1fr_1fr_1fr_auto];
+}
+.home-parts-view-14 {
+  @apply flex h-[60px] items-center gap-3 rounded-xl bg-[#f6fbfe] px-4;
+}
+.home-parts-view-15 {
+  @apply h-5 w-5 text-[#003152];
+}
+.home-parts-view-16 {
+  @apply sr-only;
+}
+.home-parts-view-17 {
+  @apply min-w-0 flex-1 bg-transparent text-sm text-[#003152] outline-none placeholder:text-[#46667b];
+}
+.home-parts-view-18 {
+  @apply flex h-[60px] items-center justify-between rounded-xl border border-[#d4e9f3] px-4;
+}
+.home-parts-view-19 {
+  @apply w-full appearance-none bg-transparent text-sm font-semibold text-[#46667b] outline-none;
+}
+.home-parts-view-20 {
+  @apply h-4 w-4 rotate-90 text-[#46667b];
+}
+.home-parts-view-21 {
+  @apply h-[60px] px-7;
+}
+.home-parts-view-22 {
+  @apply h-4 w-4;
+}
+.home-parts-view-23 {
+  @apply overflow-hidden bg-[#f6fbfe];
+}
+.home-parts-view-24 {
+  @apply mx-auto grid max-w-[1440px] items-stretch lg:grid-cols-[.95fr_1.05fr];
+}
+.home-parts-view-25 {
+  @apply flex items-center px-5 py-16 lg:py-24 xl:pl-[calc((100vw-1320px)/2)] xl:pr-16;
+}
+.home-parts-view-26 {
+  @apply max-w-[610px];
+}
+.home-parts-view-27 {
+  @apply mb-6 inline-flex items-center gap-2 rounded-full border border-[#d4e9f3] bg-white px-3.5 py-2 text-xs font-extrabold text-[#003152] shadow-sm;
+}
+.home-parts-view-28 {
+  @apply h-2 w-2 rounded-full bg-[#003152];
+}
+.home-parts-view-29 {
+  @apply text-[48px] font-extrabold leading-[1.04] tracking-[-0.055em] text-[#003152] sm:text-[64px] xl:text-[76px];
+}
+.home-parts-view-30 {
+  @apply text-[#003152];
+}
+.home-parts-view-31 {
+  @apply mt-7 max-w-[570px] text-base leading-7 text-[#46667b] md:text-lg;
+}
+.home-parts-view-32 {
+  @apply mt-8 flex flex-wrap gap-3;
+}
+.home-parts-view-33 {
+  @apply mt-9 flex flex-wrap gap-x-7 gap-y-3 border-t border-[#d4e9f3];
+}
+.home-parts-view-34 {
+  @apply flex items-center gap-2 text-xs font-bold text-[#46667b];
+}
+.home-parts-view-35 {
+  @apply grid h-5 w-5 place-items-center rounded-full bg-[#DDF5EC] text-[#168653];
+}
+.home-parts-view-36 {
+  @apply h-3 w-3;
+}
+.home-parts-view-37 {
+  @apply relative min-h-[440px] overflow-hidden lg:min-h-[690px];
+}
+.home-parts-view-38 {
+  @apply absolute inset-0 h-full w-full object-cover;
+}
+.home-parts-view-39 {
+  @apply absolute inset-0 bg-gradient-to-r from-[#003152]/20 via-transparent to-transparent;
+}
+.home-parts-view-40 {
+  @apply absolute bottom-8 right-6 rounded-2xl border border-white/30 bg-white/90 p-4 shadow-xl backdrop-blur-md md:bottom-12 md:right-10;
+}
+.home-parts-view-41 {
+  @apply flex items-center gap-3;
+}
+.home-parts-view-42 {
+  @apply grid h-11 w-11 place-items-center rounded-xl bg-[#eaf6fc] text-[#003152];
+}
+.home-parts-view-43 {
+  @apply text-xs font-extrabold text-[#003152];
+}
+.home-parts-view-44 {
+  @apply mt-1 text-[11px] text-[#46667b];
+}
+.home-parts-view-45 {
+  @apply px-5;
+}
+.home-parts-view-46 {
+  @apply h-16;
+}
+.home-parts-view-47 {
+  @apply relative h-[260px] overflow-hidden rounded-2xl bg-[#003152] shadow-sm;
+}
+.home-parts-view-48 {
+  @apply h-full w-full object-cover transition duration-500 group-hover:scale-105;
+}
+.home-parts-view-49 {
+  @apply absolute inset-0 bg-gradient-to-t from-[#003152]/90 via-[#003152]/5 to-transparent;
+}
+.home-parts-view-50 {
+  @apply absolute inset-x-0 bottom-0 flex items-end justify-between p-5 text-white;
+}
+.home-parts-view-51 {
+  @apply font-extrabold;
+}
+.home-parts-view-52 {
+  @apply mt-1 text-xs text-white/70;
+}
+.home-parts-view-53 {
+  @apply grid h-9 w-9 place-items-center rounded-full bg-white/15 backdrop-blur transition group-hover:bg-white group-hover:text-[#003152];
+}
+.home-parts-view-54 {
+  @apply overflow-hidden rounded-2xl border border-[#d4e9f3] bg-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_45px_rgba(6,43,58,.11)];
+}
+.home-parts-view-55 {
+  @apply relative h-[245px] overflow-hidden bg-[#eaf6fc];
+}
+.home-parts-view-56 {
+  @apply absolute bottom-3 left-3 rounded-lg bg-[#003152]/75 px-2.5 py-1.5 text-[10px] font-bold text-white backdrop-blur;
+}
+.home-parts-view-57 {
+  @apply p-5;
+}
+.home-parts-view-58 {
+  @apply text-[11px] font-bold uppercase tracking-[.1em] text-[#003152];
+}
+.home-parts-view-59 {
+  @apply mt-2 text-lg font-extrabold tracking-[-.02em] text-[#003152];
+}
+.home-parts-view-60 {
+  @apply mt-3 flex flex-wrap items-center gap-2 text-xs text-[#46667b];
+}
+.home-parts-view-61 {
+  @apply h-1 w-1 rounded-full bg-[#97bbcd];
+}
+.home-parts-view-62 {
+  @apply flex items-center gap-1;
+}
+.home-parts-view-63 {
+  @apply mt-5 flex items-center justify-between border-t border-[#eaf6fc];
+}
+.home-parts-view-64 {
+  @apply text-xs font-bold text-[#214d68];
+}
+.home-parts-view-65 {
+  @apply text-right;
+}
+.home-parts-view-66 {
+  @apply text-[10px] text-[#46667b];
+}
+.home-parts-view-67 {
+  @apply text-xl font-extrabold tracking-[-.03em] text-[#003152];
+}
+.home-parts-view-68 {
+  @apply mt-5 h-10 w-full;
+}
+.home-parts-view-69 {
+  @apply bg-[#003152] py-16 text-white;
+}
+.home-parts-view-70 {
+  @apply mx-auto grid max-w-[1220px] grid-cols-2 gap-y-10 px-5 lg:grid-cols-4;
+}
+.home-parts-view-71 {
+  @apply text-4xl font-extrabold tracking-[-.04em] md:text-5xl;
+}
+.home-parts-view-72 {
+  @apply mt-2 text-sm text-[#97bbcd];
+}
+.home-parts-view-73 {
+  @apply rounded-2xl border border-[#d4e9f3] bg-white p-5 transition hover:-translate-y-1 hover:shadow-xl;
+}
+.home-parts-view-74 {
+  @apply flex gap-4;
+}
+.home-parts-view-75 {
+  @apply h-16 w-16 rounded-2xl object-cover;
+}
+.home-parts-view-76 {
+  @apply min-w-0 flex-1;
+}
+.home-parts-view-77 {
+  @apply flex items-start justify-between gap-2;
+}
+.home-parts-view-78 {
+  @apply font-extrabold leading-tight text-[#003152];
+}
+.home-parts-view-79 {
+  @apply grid h-5 w-5 shrink-0 place-items-center rounded-full bg-[#168653] text-white;
+}
+.home-parts-view-80 {
+  @apply mt-1 text-xs text-[#46667b];
+}
+.home-parts-view-81 {
+  @apply mt-5 flex items-center justify-between rounded-xl bg-[#f6fbfe] px-4 py-3;
+}
+.home-parts-view-82 {
+  @apply flex items-center gap-1.5 text-xs text-[#46667b];
+}
+.home-parts-view-83 {
+  @apply mt-4 flex items-center justify-between;
+}
+.home-parts-view-84 {
+  @apply text-xs font-bold text-[#46667b];
+}
+.home-parts-view-85 {
+  @apply flex items-center gap-1 text-xs font-extrabold text-[#003152] hover:underline;
+}
+.home-parts-view-86 {
+  @apply bg-[#f6fbfe] py-24;
+}
+.home-parts-view-87 {
+  @apply mx-auto max-w-[1220px] px-5;
+}
+.home-parts-view-88 {
+  @apply relative grid gap-5 md:grid-cols-2 lg:grid-cols-4;
+}
+.home-parts-view-89 {
+  @apply absolute left-[12%] right-[12%] top-11 hidden border-t border-dashed border-[#97bbcd] lg:block;
+}
+.home-parts-view-90 {
+  @apply relative rounded-2xl bg-white p-6 shadow-[0_8px_30px_rgba(4,45,62,.06)];
+}
+.home-parts-view-91 {
+  @apply mb-7 flex items-center justify-between;
+}
+.home-parts-view-92 {
+  @apply relative z-10 grid h-14 w-14 place-items-center rounded-2xl bg-[#eaf6fc] text-[#003152];
+}
+.home-parts-view-93 {
+  @apply text-sm font-extrabold text-[#97bbcd];
+}
+.home-parts-view-94 {
+  @apply font-extrabold text-[#003152];
+}
+.home-parts-view-95 {
+  @apply mt-3 text-sm leading-6 text-[#46667b];
+}
+.home-parts-view-96 {
+  @apply px-5 py-24;
+}
+.home-parts-view-97 {
+  @apply relative mx-auto min-h-[400px] max-w-[1220px] overflow-hidden rounded-[28px];
+}
+.home-parts-view-98 {
+  @apply absolute inset-0 h-full w-full object-cover object-center;
+}
+.home-parts-view-99 {
+  @apply absolute inset-0 bg-[#003152]/80;
+}
+.home-parts-view-100 {
+  @apply relative flex min-h-[400px] max-w-[680px] flex-col justify-center p-8 text-white md:p-16;
+}
+.home-parts-view-101 {
+  @apply mb-4 text-xs font-extrabold uppercase tracking-[.2em] text-[#addef1];
+}
+.home-parts-view-102 {
+  @apply mt-5 text-base leading-7 text-white/75;
+}
+.home-parts-view-103 {
+  @apply mt-8 flex flex-wrap items-center gap-5;
+}
+.home-parts-view-104 {
+  @apply flex items-center gap-2 text-xs font-bold text-white/80;
+}
+.home-parts-view-105 {
+  @apply h-4 w-4 text-[#addef1];
+}
+.home-parts-view-106 {
+  @apply bg-[#003152] text-white;
+}
+.home-parts-view-107 {
+  @apply mx-auto grid max-w-[1220px] gap-12 px-5 py-16 md:grid-cols-2 lg:grid-cols-[1.5fr_1fr_1fr_1fr];
+}
+.home-parts-view-108 {
+  @apply mt-5 max-w-[280px] text-sm leading-6 text-[#97bbcd];
+}
+.home-parts-view-109 {
+  @apply mt-6 flex gap-2;
+}
+.home-parts-view-110 {
+  @apply grid h-10 w-10 place-items-center rounded-lg bg-white/8 text-[#97bbcd] transition hover:bg-[#003152] hover:text-white;
+}
+.home-parts-view-111 {
+  @apply h-[18px] w-[18px];
+}
+.home-parts-view-112 {
+  @apply text-sm font-extrabold;
+}
+.home-parts-view-113 {
+  @apply mt-5 space-y-3;
+}
+.home-parts-view-114 {
+  @apply text-sm text-[#97bbcd] transition hover:text-white;
+}
+.home-parts-view-115 {
+  @apply border-t border-white/10;
+}
+.home-parts-view-116 {
+  @apply mx-auto flex max-w-[1220px] flex-col justify-between gap-3 px-5 py-6 text-xs text-[#63879c] sm:flex-row;
+}

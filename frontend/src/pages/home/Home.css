@@ -1,0 +1,128 @@
+@reference "@/styles/global.css";
+/* Styles for Home.tsx */
+.home-view-1 {
+  @apply min-h-screen bg-white text-[#003152];
+}
+.home-view-2 {
+  @apply py-24;
+}
+.home-view-3 {
+  @apply mx-auto max-w-[1220px] px-5;
+}
+.home-view-4 {
+  @apply hidden items-center gap-2 text-sm font-extrabold text-[#003152] md:flex;
+}
+.home-view-5 {
+  @apply h-4 w-4;
+}
+.home-view-6 {
+  @apply grid gap-4 sm:grid-cols-2 lg:grid-cols-4;
+}
+.home-view-7 {
+  @apply bg-[#f6fbfe] py-24;
+}
+.home-view-8 {
+  @apply hidden h-10 md:inline-flex;
+}
+.home-view-9 {
+  @apply grid gap-5 sm:grid-cols-2 xl:grid-cols-4;
+}
+.home-view-10 {
+  @apply grid gap-5 md:grid-cols-3;
+}
+.home-view-11 {
+  @apply grid gap-5 md:grid-cols-2 lg:grid-cols-4;
+}
+.home-view-12 {
+  @apply rounded-2xl border border-[#d4e9f3] p-6 transition hover:border-[#addef1] hover:shadow-lg;
+}
+.home-view-13 {
+  @apply grid h-12 w-12 place-items-center rounded-xl bg-[#eaf6fc] text-[#003152];
+}
+.home-view-14 {
+  @apply mt-5 font-extrabold;
+}
+.home-view-15 {
+  @apply mt-3 text-sm leading-6 text-[#46667b];
+}
+.home-view-16 {
+  @apply rounded-2xl border border-[#d4e9f3] bg-white p-7;
+}
+.home-view-17 {
+  @apply flex items-center justify-between;
+}
+.home-view-18 {
+  @apply flex gap-3;
+}
+.home-view-19 {
+  @apply grid h-11 w-11 place-items-center rounded-full bg-[#d4e9f3] text-sm font-extrabold text-[#003152];
+}
+.home-view-20 {
+  @apply text-sm font-extrabold;
+}
+.home-view-21 {
+  @apply text-xs text-[#46667b];
+}
+.home-view-22 {
+  @apply text-4xl font-bold leading-none text-[#97bbcd];
+}
+.home-view-23 {
+  @apply mt-5 flex gap-1;
+}
+.home-view-24 {
+  @apply h-3.5 w-3.5 fill-[#F4B740] stroke-[#F4B740];
+}
+.home-view-25 {
+  @apply mt-4 text-sm leading-6 text-[#46667b];
+}
+.home-view-26 {
+  @apply mt-5 text-[11px] text-[#97bbcd];
+}
+.home-view-27 {
+  @apply grid gap-6 md:grid-cols-3;
+}
+.home-view-28 {
+  @apply h-[230px] overflow-hidden rounded-2xl;
+}
+.home-view-29 {
+  @apply h-full w-full object-cover transition duration-500 group-hover:scale-105;
+}
+.home-view-30 {
+  @apply mt-5 text-[11px] font-extrabold uppercase tracking-[.15em] text-[#003152];
+}
+.home-view-31 {
+  @apply mt-2 text-xl font-extrabold tracking-[-.02em];
+}
+.home-view-32 {
+  @apply mt-4 inline-flex items-center gap-2 text-sm font-extrabold text-[#003152];
+}
+.home-view-33 {
+  @apply px-5 pb-24;
+}
+.home-view-34 {
+  @apply mx-auto flex max-w-[1220px] flex-col items-center justify-between gap-8 rounded-[24px] bg-[#eaf6fc] p-8 md:flex-row md:p-12;
+}
+.home-view-35 {
+  @apply text-xs font-extrabold uppercase tracking-[.16em] text-[#003152];
+}
+.home-view-36 {
+  @apply mt-3 text-3xl font-extrabold tracking-[-.035em];
+}
+.home-view-37 {
+  @apply mt-3 max-w-[560px] text-sm leading-6 text-[#46667b];
+}
+.home-view-38 {
+  @apply flex w-full max-w-[450px] flex-col gap-2 sm:flex-row;
+}
+.home-view-39 {
+  @apply flex h-12 flex-1 items-center gap-2 rounded-xl border border-[#d4e9f3] bg-white px-4;
+}
+.home-view-40 {
+  @apply h-4 w-4 text-[#46667b];
+}
+.home-view-41 {
+  @apply sr-only;
+}
+.home-view-42 {
+  @apply min-w-0 flex-1 bg-transparent text-sm outline-none;
+}

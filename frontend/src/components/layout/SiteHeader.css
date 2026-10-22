@@ -1,0 +1,355 @@
+/* One ribbon header for every React page and role. */
+.ds-header.ribbon-header {
+  position: sticky;
+  top: 0;
+  z-index: 90;
+  padding: 16px 20px;
+  border: 0;
+  background: #f6fbfeed;
+  backdrop-filter: blur(14px);
+  font-family: var(--font);
+}
+.ribbon-header .ds-header-in {
+  position: relative;
+  isolation: isolate;
+  max-width: 1600px;
+  height: 72px;
+  padding: 0 20px;
+  gap: 16px;
+  border-radius: 22px;
+  background: #fff;
+  box-shadow:
+    0 6px 0 #d4e9f3,
+    0 12px 30px #0031520c;
+}
+.ribbon-header .ds-brand {
+  position: relative;
+  flex-shrink: 0;
+  align-self: stretch;
+  padding-right: 38px;
+  gap: 10px;
+  font-size: 16px;
+  letter-spacing: 0.055em;
+}
+.ribbon-header .ds-brand::after {
+  content: "";
+  position: absolute;
+  right: -16px;
+  top: 0;
+  width: 55px;
+  height: 100%;
+  background: linear-gradient(135deg, #eaf6fc, #addef1);
+  border-radius: 70% 0 70% 0;
+  transform: skew(-20deg);
+  z-index: -1;
+}
+.ribbon-header .ds-brand > span {
+  background: #46667b;
+  border-radius: 12px;
+}
+.ribbon-header .ds-nav {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  gap: 2px;
+  margin-left: 10px;
+  align-items: center;
+}
+.ribbon-header .ds-nav a {
+  position: relative;
+  flex-shrink: 0;
+  height: 40px;
+  padding: 0 11px;
+  border-radius: 12px;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  color: #637180;
+}
+.ribbon-header .ds-nav a:hover {
+  color: #003152;
+  background: #f6fbfe;
+}
+.ribbon-header .ds-nav a.on {
+  color: #003152;
+}
+.ribbon-header .ds-nav a.on::after {
+  display: none;
+}
+.ribbon-header .nav-indicator {
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-radius: 12px;
+  background: #eaf6fc;
+  border-bottom: 2px solid #addef1;
+  pointer-events: none;
+  transition:
+    transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+    width 0.35s,
+    height 0.35s,
+    opacity 0.2s;
+}
+.ribbon-header .ds-nav .farm-nav-cta {
+  margin-left: auto;
+  border-radius: 999px;
+  color: white;
+  background: linear-gradient(115deg, #addef1, #003152);
+  box-shadow: 0 4px 10px #addef126;
+  gap: 7px;
+  padding-inline: 17px;
+}
+.ribbon-header .ds-nav .farm-nav-cta.on,
+.ribbon-header .ds-nav .farm-nav-cta:hover {
+  color: white;
+  background: #003152;
+}
+.ribbon-header .ds-header-right {
+  gap: 9px;
+  margin-left: 0;
+  flex-shrink: 0;
+}
+.ribbon-header .ribbon-mobile-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  padding: 18px 4px 4px;
+}
+.ribbon-mobile-nav a {
+  padding: 10px 14px;
+  color: #46667b;
+  border-radius: 10px;
+  background: #fff;
+  text-decoration: none;
+  font-size: 13px;
+}
+.ribbon-mobile-nav a[aria-current] {
+  color: #003152;
+  background: #eaf6fc;
+}
+@media (max-width: 1250px) {
+  .ribbon-header .ds-brand {
+    font-size: 14px;
+    padding-right: 24px;
+  }
+  .ribbon-header .ds-header-in {
+    gap: 10px;
+    padding-inline: 12px;
+  }
+  .ribbon-header .ds-nav {
+    margin-left: 0;
+  }
+  .ribbon-header .ds-nav a {
+    padding-inline: 8px;
+    font-size: 11px;
+  }
+  .ribbon-header .ds-header-right {
+    gap: 6px;
+  }
+}
+@media (max-width: 1100px) {
+  .ribbon-header .ds-nav {
+    display: none;
+  }
+  .ribbon-header .ds-header-right {
+    margin-left: auto;
+  }
+  .section-menu-toggle {
+    display: grid;
+  }
+  .ribbon-header .ds-brand {
+    padding-right: 38px;
+  }
+}
+@media (max-width: 760px) {
+  .ds-header.ribbon-header {
+    padding: 10px 10px 12px;
+  }
+  .ribbon-header .ds-header-in {
+    height: 66px;
+    gap: 7px;
+    border-radius: 17px;
+    padding-inline: 10px;
+  }
+  .ribbon-header .ds-brand {
+    font-size: 12px;
+    gap: 7px;
+    padding-right: 16px;
+  }
+  .ribbon-header .ds-brand::after {
+    width: 30px;
+    right: -5px;
+  }
+  .ribbon-header .ds-brand > span {
+    width: 30px;
+    height: 30px;
+  }
+  .workspace-toggle,
+  .section-menu-toggle {
+    width: 32px;
+    height: 34px;
+    border-radius: 9px;
+  }
+  .ribbon-header .ds-header-right {
+    gap: 4px;
+  }
+  .ribbon-header .lang-switch button {
+    min-width: 25px;
+    padding: 4px;
+  }
+  .ribbon-header .pt-iconbtn {
+    width: 32px;
+    height: 34px;
+  }
+  .ribbon-header .sl-avatar {
+    width: 30px;
+    height: 30px;
+    font-size: 11px;
+  }
+  .ribbon-header .sl-btn {
+    padding: 8px 10px;
+    min-height: 34px;
+    font-size: 12px;
+  }
+}
+@media (max-width: 390px) {
+  .ribbon-header .ds-brand strong {
+    display: none;
+  }
+}
+@media (max-width: 1100px) {
+  .ribbon-header .section-menu-toggle {
+    display: grid;
+  }
+}
+.ribbon-header .nav-more {
+  align-self: center;
+  height: 40px;
+  border: 0;
+  padding: 0 10px;
+  background: transparent;
+  color: #637180;
+  font: 650 12px var(--font);
+  white-space: nowrap;
+  cursor: pointer;
+  border-radius: 12px;
+}
+.ribbon-header .nav-more:hover,
+.ribbon-header .nav-more.on {
+  background: #eaf6fc;
+  color: #003152;
+}
+.ribbon-more-menu {
+  min-width: 180px;
+}
+.ribbon-more-menu a {
+  text-decoration: none;
+  padding: 11px 13px;
+  color: #46667b;
+  font: 600 13px var(--font);
+}
+/* Keep the moving background below both links and the More trigger. */
+.ribbon-header .ds-nav {
+  isolation: isolate;
+}
+.ribbon-header .nav-indicator {
+  z-index: 0;
+  will-change: transform;
+  transition:
+    transform 0.46s cubic-bezier(0.2, 0.8, 0.2, 1),
+    width 0.38s cubic-bezier(0.2, 0.8, 0.2, 1),
+    height 0.38s,
+    opacity 0.18s;
+}
+.ribbon-header .ds-nav > a,
+.ribbon-header .nav-more {
+  position: relative;
+  z-index: 1;
+}
+.ribbon-header .nav-more {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: #003152;
+}
+.ribbon-header .nav-more.on {
+  background: transparent;
+}
+.ribbon-header .nav-more:hover {
+  background: #addef166;
+}
+/* Radix portals sit outside the sticky header's stacking context. */
+[data-radix-popper-content-wrapper]:has(.ribbon-more-menu) {
+  z-index: 120 !important;
+}
+.ribbon-more-menu {
+  z-index: 120;
+  min-width: 208px;
+  padding: 7px;
+  border: 1px solid #d4e9f3;
+  border-radius: 14px;
+  box-shadow: 0 14px 36px #00315224;
+  background: #fff;
+}
+.ribbon-more-menu a {
+  min-height: 42px;
+  border-radius: 9px;
+  color: #003152;
+}
+.ribbon-more-menu a[data-highlighted] {
+  background: #addef1;
+  color: #003152;
+}
+.ribbon-header .nav-indicator {
+  background: #addef1;
+  border-bottom-color: #003152;
+}
+.ribbon-header .ds-brand > span {
+  background: #003152;
+}
+.ribbon-header .ds-nav .farm-nav-cta {
+  background: #003152;
+}
+.ribbon-header .ds-nav .farm-nav-cta:hover {
+  background: #164e70;
+}
+/* More is anchored inside the sticky header, below its lower edge. */
+.ribbon-header .ds-nav .ribbon-inline-menu {
+  position: absolute;
+  z-index: 10;
+  display: grid;
+  gap: 3px;
+  width: 220px;
+  box-sizing: border-box;
+  overflow-y: auto;
+  animation: ribbon-menu-open 0.18s ease-out;
+}
+.ribbon-header .ds-nav .ribbon-inline-menu a {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 42px;
+  height: auto;
+  margin: 0;
+  padding: 11px 13px;
+  color: #003152;
+  border-radius: 9px;
+  font-size: 13px;
+  white-space: normal;
+}
+.ribbon-header .ds-nav .ribbon-inline-menu a:hover,
+.ribbon-header .ds-nav .ribbon-inline-menu a:focus-visible {
+  background: #addef1;
+  color: #003152;
+}
+@keyframes ribbon-menu-open {
+  from {
+    opacity: 0;
+    translate: 0 -4px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}

@@ -1,0 +1,226 @@
+.admin-toolbar {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 20px;
+  border-bottom: 1px solid #d4e9f3;
+}
+.admin-toolbar input {
+  flex: 1 1 260px;
+}
+.admin-toolbar select {
+  flex: 0 1 240px;
+}
+.admin-toolbar input,
+.admin-toolbar select,
+.sl-field textarea {
+  min-height: 42px;
+  padding: 10px 12px;
+  border: 1px solid #d4e9f3;
+  border-radius: 10px;
+  background: #fff;
+  color: #003152;
+  box-sizing: border-box;
+  font: inherit;
+}
+.admin-pad {
+  padding: 24px;
+  margin-bottom: 20px;
+}
+.admin-pad h2 {
+  margin: 0 0 14px;
+  font-size: 18px;
+}
+.admin-module-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 20px;
+}
+.admin-module {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 24px;
+  text-decoration: none;
+  color: #003152;
+  transition:
+    transform 0.2s,
+    box-shadow 0.2s;
+}
+.admin-module:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 8px 30px #00315212;
+}
+.admin-module-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.admin-module-head > span {
+  display: grid;
+  place-items: center;
+  height: 46px;
+  width: 46px;
+  background: #eaf6fc;
+  border-radius: 12px;
+}
+.admin-module-head strong {
+  font-size: 26px;
+}
+.admin-module h2 {
+  font-size: 18px;
+  margin: 4px 0 0;
+}
+.admin-module p {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #46667b;
+  margin: 0;
+  flex: 1;
+}
+.admin-module-link {
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 8px;
+}
+.admin-note {
+  color: #46667b;
+  font-size: 13px;
+  line-height: 1.7;
+  margin-top: 20px;
+}
+.admin-meta {
+  display: block;
+  color: #46667b;
+  margin-top: 5px;
+}
+.admin-pill {
+  display: inline-flex;
+  padding: 5px 10px;
+  border-radius: 8px;
+  background: #eaf6fc;
+  color: #003152;
+  font-size: 12px;
+  white-space: nowrap;
+}
+.admin-pill.active {
+  background: #e3f4ec;
+  color: #176a48;
+}
+.admin-pill.blocked {
+  background: #fbe9ea;
+  color: #a92f3a;
+}
+.admin-icon-button {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 34px;
+  border: 1px solid #d4e9f3;
+  border-radius: 9px;
+  background: #fff;
+  color: #003152;
+  cursor: pointer;
+}
+.admin-actions-menu {
+  min-width: 210px;
+  padding: 7px;
+  border-radius: 12px;
+  color: #003152;
+}
+.admin-actions-menu > [role="menuitem"] {
+  gap: 10px;
+  padding: 11px 12px;
+  border-radius: 8px;
+}
+.admin-danger {
+  color: #b8353d;
+}
+[data-radix-popper-content-wrapper]:has(.admin-actions-menu),
+[data-radix-popper-content-wrapper]:has(.pt-pop),
+[data-radix-popper-content-wrapper]:has(.pt-menu) {
+  z-index: 130 !important;
+}
+html body .pt-pop.sl-app {
+  min-height: 0;
+  height: auto;
+  max-height: min(520px, calc(100dvh - 140px));
+  width: 380px;
+  display: block;
+}
+html body .pt-pop-list {
+  min-height: 0;
+  max-height: 400px;
+  overflow: auto;
+}
+html body .pt-pop .pt-state {
+  padding: 20px;
+  min-height: 0;
+}
+html body .dialog-view-1 {
+  z-index: 150;
+}
+html body .dialog-view-2 {
+  z-index: 160;
+  min-height: 0;
+  max-height: calc(100dvh - 40px);
+  overflow-y: auto;
+}
+.admin-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+.admin-detail-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 20px;
+}
+.admin-facts {
+  display: grid;
+  grid-template-columns: 140px minmax(0, 1fr);
+  gap: 14px;
+  font-size: 14px;
+}
+.admin-facts dt {
+  color: #46667b;
+}
+.admin-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+.admin-action-stack {
+  display: grid;
+  gap: 10px;
+}
+.admin-inline-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 20px;
+}
+@media (max-width: 1200px) {
+  .admin-module-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 760px) {
+  .admin-module-grid,
+  .admin-detail-grid,
+  .admin-kpis {
+    grid-template-columns: 1fr;
+  }
+  .admin-facts {
+    grid-template-columns: 1fr;
+    gap: 6px;
+  }
+  .admin-facts dd {
+    margin-bottom: 10px;
+  }
+  .admin-toolbar select {
+    flex: 1 1 100%;
+  }
+  .admin-pad {
+    padding: 18px;
+  }
+}

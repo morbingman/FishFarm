@@ -1,0 +1,143 @@
+/* Shared brand layer: every role uses Dark Azure #003152 + Soft Blue #ADDEF1.
+   Imported by the single SiteHeader so it is present on every route. */
+:root,
+html body .sl-app,
+html body .buyer-app,
+html body .auth-app,
+html body .workspace-frame {
+  --brand-dark: #003152;
+  --brand-soft: #addef1;
+  --primary: #003152;
+  --foreground: #003152;
+  --navy: #003152;
+  --ocean: #003152;
+  --teal: #003152;
+  --teal-dark: #164e70;
+  --teal-soft: #eaf6fc;
+  --ice: #f6fbfe;
+  --line: #d4e9f3;
+  --text: #003152;
+  --muted: #46667b;
+  --buy-blue: #003152;
+  --buy-teal: #003152;
+  --color-primary: #003152;
+  --color-primary-foreground: #fff;
+  --color-secondary: #addef1;
+  --color-accent: #eaf6fc;
+  --color-accent-foreground: #003152;
+  --color-ring: #003152;
+  --color-market-navy: #003152;
+  --color-market-ocean: #003152;
+}
+html body .ribbon-header {
+  background: #f6fbfeed;
+}
+html body .ribbon-header .ds-header-in {
+  box-shadow:
+    0 6px 0 #addef1,
+    0 12px 30px #0031520c;
+}
+html body .ribbon-header .ds-brand {
+  color: #003152;
+}
+html body .ribbon-header .ds-brand > span {
+  background: #003152;
+  color: white;
+}
+html body .ribbon-header .ds-brand::after {
+  background: linear-gradient(135deg, #eaf6fc, #addef1);
+}
+html body .ribbon-header .nav-indicator {
+  background: #addef1;
+  border-color: #003152;
+  z-index: 0;
+}
+html body .ribbon-header .ds-nav > a,
+html body .ribbon-header .nav-more {
+  position: relative;
+  z-index: 1;
+}
+html body .ribbon-header .ds-nav a.on,
+html body .ribbon-header .nav-more {
+  color: #003152;
+}
+html body .ribbon-header .ds-nav .farm-nav-cta,
+html body .ribbon-header .sl-btn-primary {
+  background: #003152;
+  color: #fff;
+  box-shadow: 0 4px 10px #00315226;
+}
+html body .ribbon-header .ds-nav .farm-nav-cta:hover,
+html body .ribbon-header .sl-btn-primary:hover {
+  background: #164e70;
+  color: #fff;
+}
+html body .workspace-sidebar {
+  background: #003152;
+}
+html body .workspace-indicator {
+  background: #addef1;
+  box-shadow: inset 3px 0 #fff;
+}
+html body .workspace-nav a {
+  color: #addef1;
+}
+html body .workspace-nav a[aria-current] {
+  color: #003152;
+}
+html body .workspace-toggle {
+  color: #003152;
+  border-color: #d4e9f3;
+}
+html body .workspace-toggle[aria-expanded="true"] {
+  background: #addef1;
+  color: #003152;
+}
+@media (prefers-reduced-motion: reduce) {
+  .ribbon-inline-menu {
+    animation: none !important;
+  }
+}
+
+/* Keep the farming shortcut separate from the moving navigation marker. */
+html body .ribbon-header .ds-nav .farm-nav-cta,
+html body .ribbon-header .ds-nav .farm-nav-cta:hover {
+  background:
+    radial-gradient(ellipse at 20% 0%, #ffffff5c, transparent 65%),
+    linear-gradient(135deg, #308ed8e6, #075e9eea 62%, #003e70f0);
+  color: #fff;
+  border: 1px solid #b7e6ffcc;
+  box-shadow:
+    0 5px 16px #0876b840,
+    0 0 0 1px #197eb51a,
+    inset 0 1px 0 #ffffff80,
+    inset 0 -1px 0 #00315230;
+  text-shadow: 0 1px 2px #0031524d;
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  transform: none;
+  transition: none;
+  animation: none;
+}
+html body .ribbon-header .ds-nav .farm-nav-cta:hover {
+  background:
+    radial-gradient(ellipse at 25% 0%, #ffffff70, transparent 68%),
+    linear-gradient(135deg, #389ce8ed, #0869adef 62%, #004a80f5);
+  box-shadow:
+    0 6px 20px #0876b855,
+    0 0 12px #49b9ed26,
+    inset 0 1px 0 #ffffff99,
+    inset 0 -1px 0 #00315230;
+}
+/* Reserve space even when shared input styles override portal defaults. */
+html body .pt-search input {
+  padding-inline-start: 40px;
+  padding-inline-end: 14px;
+}
+html body .pt-search > svg {
+  width: 18px;
+  height: 18px;
+  left: 13px;
+  pointer-events: none;
+  z-index: 1;
+}
