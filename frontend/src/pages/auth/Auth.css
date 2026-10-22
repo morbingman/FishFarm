@@ -433,10 +433,10 @@
   cursor: not-allowed;
 }
 .auth-google {
-  font-family: Arial, sans-serif;
-  font-size: 20px;
-  font-weight: 700;
-  color: #addef1;
+  display: block;
+  flex: 0 0 20px;
+  width: 20px;
+  height: 20px;
 }
 .auth-divider {
   display: flex;

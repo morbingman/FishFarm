@@ -41,7 +41,7 @@ export function Profile({
   if (f.phone && !/^\+?[\d\s()-]{7,20}$/.test(f.phone))
     errs.phone = "Enter a valid phone number.";
   if (!f.location.trim()) errs.location = "Enter your location.";
-  if (user.role === "Seller" && !f.store.trim())
+  if (user.role === "Admin" && !f.store.trim())
     errs.store = "Enter your store name.";
   const set =
     (k: keyof typeof f) =>
@@ -68,7 +68,7 @@ export function Profile({
           name: f.name.trim(),
           phone: f.phone.trim(),
           location: f.location.trim(),
-          ...(user.role === "Seller"
+          ...(user.role === "Admin"
             ? {
                 store: f.store.trim(),
               }
@@ -157,12 +157,12 @@ export function Profile({
             </UiLabel>
             {field(
               "name",
-              user.role === "Seller" ? "Contact name" : "Full name",
+              user.role === "Admin" ? "Contact name" : "Full name",
               {
                 req: true,
               },
             )}
-            {user.role === "Seller" &&
+            {user.role === "Admin" &&
               field("store", "Store name", {
                 req: true,
                 hint: "Shown to buyers on every listing.",

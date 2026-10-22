@@ -1,180 +1,91 @@
-import type { LStatus } from "@/services/demoStore";
-import "./Overview.css";
-import { TableCell as UiTableCell } from "@/components/ui/table";
-import { TableBody as UiTableBody } from "@/components/ui/table";
-import { TableHead as UiTableHead } from "@/components/ui/table";
-import { TableRow as UiTableRow } from "@/components/ui/table";
-import { TableHeader as UiTableHeader } from "@/components/ui/table";
-import { Table as UiTable } from "@/components/ui/table";
-import { Button as UiButton } from "@/components/ui/button";
-import {
-  Icon,
-  StateBlock,
-  Skeleton,
-  useLoading,
-  go,
-} from "@/components/common/Portal";
-import { timeAgo, useStore } from "@/services/demoStore";
-import { waitingHours } from "@/data/adminData";
+import { useTranslation } from "@/context/LanguageContext";
+import { ADMIN_NAV, adminLabel } from "@/data/adminNavigation";
+import { Icon } from "@/components/common/Portal";
+import { isAccountBlocked, useStore } from "@/services/demoStore";
+import { useFarming } from "@/services/farmingStore";
+import { useSales } from "@/services/commerceStore";
 export function Overview() {
-  const s = useStore();
-  const loading = useLoading();
-  const c = (st: LStatus) => s.listings.filter((l) => l.status === st).length;
-  const queue = s.listings
-    .filter((l) => l.status === "pending")
-    .sort((a, b) => waitingHours(b) - waitingHours(a));
-  const kpis: [
-    string,
-    number,
-    string,
-    string,
-    "shield" | "check" | "alert" | "users",
-  ][] = [
-    [
-      "Pending review",
-      c("pending"),
-      "#admin/queue?tab=pending",
-      "Review queue",
-      "shield",
+  const { language } = useTranslation();
+  const t = (vi: string, en: string) => (language === "vi" ? vi : en);
+  const store = useStore();
+  const farming = useFarming();
+  const sales = useSales();
+  const notes: Record<string, [string, string]> = {
+    "#admin/listings": [
+      "Thêm cá mới, chỉnh sửa thông tin, hình ảnh, giá và số lượng; tạm ẩn hoặc xóa bản nháp.",
+      "Create and edit fish listings, photos, prices and quantities; pause listings or delete drafts.",
     ],
-    [
-      "Live listings",
-      c("approved"),
-      "#admin/queue?tab=approved",
-      "View live listings",
-      "check",
+    "#admin/queue": [
+      "Xem nội dung chờ duyệt, yêu cầu bổ sung, từ chối hoặc duyệt đăng; xử lý cá đang hiển thị.",
+      "Review submissions, request changes, reject or publish listings and moderate live inventory.",
     ],
-    [
-      "Changes / rejected",
-      c("changes") + c("rejected"),
-      "#admin/queue?tab=changes",
-      "See sent back",
-      "alert",
+    "#admin/orders": [
+      "Tiếp nhận đơn mua cá, kiểm tra khách hàng và cập nhật đóng gói, giao hàng, hoàn tất.",
+      "Review purchases and customer details, then update preparation, shipping and completion.",
     ],
-    [
-      "Active users",
-      s.users.filter((u) => u.status === "active").length,
-      "#admin/users",
-      "Manage users",
-      "users",
+    "#admin/bookings": [
+      "Xem đơn đặt nuôi từ khách, đối soát tiền cọc, xác nhận đặt nuôi và theo dõi đến khi bàn giao.",
+      "Review customer bookings, reconcile deposits and manage farming through handover.",
     ],
-  ];
+    "#admin/users": [
+      "Xem trạng thái khách hàng; khóa 24 giờ, 7 ngày hoặc vĩnh viễn, mở khóa và xóa tài khoản.",
+      "Review customer access; block for 24 hours, 7 days or permanently, unblock or delete accounts.",
+    ],
+    "#admin/activity": [
+      "Tra cứu người thực hiện, thời điểm và nội dung thay đổi để đối chiếu vận hành.",
+      "Trace who performed each action, when it happened and what changed.",
+    ],
+  };
+  const counts: Record<string, number> = {
+    "#admin/listings": store.listings.length,
+    "#admin/queue": store.listings.filter((item) => item.status === "pending")
+      .length,
+    "#admin/orders": sales.length,
+    "#admin/bookings": farming.orders.length,
+    "#admin/users": store.users.filter(
+      (item) => item.role === "Buyer" && !item.deletedAt,
+    ).length,
+    "#admin/activity": store.activity.length,
+  };
   return (
-    <>
-      <div className="sl-page-head">
+    <div data-no-translate>
+      <header className="sl-page-head">
         <div>
-          <span className="sl-eyebrow">Admin Console</span>
-          <h1>Marketplace overview</h1>
-          <p>Everything that needs your attention, in one place.</p>
+          <span className="sl-eyebrow">
+            FISHMARKET · {t("Quản trị", "Administration")}
+          </span>
+          <h1>{t("Tổng quan quản lý", "Management overview")}</h1>
+          <p>
+            {t(
+              "Chọn khu vực cần xử lý. Mỗi mục bên dưới tóm tắt công việc của khu vực đó.",
+              "Choose a management area. Each section below explains what you can do there.",
+            )}
+          </p>
         </div>
-        <UiButton
-          variant="plain"
-          className="sl-btn sl-btn-primary lg"
-          disabled={!queue.length}
-          onClick={() => go(`admin/review/${queue[0].id}`)}
-        >
-          Review next listing <Icon name="arrow" />
-        </UiButton>
-      </div>
-      <div className="sl-stats">
-        {kpis.map(([label, n, href, cta, ic]) => (
-          <UiButton
-            variant="plain"
-            key={label}
-            className="sl-stat pt-kpi"
-            onClick={() => go(href)}
-          >
-            <div className="sl-stat-top">
+      </header>
+      <div className="admin-module-grid">
+        {ADMIN_NAV.filter((item) => item.href !== "#admin").map((item) => (
+          <a className="sl-card admin-module" key={item.href} href={item.href}>
+            <div className="admin-module-head">
               <span>
-                <Icon name={ic} />
+                <Icon name={item.icon} size={23} />
               </span>
+              <strong>{counts[item.href]}</strong>
             </div>
-            <strong>{n}</strong>
-            <small>{label}</small>
-            <span className="go">
-              {cta} <Icon name="arrow" size={13} />
+            <h2>{adminLabel(item.label, language)}</h2>
+            <p>{notes[item.href]?.[language === "vi" ? 0 : 1]}</p>
+            <span className="admin-module-link">
+              {t("Mở quản lý", "Open section")} →
             </span>
-          </UiButton>
+          </a>
         ))}
       </div>
-      <div className="pt-grid2">
-        <section className="sl-card">
-          <div className="sl-card-head">
-            <h2>Needs attention</h2>
-            <a className="sl-link" href="#admin/queue?tab=pending">
-              View queue
-            </a>
-          </div>
-          {loading ? (
-            <Skeleton rows={3} />
-          ) : queue.length === 0 ? (
-            <StateBlock
-              icon="check"
-              title="Queue is clear"
-              body="No listings are waiting for review. New submissions will appear here and in your notifications."
-            />
-          ) : (
-            <div className="sl-table-wrap">
-              <UiTable className="sl-table">
-                <UiTableHeader>
-                  <UiTableRow>
-                    <UiTableHead>Listing</UiTableHead>
-                    <UiTableHead>Seller</UiTableHead>
-                    <UiTableHead>Waiting</UiTableHead>
-                  </UiTableRow>
-                </UiTableHeader>
-                <UiTableBody>
-                  {queue.slice(0, 5).map((l) => (
-                    <UiTableRow
-                      key={l.id}
-                      className="pt-row-click"
-                      onClick={() => go(`admin/review/${l.id}`)}
-                    >
-                      <UiTableCell>
-                        <b>{l.draft.name}</b>
-                        <br />
-                        <small className="pt-mini">{l.id}</small>
-                      </UiTableCell>
-                      <UiTableCell>{l.sellerName}</UiTableCell>
-                      <UiTableCell>{waitingHours(l)} h</UiTableCell>
-                    </UiTableRow>
-                  ))}
-                </UiTableBody>
-              </UiTable>
-            </div>
-          )}
-        </section>
-        <section className="sl-card">
-          <div className="sl-card-head">
-            <h2>Recent activity</h2>
-            <a className="sl-link" href="#admin/activity">
-              View all
-            </a>
-          </div>
-          {loading ? (
-            <Skeleton rows={4} />
-          ) : (
-            <ul className="pt-timeline overview-view-2">
-              {s.activity.slice(0, 5).map((a) => (
-                <li key={a.id}>
-                  <b>{a.action}</b>
-                  {a.target &&
-                    (a.link ? (
-                      <a href={a.link} className="sl-link">
-                        {a.target}
-                      </a>
-                    ) : (
-                      <span>{a.target}</span>
-                    ))}
-                  <small>
-                    {a.actor} · {timeAgo(a.at)}
-                  </small>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
-    </>
+      <p className="admin-note">
+        {t(
+          "Thông báo mới nằm ở biểu tượng chuông trên navbar; mỗi lần mở hiển thị tối đa 4 tin.",
+          "Open the bell in the navbar to see up to four recent notifications.",
+        )}
+      </p>
+    </div>
   );
 }

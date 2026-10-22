@@ -46,8 +46,8 @@ export function Detail({
   const [err, setErr] = useState("");
   const [preview, setPreview] = useState(false);
   const crumbs = (label: string): [string, string?][] => [
-    [t("Seller Center"), "#seller"],
-    [t("My Listings"), "#seller/listings"],
+    [t("Seller Center"), "#admin"],
+    [t("My Listings"), "#admin/listings"],
     [label],
   ];
   if (!l && s.deleted.includes(id))
@@ -61,14 +61,14 @@ export function Detail({
           title={t("This listing was deleted")}
           body={t("The listing was deleted and can no longer be opened.")}
           actions={
-            <a className="sl-btn sl-btn-primary" href="#seller/listings">
+            <a className="sl-btn sl-btn-primary" href="#admin/listings">
               {t("Back to My Listings")}
             </a>
           }
         />
       </>
     );
-  if (!l || l.owner !== user.email)
+  if (!l || (user.role !== "Admin" && l.owner !== user.email))
     return (
       <>
         <Crumbs items={crumbs(id)} />
@@ -79,7 +79,7 @@ export function Detail({
           title={t("Listing not found")}
           body={t("It may have been deleted or you may not have access to it.")}
           actions={
-            <a className="sl-btn sl-btn-primary" href="#seller/listings">
+            <a className="sl-btn sl-btn-primary" href="#admin/listings">
               {t("Back to My Listings")}
             </a>
           }
@@ -138,7 +138,7 @@ export function Detail({
         <Banner
           tone="warn"
           action={
-            <a className="sl-btn sl-btn-primary" href={`#seller/edit/${l.id}`}>
+            <a className="sl-btn sl-btn-primary" href={`#admin/edit/${l.id}`}>
               {t("Edit & resubmit")}
             </a>
           }
@@ -177,7 +177,7 @@ export function Detail({
       )}
       <div className="sl-row detail-view-2">
         {(st === "draft" || st === "changes" || st === "rejected") && (
-          <a className="sl-btn sl-btn-primary" href={`#seller/edit/${l.id}`}>
+          <a className="sl-btn sl-btn-primary" href={`#admin/edit/${l.id}`}>
             <Icon name="edit" />
             {st === "draft" ? t("Edit listing") : t("Edit & resubmit")}
           </a>
@@ -317,7 +317,7 @@ export function Detail({
             request(() => deleteListing(user, l.id), 650)
               .then(() => {
                 flash("Listing deleted.");
-                go("seller/listings");
+                go("admin/listings");
               })
               .catch((e: Error) => {
                 setBusy(false);
@@ -336,7 +336,7 @@ export function Detail({
           body="Saving changes sends the listing back to review and hides it from buyers until it is approved again."
           confirmLabel="Continue to edit"
           onCancel={() => setDlg(null)}
-          onConfirm={() => go(`seller/edit/${l.id}`)}
+          onConfirm={() => go(`admin/edit/${l.id}`)}
         />
       )}
     </>

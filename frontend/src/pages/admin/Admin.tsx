@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { User } from "@/services/demoStore";
 import type { Lang } from "@/hooks/useTranslation";
 import {
@@ -13,7 +14,13 @@ import { Queue } from "@/pages/admin/Queue";
 import { Review } from "@/pages/admin/Review";
 import { Users } from "@/pages/admin/Users";
 import { ActivityLog } from "@/pages/admin/ActivityLog";
-import { Roles } from "@/pages/admin/Roles";
+import { Listings } from "@/pages/seller/Listings";
+import { ListingForm } from "@/pages/seller/ListingForm";
+import { Detail } from "@/pages/seller/Detail";
+import { Bookings } from "./Bookings";
+import { PurchaseOrders } from "./PurchaseOrders";
+import { vi, xvi } from "@/data/sellerData";
+import "./AdminWorkspace.css";
 export default function Admin({
   user,
   language,
@@ -24,10 +31,33 @@ export default function Admin({
   setLanguage: (l: Lang) => void;
 }) {
   const s = useStore();
+  const dictionary = {
+    ...portalVi,
+    ...vi,
+    ...xvi,
+    "Seller Center": language === "vi" ? "Quản lý cá" : "Fish management",
+    "My Listings": language === "vi" ? "Danh sách cá" : "Fish listings",
+    "Back to My Listings":
+      language === "vi" ? "Về danh sách cá" : "Back to fish listings",
+    "+ Add New Fish": language === "vi" ? "Thêm cá mới" : "Add fish",
+  };
+  const text = (value: string) =>
+    language === "vi"
+      ? (dictionary[value as keyof typeof dictionary] ?? value)
+      : ({
+          "Seller Center": "Fish management",
+          "My Listings": "Fish listings",
+          "+ Add New Fish": "Add fish",
+          "Back to My Listings": "Back to fish listings",
+        }[value] ?? value);
   const { parts, params } = useHash();
   const [toast, show] = useToast();
   const pending = s.listings.filter((l) => l.status === "pending").length;
   const sec = parts[1] ?? "";
+  useEffect(() => {
+    if (sec === "roles") window.location.replace("#admin/users");
+    window.scrollTo({ top: 0, behavior: "instant" });
+  }, [sec, parts[2]]);
   const active =
     sec === "" ? "#admin" : sec === "review" ? "#admin/queue" : `#admin/${sec}`;
   let body;
@@ -43,7 +73,37 @@ export default function Admin({
     body = <Review key={parts[2]} id={parts[2]} user={user} show={show} />;
   else if (sec === "users") body = <Users user={user} show={show} />;
   else if (sec === "activity") body = <ActivityLog />;
-  else if (sec === "roles") body = <Roles />;
+  else if (sec === "listings")
+    body = (
+      <Listings user={user} t={text} initTab={params.get("tab") ?? "all"} />
+    );
+  else if (sec === "add")
+    body = <ListingForm key="new" user={user} t={text} show={show} />;
+  else if (sec === "edit" && parts[2])
+    body = (
+      <ListingForm
+        key={parts[2]}
+        id={parts[2]}
+        user={user}
+        t={text}
+        show={show}
+      />
+    );
+  else if (sec === "listing" && parts[2])
+    body = (
+      <Detail
+        key={parts[2]}
+        id={parts[2]}
+        user={user}
+        t={text}
+        show={show}
+        submitted={params.get("submitted") === "1"}
+      />
+    );
+  else if (sec === "bookings") body = <Bookings id={parts[2]} show={show} />;
+  else if (sec === "orders")
+    body = <PurchaseOrders id={parts[2]} show={show} />;
+  else if (sec === "roles") body = <Users user={user} show={show} />;
   else
     body = (
       <StateBlock

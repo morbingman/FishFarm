@@ -42,13 +42,7 @@ export function History({ user }: { user: User }) {
             actions={
               <a
                 className="sl-btn sl-btn-primary"
-                href={
-                  user.role === "Seller"
-                    ? "#seller/add"
-                    : user.role === "Admin"
-                      ? "#admin"
-                      : "#marketplace"
-                }
+                href={user.role === "Admin" ? "#admin" : "#marketplace"}
               >
                 Get started
               </a>

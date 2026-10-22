@@ -1,3 +1,4 @@
+import { adminActive } from "@/data/adminNavigation";
 import { useEffect, useState, type ReactNode } from "react";
 import type { User } from "@/services/demoStore";
 import type { Lang } from "@/hooks/useTranslation";
@@ -27,7 +28,9 @@ function WorkspaceSidebar({
 }) {
   const { hash } = useHash();
   const items: NavItem[] = [
-    { label: "Home", href: "#home", icon: "dash" },
+    ...(user.role === "Admin"
+      ? []
+      : [{ label: "Home", href: "#home", icon: "dash" as const }]),
     ...ROLE_NAV[user.role],
     ...(user.role === "Buyer"
       ? [
@@ -40,12 +43,10 @@ function WorkspaceSidebar({
           FARM_ORDERS_NAV,
         ]
       : []),
-    ...ACCOUNT_NAV,
+    ...(user.role === "Admin" ? [] : ACCOUNT_NAV),
   ];
   const rawRoute = (hash || "#home").split("?")[0];
-  const route = /^#seller\/(edit|listing)\//.test(rawRoute)
-    ? "#seller/listings"
-    : rawRoute;
+  const route = user.role === "Admin" ? adminActive(rawRoute) : rawRoute;
   const matched =
     items
       .filter((i) => route === i.href || route.startsWith(i.href + "/"))
@@ -60,6 +61,9 @@ function WorkspaceSidebar({
           "Farm a Fish": "Đặt nuôi cá",
           "Farming Orders": "Đơn đặt nuôi",
           ...portalVi,
+          "Fish management": "Quản lý cá",
+          "Purchase orders": "Đơn mua cá",
+          "Farming bookings": "Cá đặt nuôi",
         }[s] ?? s)
       : s;
   return (
@@ -91,6 +95,7 @@ function WorkspaceSidebar({
             <span className="workspace-label">{label(item.label)}</span>
           </a>
         ))}
+
       </nav>
     </aside>
   );
@@ -112,14 +117,14 @@ export function WorkspaceFrame({
   }, [user?.email]);
   useEffect(() => {
     const escape = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
+      if (e.key === "Escape" && expanded) {
         setExpanded(false);
         document.getElementById("workspace-toggle")?.focus();
       }
     };
     window.addEventListener("keydown", escape);
     return () => window.removeEventListener("keydown", escape);
-  }, []);
+  }, [expanded]);
   return (
     <NavigationContext.Provider
       value={{ expanded, toggle: () => setExpanded((v) => !v) }}

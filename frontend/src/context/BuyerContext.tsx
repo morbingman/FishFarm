@@ -1,3 +1,4 @@
+import { recordPurchase, useSales } from "@/services/commerceStore";
 import { useSessionState } from "@/hooks/useSessionState";
 import { pageTitles } from "@/data/buyerData";
 import type { ReactNode as Node } from "react";
@@ -28,6 +29,7 @@ function useBuyerState({
 }) {
   useDomTranslation(language, buyerVi);
   const store = useStore();
+  const sales = useSales();
   const stock: Fish[] = [
     ...baseStock,
     ...store.listings
@@ -114,6 +116,13 @@ function useBuyerState({
     "ready",
   );
   const [simulateFailure, setSimulateFailure] = useState(false);
+  const [purchaseId, setPurchaseId] = useSessionState(
+    draftKey("purchaseId"),
+    "",
+  );
+  const currentPurchase = sales.find(
+    (order) => order.id === purchaseId && order.owner === user.email,
+  );
   const [hasOrder, setHasOrder] = useSessionState(draftKey("hasOrder"), false);
   const [delivered, setDelivered] = useSessionState(
     draftKey("delivered"),
@@ -199,13 +208,12 @@ function useBuyerState({
     setAvailable(true);
   }
   function beginCheckout(fish: Fish[]) {
-    if (hasOrder) {
-      setToast(
-        "This prototype keeps one order per session. Your current demo order is below.",
-      );
-      go("orders");
-      return;
-    }
+    setPurchaseId("");
+    setHasOrder(false);
+    setDelivered(false);
+    setCompleted(false);
+    setReviewSent(false);
+    setDisputeSent(false);
     setItems(fish);
     go("checkout");
   }
@@ -256,26 +264,25 @@ function useBuyerState({
       } else {
         setPaymentState("paid");
         setHasOrder(true);
+        const purchase = recordPurchase({
+          owner: user.email,
+          items: items.map(({ id, name, price, image }) => ({
+            id,
+            name,
+            price,
+            image,
+          })),
+          total,
+          shipping,
+        });
+        setPurchaseId(purchase.id);
         notify(
           user.email,
           "success",
           "Order confirmed",
-          "Your order #FM-10248 is confirmed. Follow its progress in your orders.",
+          `Your order ${purchase.id} is confirmed. Follow its progress in your orders.`,
           "#marketplace",
         );
-        items.forEach((it) => {
-          const l = store.listings.find(
-            (x) => 1000 + Number(x.id.replace(/\D/g, "")) === it.id,
-          );
-          if (l)
-            notify(
-              l.owner,
-              "status",
-              "New order received",
-              `A buyer ordered "${l.draft.name}" (${l.id}).`,
-              "#seller/orders",
-            );
-        });
         setCart((old) =>
           old.filter((fish) => !items.some((item) => item.id === fish.id)),
         );
@@ -283,6 +290,30 @@ function useBuyerState({
       }
     }, 1600);
   }
+  function viewPurchase(id: string) {
+    const order = sales.find(
+      (item) => item.id === id && item.owner === user.email,
+    );
+    if (!order) return;
+    setPurchaseId(order.id);
+    setShipping(order.shipping);
+    setHasOrder(true);
+    setItems(
+      order.items.map(
+        (item) =>
+          stock.find((fish) => fish.id === item.id) ?? { ...stock[0], ...item },
+      ),
+    );
+    setDelivered(["delivered", "completed"].includes(order.status));
+    setCompleted(order.status === "completed");
+    go("tracking");
+  }
+  useEffect(() => {
+    if (currentPurchase) {
+      setDelivered(["delivered", "completed"].includes(currentPurchase.status));
+      setCompleted(currentPurchase.status === "completed");
+    }
+  }, [currentPurchase?.status]);
   const filtered = stock
     .filter(
       (fish) =>
@@ -378,6 +409,10 @@ function useBuyerState({
     setSimulateFailure,
     hasOrder,
     setHasOrder,
+    sales,
+    currentPurchase,
+    purchaseId,
+    viewPurchase,
     delivered,
     setDelivered,
     completed,

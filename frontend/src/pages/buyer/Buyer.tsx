@@ -1,3 +1,4 @@
+import { LogoMark } from "@/components/layout/LogoMark";
 import "./Buyer.css";
 import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { Textarea as UiTextarea } from "@/components/ui/textarea";
@@ -233,7 +234,7 @@ export function BuyerLayout() {
           className="buy-footer-brand"
           onClick={() => go("marketplace")}
         >
-          <Glyph name="fish" />
+          <LogoMark />
           FISHMARKET
         </UiButton>
         <span>Better fish. Better connections. Better trade.</span>
@@ -318,7 +319,7 @@ export function BuyerLayout() {
                 <h2>You're all caught up.</h2>
                 <p>
                   {hasOrder
-                    ? "Your demo order #FM-10248 is confirmed. Follow its progress in your orders."
+                    ? "Your purchase is confirmed. Follow its progress in your orders."
                     : "Order updates and important marketplace news will appear here."}
                 </p>
                 <BuyButton

@@ -1,3 +1,4 @@
+import { LogoMark } from "@/components/layout/LogoMark";
 import type { Lang } from "@/hooks/useTranslation";
 import type { FormEvent } from "react";
 import {
@@ -108,12 +109,11 @@ export default function Auth({
     const back = takeReturnTo();
     const top = (back ?? "").split(/[/?]/)[0];
     const ok =
-      (top === "seller" && r === "Seller") ||
       (top === "admin" && r === "Admin") ||
       top === "marketplace" ||
       top === "account";
     window.location.hash =
-      r === "Buyer" ? "home" : ok && back ? back : homeFor(r);
+      r === "Admin" ? (top === "admin" && back ? back : "admin") : "home";
   }
   function pending(callback: () => void) {
     setBusy(true);
@@ -149,14 +149,7 @@ export default function Auth({
         nextErrors.confirm = "Your passwords don't match.";
     }
     if (screen === "register") {
-      for (const field of [
-        "name",
-        "phone",
-        "location",
-        ...(role === "Seller"
-          ? ["store", "business", "storeLocation", "description"]
-          : []),
-      ])
+      for (const field of ["name", "phone", "location"])
         if (!data[field]?.trim()) nextErrors[field] = "This field is required.";
       if (data.phone && !/^\+?[\d\s()-]{7,20}$/.test(data.phone))
         nextErrors.phone = "Enter a valid phone number.";
@@ -220,7 +213,7 @@ export default function Auth({
             role,
             phone: r.phone,
             location: r.location,
-            store: role === "Seller" ? r.store : undefined,
+            store: undefined,
           });
         go("created");
       }
@@ -251,9 +244,7 @@ export default function Auth({
           />
           <div className="auth-photo-shade" />
           <a className="auth-brand" href="#home">
-            <span className="auth-brand-mark">
-              <Symbol name="fish" />
-            </span>
+            <LogoMark />
             FISHMARKET
             <span className="auth-brand-dot" />
           </a>
@@ -418,7 +409,12 @@ export default function Auth({
                     })
                   }
                 >
-                  <span className="auth-google">G</span> Continue with Google
+                  <svg className="auth-google" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
+                    <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.89-1.74 2.98-4.3 2.98-7.36Z" />
+                    <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.41l-3.24-2.51c-.9.6-2.05.97-3.38.97-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z" />
+                    <path fill="#FBBC05" d="M6.41 13.93a6 6 0 0 1 0-3.86V7.48H3.07a10 10 0 0 0 0 9.04l3.34-2.59Z" />
+                    <path fill="#EA4335" d="M12 5.95c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.93 5.48l3.34 2.59C7.2 7.71 9.4 5.95 12 5.95Z" />
+                  </svg> Continue with Google
                 </Action>
                 <p className="auth-bottom-question">
                   Don't have an account?{" "}
@@ -440,7 +436,7 @@ export default function Auth({
                     className="auth-role-tabs"
                     aria-label="Demo account role"
                   >
-                    {(["Buyer", "Seller", "Admin"] as Role[]).map((r) => (
+                    {(["Buyer", "Admin"] as Role[]).map((r) => (
                       <UiButton
                         variant="plain"
                         key={r}
@@ -526,93 +522,6 @@ export default function Auth({
                   Use at least 8 characters, one uppercase letter, and one
                   number.
                 </p>
-                <fieldset className="auth-role-fieldset">
-                  <legend>Choose your account type</legend>
-                  <div className="auth-account-cards">
-                    {(["Buyer", "Seller"] as Role[]).map((r) => (
-                      <UiLabel
-                        key={r}
-                        className={`auth-account-card ${
-                          role === r ? "selected" : ""
-                        }`}
-                      >
-                        <UiInput
-                          type="radio"
-                          name="role"
-                          value={r}
-                          checked={role === r}
-                          onChange={() => setRole(r)}
-                        />
-                        <Symbol name={r === "Buyer" ? "user" : "store"} />
-                        <strong>{r}</strong>
-                        <span>
-                          {r === "Buyer"
-                            ? "Buy fish from trusted sellers."
-                            : "Sell your fish and grow your business."}
-                        </span>
-                      </UiLabel>
-                    ))}
-                  </div>
-                </fieldset>
-                {role === "Seller" && (
-                  <div className="auth-seller-fields">
-                    <div className="auth-subheading">
-                      <Symbol name="store" />
-                      Tell us about your business
-                    </div>
-                    <div className="auth-register-grid">
-                      <Field
-                        label="Store Name"
-                        name="store"
-                        placeholder="Your business name"
-                        error={errors.store}
-                      />
-                      <div className="auth-field">
-                        <UiLabel htmlFor="business">Business Type</UiLabel>
-                        <NativeSelect
-                          id="business"
-                          name="business"
-                          aria-invalid={!!errors.business}
-                          defaultValue=""
-                        >
-                          <NativeSelectOption value="" disabled>
-                            Select business type
-                          </NativeSelectOption>
-                          {[
-                            "Breeder",
-                            "Farm",
-                            "Wholesaler",
-                            "Retailer",
-                            "Individual seller",
-                          ].map((b) => (
-                            <NativeSelectOption key={b}>{b}</NativeSelectOption>
-                          ))}
-                        </NativeSelect>
-                        {errors.business && (
-                          <span className="auth-error">{errors.business}</span>
-                        )}
-                      </div>
-                    </div>
-                    <Field
-                      label="Store Location"
-                      name="storeLocation"
-                      placeholder="Business address, city, country"
-                      error={errors.storeLocation}
-                    />
-                    <div className="auth-field">
-                      <UiLabel htmlFor="description">Store Description</UiLabel>
-                      <UiTextarea
-                        id="description"
-                        name="description"
-                        placeholder="Tell buyers about your stock and expertise"
-                        aria-invalid={!!errors.description}
-                      />
-                      {errors.description && (
-                        <span className="auth-error">{errors.description}</span>
-                      )}
-                    </div>
-                  </div>
-                )}
                 <div>
                   <UiLabel className="auth-checkbox auth-terms">
                     <UiInput name="terms" type="checkbox" />
@@ -892,11 +801,7 @@ export default function Auth({
                     window.location.hash = homeFor(role);
                   }}
                 >
-                  {role === "Seller"
-                    ? "Open Seller Center"
-                    : role === "Admin"
-                      ? "Open Admin Console"
-                      : "Open Home"}
+                  {role === "Admin" ? "Open Admin Console" : "Open Home"}
                   <Symbol name="arrow" />
                 </Action>
                 <Action

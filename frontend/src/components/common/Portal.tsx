@@ -1,3 +1,4 @@
+import { ADMIN_NAV } from "@/data/adminNavigation";
 import type { ReactNode } from "react";
 import type { LStatus, Notif, User, Role } from "@/services/demoStore";
 import type { Lang } from "@/hooks/useTranslation";
@@ -622,7 +623,15 @@ export const openNotif = (n: Notif) => {
   markRead(n.id);
   go(n.link);
 };
-export function NotifBell({ user, language }: { user: User; language: Lang }) {
+export function NotifBell({
+  user,
+  language,
+  triggerLabel,
+}: {
+  user: User;
+  language: Lang;
+  triggerLabel?: string;
+}) {
   const s = useStore();
   const [open, setOpen] = useState(false);
   const mine = notifsFor(s, user);
@@ -632,13 +641,16 @@ export function NotifBell({ user, language }: { user: User; language: Lang }) {
       <PopoverTrigger asChild>
         <UiButton
           variant="plain"
-          className="pt-iconbtn"
+          className={triggerLabel ? "workspace-notifications" : "pt-iconbtn"}
           aria-label={`Notifications${
             unread.length ? `, ${unread.length} unread` : ""
           }`}
           aria-expanded={open}
         >
           <Icon name="bell" />
+          {triggerLabel && (
+            <span className="workspace-label">{triggerLabel}</span>
+          )}
           {unread.length > 0 && (
             <span className="pt-badge">
               {unread.length > 9 ? "9+" : unread.length}
@@ -650,6 +662,8 @@ export function NotifBell({ user, language }: { user: User; language: Lang }) {
         className="pt-pop sl-app ui-floating-panel"
         aria-label="Notifications"
         align="end"
+        sideOffset={18}
+        collisionPadding={12}
       >
         <div className="pt-pop-head">
           <b>Notifications</b>
@@ -671,7 +685,7 @@ export function NotifBell({ user, language }: { user: User; language: Lang }) {
               body="Status changes, approvals and reminders will show up here."
             />
           ) : (
-            mine.slice(0, 6).map((n) => (
+            mine.slice(0, 4).map((n) => (
               <NotifItem
                 key={n.id}
                 n={n}
@@ -683,18 +697,6 @@ export function NotifBell({ user, language }: { user: User; language: Lang }) {
               />
             ))
           )}
-        </div>
-        <div className="pt-pop-foot">
-          <UiButton
-            variant="plain"
-            className="sl-link"
-            onClick={() => {
-              setOpen(false);
-              go("account/notifications");
-            }}
-          >
-            View all notifications
-          </UiButton>
         </div>
       </PopoverContent>
     </Popover>
@@ -726,42 +728,46 @@ export function UserMenu({ user, dark }: { user: User; dark?: boolean }) {
             {user.role} · {user.email}
           </small>
         </div>
-        <DropdownMenuItem asChild>
-          <UiButton
-            variant="plain"
-            onClick={() => {
-              setOpen(false);
-              go("account/profile");
-            }}
-          >
-            <Icon name="user" size={16} />
-            Profile
-          </UiButton>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <UiButton
-            variant="plain"
-            onClick={() => {
-              setOpen(false);
-              go("account/settings");
-            }}
-          >
-            <Icon name="gear" size={16} />
-            Account settings
-          </UiButton>
-        </DropdownMenuItem>
-        <DropdownMenuItem asChild>
-          <UiButton
-            variant="plain"
-            onClick={() => {
-              setOpen(false);
-              go("account/notifications");
-            }}
-          >
-            <Icon name="bell" size={16} />
-            Notifications
-          </UiButton>
-        </DropdownMenuItem>
+        {user.role !== "Admin" && (
+          <>
+            <DropdownMenuItem asChild>
+              <UiButton
+                variant="plain"
+                onClick={() => {
+                  setOpen(false);
+                  go("account/profile");
+                }}
+              >
+                <Icon name="user" size={16} />
+                Profile
+              </UiButton>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <UiButton
+                variant="plain"
+                onClick={() => {
+                  setOpen(false);
+                  go("account/settings");
+                }}
+              >
+                <Icon name="gear" size={16} />
+                Account settings
+              </UiButton>
+            </DropdownMenuItem>
+            <DropdownMenuItem asChild>
+              <UiButton
+                variant="plain"
+                onClick={() => {
+                  setOpen(false);
+                  go("account/notifications");
+                }}
+              >
+                <Icon name="bell" size={16} />
+                Notifications
+              </UiButton>
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuItem asChild>
           <UiButton
             variant="plain"
@@ -820,75 +826,7 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
     },
     FARM_NAV,
   ],
-  Seller: [
-    {
-      label: "Dashboard",
-      href: "#seller",
-      icon: "dash",
-    },
-    {
-      label: "My Listings",
-      href: "#seller/listings",
-      icon: "list",
-    },
-    {
-      label: "Add New Fish",
-      href: "#seller/add",
-      icon: "plus",
-    },
-    {
-      label: "Orders",
-      href: "#seller/orders",
-      icon: "bag",
-    },
-    {
-      label: "Customers",
-      href: "#seller/customers",
-      icon: "users",
-    },
-    {
-      label: "Messages",
-      href: "#seller/messages",
-      icon: "msg",
-    },
-    {
-      label: "Analytics",
-      href: "#seller/analytics",
-      icon: "chart",
-    },
-    {
-      label: "Reviews",
-      href: "#seller/reviews",
-      icon: "star",
-    },
-  ],
-  Admin: [
-    {
-      label: "Overview",
-      href: "#admin",
-      icon: "dash",
-    },
-    {
-      label: "Moderation Queue",
-      href: "#admin/queue",
-      icon: "shield",
-    },
-    {
-      label: "Users",
-      href: "#admin/users",
-      icon: "users",
-    },
-    {
-      label: "Activity Log",
-      href: "#admin/activity",
-      icon: "activity",
-    },
-    {
-      label: "Roles & Permissions",
-      href: "#admin/roles",
-      icon: "lock",
-    },
-  ],
+  Admin: ADMIN_NAV,
 };
 export const ACCOUNT_NAV: NavItem[] = [
   {
@@ -964,12 +902,7 @@ export function AccessDenied({
     "Switch account": "Đổi tài khoản",
     "Back to homepage": "Về trang chủ",
   });
-  const home =
-    user.role === "Seller"
-      ? "#seller"
-      : user.role === "Admin"
-        ? "#admin"
-        : "#marketplace";
+  const home = user.role === "Admin" ? "#admin" : "#marketplace";
   return (
     <FullState>
       <div className="pt-fullbody">
@@ -1012,6 +945,7 @@ export function SessionExpired({
 }) {
   useDomTranslation(language, {
     "Your session expired": "Phiên đăng nhập đã hết hạn",
+    "Your seven-day session has expired. Sign in again to continue.": "Phiên đăng nhập 7 ngày đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.",
     "Sign in again": "Đăng nhập lại",
     "Back to homepage": "Về trang chủ",
   });
@@ -1023,7 +957,7 @@ export function SessionExpired({
           icon="clock"
           tone="warn"
           title="Your session expired"
-          body="For your security you were signed out after 15 minutes of inactivity. Anything you hadn't saved may need to be redone. Sign in again to pick up where you left off."
+          body="Your seven-day session has expired. Sign in again to continue."
           actions={
             <>
               <a className="sl-btn sl-btn-primary" href="#login">

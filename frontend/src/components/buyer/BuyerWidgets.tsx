@@ -84,12 +84,12 @@ export function Stepper({ active }: { active: number }) {
   );
 }
 export function OrderProduct() {
-  const { items, total } = useBuyer();
+  const { items, total, purchaseId, currentPurchase } = useBuyer();
   return (
     <div className="buy-order-product">
       <img src={items[0].image} alt={items[0].name} />
       <div>
-        <span className="buy-eyebrow">ORDER #FM-10248</span>
+        <span className="buy-eyebrow">ORDER {purchaseId || "—"}</span>
         <h2>
           {items[0].name}
           {items.length > 1 ? ` + ${items.length - 1} more` : ""}
@@ -98,7 +98,7 @@ export function OrderProduct() {
           {items[0].seller} <Verified />
         </p>
       </div>
-      <strong>{money(total)}</strong>
+      <strong>{money(currentPurchase?.total ?? total)}</strong>
     </div>
   );
 }

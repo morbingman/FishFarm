@@ -1,0 +1,85 @@
+html body .brand-logo-block,
+html body .ribbon-header .ds-brand > .brand-logo-block {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: center;
+  width: 52px;
+  height: 52px;
+  padding: 4px;
+  box-sizing: border-box;
+  border-radius: 13px;
+  background: #003152;
+  box-shadow: inset 0 0 0 1px #addef133;
+}
+html body .brand-logo-block img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+html body .admin-header .ds-nav {
+  overflow-x: auto;
+  min-width: 0;
+  flex: 1;
+  margin-left: 4px;
+  scrollbar-width: thin;
+}
+html body .admin-header .ds-nav > a {
+  padding-inline: 10px;
+  font-size: 12px;
+}
+.workspace-notifications {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  height: 45px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 12px;
+  color: #addef1;
+  background: none;
+  cursor: pointer;
+  text-align: left;
+  font: 600 13px var(--font);
+  white-space: nowrap;
+}
+.workspace-notifications:hover {
+  background: #ffffff0a;
+  color: white;
+}
+.workspace-notifications svg {
+  flex-shrink: 0;
+}
+html body .pt-pop.sl-app {
+  min-height: 0;
+  height: auto;
+}
+@media (max-width: 760px) {
+  html body .ribbon-header .ds-brand > .brand-logo-block {
+    width: 40px;
+    height: 40px;
+    padding: 3px;
+    border-radius: 10px;
+  }
+}
+html body .pt-menu.sl-app {
+  min-height: 0;
+  height: auto;
+  max-height: calc(100dvh - 130px);
+  overflow-y: auto;
+}
+.workspace-nav {
+  min-width: 0;
+}
+.workspace-nav a,
+.workspace-notifications {
+  min-width: 0;
+  overflow: hidden;
+}
+.workspace-label {
+  min-width: 0;
+  overflow: hidden;
+}

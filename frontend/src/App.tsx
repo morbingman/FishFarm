@@ -3,6 +3,7 @@ import { WorkspaceFrame } from "@/components/layout/WorkspaceFrame";
 import { Button as UiButton } from "@/components/ui/button";
 import {
   endSession,
+  refreshAccountLocks,
   flash,
   hasSession,
   homeFor,
@@ -23,7 +24,6 @@ import { type Language, LanguageContext } from "@/context/LanguageContext";
 import { AppContent } from "@/pages/home/Home";
 export const Auth = lazy(() => import("@/pages/auth/Auth"));
 export const Buyer = lazy(() => import("@/pages/buyer/Buyer"));
-export const Seller = lazy(() => import("@/pages/seller/Seller"));
 export const Admin = lazy(() => import("@/pages/admin/Admin"));
 export const Account = lazy(() => import("@/pages/account/Account"));
 export const Farming = lazy(() => import("@/pages/farming/Farming"));
@@ -32,7 +32,6 @@ export type View =
   | "home"
   | "auth"
   | "buyer"
-  | "seller"
   | "admin"
   | "account"
   | "expired"
@@ -75,6 +74,7 @@ export default function App() {
       }),
     );
     const id = setInterval(() => {
+      refreshAccountLocks();
       if (sessionExpired()) {
         endSession();
         window.location.hash = "expired";
@@ -88,7 +88,17 @@ export default function App() {
       clearInterval(id);
     };
   }, []);
-  const top = topOf(hash);
+  const requestedTop = topOf(hash);
+  const adminRedirect =
+    user?.role === "Admin" && !["admin", "expired"].includes(requestedTop);
+  const top = adminRedirect ? "admin" : requestedTop;
+  useEffect(() => {
+    if (adminRedirect) window.location.replace("#admin");
+    else if (requestedTop === "seller")
+      window.location.replace(
+        user?.role === "Admin" ? "#admin/listings" : "#home",
+      );
+  }, [adminRedirect, requestedTop, user?.role]);
   let view: View = "home";
   let denied: string | null = null;
   if (sessionExpired()) view = "expired";
@@ -102,9 +112,6 @@ export default function App() {
   else if (top === "farming") {
     view = "farming";
     if (user.role !== "Buyer") denied = "Buyer";
-  } else if (top === "seller") {
-    view = "seller";
-    if (user.role !== "Seller") denied = "Seller";
   } else {
     view = "admin";
     if (user.role !== "Admin") denied = "Admin";
@@ -136,7 +143,7 @@ export default function App() {
   }, [view, hash]);
   useEffect(() => {
     localStorage.setItem("fishmarket-language", language);
-    document.documentElement.lang = view === "home" ? language : "en";
+    document.documentElement.lang = language;
   }, [language, view]);
   let page;
   if (denied && user)
@@ -162,8 +169,6 @@ export default function App() {
       />
     );
   else if (!user) page = null;
-  else if (view === "seller")
-    page = <Seller user={user} language={language} setLanguage={setLanguage} />;
   else if (view === "admin")
     page = <Admin user={user} language={language} setLanguage={setLanguage} />;
   else if (view === "farming")
@@ -201,9 +206,11 @@ export default function App() {
       )}
       {warn && user && (
         <div role="alert" className="sl-card pad app-view-3">
-          <b>Still there?</b>
+          <b>{language === "vi" ? "Phiên sắp hết hạn" : "Session expiring"}</b>
           <p className="app-view-5">
-            You'll be signed out in less than a minute because of inactivity.
+            {language === "vi"
+              ? "Phiên đăng nhập 7 ngày sẽ hết hạn trong chưa đầy một phút."
+              : "Your seven-day session expires in less than a minute."}
           </p>
           <UiButton
             variant="plain"
@@ -213,7 +220,7 @@ export default function App() {
               setWarn(false);
             }}
           >
-            Stay signed in
+            {language === "vi" ? "Tiếp tục đăng nhập" : "Stay signed in"}
           </UiButton>
         </div>
       )}

@@ -1,3 +1,5 @@
+import { LogoMark } from "./LogoMark";
+import { ADMIN_NAV, adminLabel, adminActive } from "@/data/adminNavigation";
 import "./SiteHeader.css";
 import type { Lang } from "@/hooks/useTranslation";
 import { useEffect, useRef, useState } from "react";
@@ -12,7 +14,7 @@ const VI: Record<string, string> = {
   Home: "Trang chủ",
   Categories: "Danh mục",
   "Featured Fish": "Cá nổi bật",
-  Sellers: "Nhà bán",
+  Sellers: "Trang trại",
   "How it works": "Cách hoạt động",
   Insights: "Kiến thức",
   "Farm a Fish": "Đặt nuôi cá",
@@ -63,8 +65,15 @@ export function SiteHeader({
   });
   const [activeSection, setActiveSection] = useState("top");
   const scrollTarget = useRef<string | null>(null);
-  const home = !parts[0] || parts[0] === "home";
-  const active = home ? activeSection : parts[0] === "farming" ? "farming" : "";
+  const isAdmin = user?.role === "Admin";
+  const home = !isAdmin && (!parts[0] || parts[0] === "home");
+  const active = isAdmin
+    ? adminActive(hash)
+    : home
+      ? activeSection
+      : parts[0] === "farming"
+        ? "farming"
+        : "";
   const { ref, style } = useNavIndicator(active + language);
   useEffect(() => {
     setMobile(false);
@@ -197,7 +206,7 @@ export function SiteHeader({
   };
   return (
     <header
-      className="ds-header ribbon-header"
+      className={`ds-header ribbon-header ${isAdmin ? "admin-header" : ""}`}
       data-theme="azure-v3"
       data-no-translate
     >
@@ -218,97 +227,122 @@ export function SiteHeader({
             <Menu size={21} />
           </button>
         )}
-        <a className="ds-brand" href="#home" aria-label="FISHMARKET home">
-          <span>
-            <Icon name="fish" />
-          </span>
+        <a
+          className="ds-brand"
+          href={isAdmin ? "#admin" : "#home"}
+          aria-label="FISHMARKET"
+        >
+          <LogoMark />
           <strong>FISHMARKET</strong>
         </a>
         <nav className="ds-nav" aria-label="Main" ref={ref}>
           <span className="nav-indicator" style={style} aria-hidden="true" />
-          {PRIMARY_SECTIONS.map((s) => (
-            <a
-              key={s.key}
-              href={s.key === "top" ? "#home" : `#home?section=${s.key}`}
-              onClick={(e) => navigateSection(e, s.key)}
-              className={active === s.key ? "on" : ""}
-              aria-current={active === s.key ? "location" : undefined}
-            >
-              {tr(language, s.label)}
-            </a>
-          ))}
-          <button
-            ref={moreButton}
-            type="button"
-            className={`nav-more ${EXTRA_SECTIONS.some((s) => s.key === active) ? "on" : ""}`}
-            data-nav-active={EXTRA_SECTIONS.some((s) => s.key === active)}
-            aria-haspopup="menu"
-            aria-expanded={moreOpen}
-            aria-controls="ribbon-more-menu"
-            onClick={() => setMoreOpen((open) => !open)}
-            onKeyDown={(event) => {
-              if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-                event.preventDefault();
-                setMoreOpen(true);
-              }
-            }}
-          >
-            {tr(language, "More")}
-          </button>
-          {moreOpen && (
-            <div
-              id="ribbon-more-menu"
-              ref={moreMenu}
-              className="ribbon-more-menu ribbon-inline-menu"
-              role="menu"
-              aria-label={tr(language, "More")}
-              style={menuPosition}
-              data-no-translate
-              onKeyDown={(event) => {
-                const links = Array.from(
-                  moreMenu.current?.querySelectorAll<HTMLAnchorElement>("a") ??
-                    [],
-                );
-                const index = links.indexOf(
-                  document.activeElement as HTMLAnchorElement,
-                );
-                if (
-                  ["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)
-                ) {
-                  event.preventDefault();
-                  const next =
-                    event.key === "Home"
-                      ? 0
-                      : event.key === "End"
-                        ? links.length - 1
-                        : (index +
-                            (event.key === "ArrowDown" ? 1 : -1) +
-                            links.length) %
-                          links.length;
-                  links[next]?.focus({ preventScroll: true });
-                } else if (event.key === "Tab") setMoreOpen(false);
-              }}
-            >
-              {EXTRA_SECTIONS.map((section) => (
+          {isAdmin
+            ? ADMIN_NAV.map((item) => (
                 <a
-                  key={section.key}
-                  role="menuitem"
-                  tabIndex={-1}
-                  href={`#home?section=${section.key}`}
-                  onClick={(event) => navigateSection(event, section.key)}
+                  key={item.href}
+                  href={item.href}
+                  className={active === item.href ? "on" : ""}
+                  aria-current={active === item.href ? "page" : undefined}
                 >
-                  {tr(language, section.label)}
+                  {adminLabel(item.label, language)}
+                </a>
+              ))
+            : PRIMARY_SECTIONS.map((s) => (
+                <a
+                  key={s.key}
+                  href={s.key === "top" ? "#home" : `#home?section=${s.key}`}
+                  onClick={(e) => navigateSection(e, s.key)}
+                  className={active === s.key ? "on" : ""}
+                  aria-current={active === s.key ? "location" : undefined}
+                >
+                  {s.key === "sellers"
+                    ? language === "vi"
+                      ? "Trang trại"
+                      : "Farms"
+                    : tr(language, s.label)}
                 </a>
               ))}
-            </div>
+          {!isAdmin && (
+            <>
+              <button
+                ref={moreButton}
+                type="button"
+                className={`nav-more ${EXTRA_SECTIONS.some((s) => s.key === active) ? "on" : ""}`}
+                data-nav-active={EXTRA_SECTIONS.some((s) => s.key === active)}
+                aria-haspopup="menu"
+                aria-expanded={moreOpen}
+                aria-controls="ribbon-more-menu"
+                onClick={() => setMoreOpen((open) => !open)}
+                onKeyDown={(event) => {
+                  if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+                    event.preventDefault();
+                    setMoreOpen(true);
+                  }
+                }}
+              >
+                {tr(language, "More")}
+              </button>
+              {moreOpen && (
+                <div
+                  id="ribbon-more-menu"
+                  ref={moreMenu}
+                  className="ribbon-more-menu ribbon-inline-menu"
+                  role="menu"
+                  aria-label={tr(language, "More")}
+                  style={menuPosition}
+                  data-no-translate
+                  onKeyDown={(event) => {
+                    const links = Array.from(
+                      moreMenu.current?.querySelectorAll<HTMLAnchorElement>(
+                        "a",
+                      ) ?? [],
+                    );
+                    const index = links.indexOf(
+                      document.activeElement as HTMLAnchorElement,
+                    );
+                    if (
+                      ["ArrowDown", "ArrowUp", "Home", "End"].includes(
+                        event.key,
+                      )
+                    ) {
+                      event.preventDefault();
+                      const next =
+                        event.key === "Home"
+                          ? 0
+                          : event.key === "End"
+                            ? links.length - 1
+                            : (index +
+                                (event.key === "ArrowDown" ? 1 : -1) +
+                                links.length) %
+                              links.length;
+                      links[next]?.focus({ preventScroll: true });
+                    } else if (event.key === "Tab") setMoreOpen(false);
+                  }}
+                >
+                  {EXTRA_SECTIONS.map((section) => (
+                    <a
+                      key={section.key}
+                      role="menuitem"
+                      tabIndex={-1}
+                      href={`#home?section=${section.key}`}
+                      onClick={(event) => navigateSection(event, section.key)}
+                    >
+                      {tr(language, section.label)}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </>
           )}
           {(!user || user.role === "Buyer") && (
             <a
-              className={`farm-nav-cta ${active === "farming" ? "on" : ""}`}
+              className="farm-nav-cta"
+              data-no-indicator
               href="#farming"
               aria-current={active === "farming" ? "page" : undefined}
             >
-              {tr(language, "Farm a Fish")} <Icon name="arrow" size={14} />
+              {tr(language, "Farm a Fish")}
             </a>
           )}
         </nav>
@@ -341,16 +375,31 @@ export function SiteHeader({
           className="ribbon-mobile-nav"
           aria-label="Homepage sections"
         >
-          {SECTIONS.map((s) => (
-            <a
-              key={s.key}
-              href={s.key === "top" ? "#home" : `#home?section=${s.key}`}
-              aria-current={active === s.key ? "location" : undefined}
-              onClick={(e) => navigateSection(e, s.key)}
-            >
-              {tr(language, s.label)}
-            </a>
-          ))}
+          {isAdmin
+            ? ADMIN_NAV.map((item) => (
+                <a
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => setMobile(false)}
+                  aria-current={active === item.href ? "page" : undefined}
+                >
+                  {adminLabel(item.label, language)}
+                </a>
+              ))
+            : SECTIONS.map((s) => (
+                <a
+                  key={s.key}
+                  href={s.key === "top" ? "#home" : `#home?section=${s.key}`}
+                  aria-current={active === s.key ? "location" : undefined}
+                  onClick={(e) => navigateSection(e, s.key)}
+                >
+                  {s.key === "sellers"
+                    ? language === "vi"
+                      ? "Trang trại"
+                      : "Farms"
+                    : tr(language, s.label)}
+                </a>
+              ))}
           {(!user || user.role === "Buyer") && (
             <a href="#farming">{tr(language, "Farm a Fish")}</a>
           )}
@@ -360,15 +409,32 @@ export function SiteHeader({
   );
 }
 export function SiteFooter({ language }: { language: Lang }) {
+  const footerUser = useUser();
   return (
     <footer className="ds-footer" data-no-translate>
       <div className="ds-footer-in">
         <span>© 2026 FISHMARKET. {tr(language, "All rights reserved.")}</span>
         <nav aria-label="Footer">
-          <a href="#marketplace">{tr(language, "Marketplace")}</a>
-          <a href="#account/settings">{tr(language, "Help & support")}</a>
-          <a href="#account/settings">{tr(language, "Privacy")}</a>
-          <a href="#account/settings">{tr(language, "Terms")}</a>
+          {footerUser?.role === "Admin" ? (
+            <>
+              {ADMIN_NAV.filter((item) =>
+                ["#admin/users", "#admin/bookings", "#admin/activity"].includes(
+                  item.href,
+                ),
+              ).map((item) => (
+                <a key={item.href} href={item.href}>
+                  {adminLabel(item.label, language)}
+                </a>
+              ))}
+            </>
+          ) : (
+            <>
+              <a href="#marketplace">{tr(language, "Marketplace")}</a>
+              <a href="#account/settings">{tr(language, "Help & support")}</a>
+              <a href="#account/settings">{tr(language, "Privacy")}</a>
+              <a href="#account/settings">{tr(language, "Terms")}</a>
+            </>
+          )}
         </nav>
       </div>
     </footer>

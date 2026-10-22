@@ -1,4 +1,11 @@
 export const portalVi: Record<string, string> = {
+  "Farm / source": "Trang trại / nguồn",
+  "Farm / source information": "Thông tin trang trại / nguồn",
+  "Managed by FISHMARKET": "FISHMARKET quản lý",
+  "Review, publish or request changes to fish listings.":
+    "Kiểm tra, xuất bản hoặc yêu cầu bổ sung thông tin cá.",
+  "Search by name, ID or farm": "Tìm theo tên, mã hoặc trang trại",
+
   FISHMARKET: "FISHMARKET",
   "Admin Console": "Bảng quản trị",
   "Seller Center": "Kênh người bán",

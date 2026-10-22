@@ -98,3 +98,46 @@ html body .workspace-toggle[aria-expanded="true"] {
     animation: none !important;
   }
 }
+
+/* Keep the farming shortcut separate from the moving navigation marker. */
+html body .ribbon-header .ds-nav .farm-nav-cta,
+html body .ribbon-header .ds-nav .farm-nav-cta:hover {
+  background:
+    radial-gradient(ellipse at 20% 0%, #ffffff5c, transparent 65%),
+    linear-gradient(135deg, #308ed8e6, #075e9eea 62%, #003e70f0);
+  color: #fff;
+  border: 1px solid #b7e6ffcc;
+  box-shadow:
+    0 5px 16px #0876b840,
+    0 0 0 1px #197eb51a,
+    inset 0 1px 0 #ffffff80,
+    inset 0 -1px 0 #00315230;
+  text-shadow: 0 1px 2px #0031524d;
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  backdrop-filter: blur(14px) saturate(140%);
+  transform: none;
+  transition: none;
+  animation: none;
+}
+html body .ribbon-header .ds-nav .farm-nav-cta:hover {
+  background:
+    radial-gradient(ellipse at 25% 0%, #ffffff70, transparent 68%),
+    linear-gradient(135deg, #389ce8ed, #0869adef 62%, #004a80f5);
+  box-shadow:
+    0 6px 20px #0876b855,
+    0 0 12px #49b9ed26,
+    inset 0 1px 0 #ffffff99,
+    inset 0 -1px 0 #00315230;
+}
+/* Reserve space even when shared input styles override portal defaults. */
+html body .pt-search input {
+  padding-inline-start: 40px;
+  padding-inline-end: 14px;
+}
+html body .pt-search > svg {
+  width: 18px;
+  height: 18px;
+  left: 13px;
+  pointer-events: none;
+  z-index: 1;
+}

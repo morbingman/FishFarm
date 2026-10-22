@@ -1,7 +1,6 @@
 import type { Lang } from "@/hooks/useTranslation";
 import type { User } from "@/services/demoStore";
 import type { Fish } from "@/services/farmingStore";
-import type { IconName } from "@/components/common/Portal";
 import "./Catalog.css";
 import {
   NativeSelect,
@@ -25,14 +24,13 @@ import {
   availOf,
   canBook,
   L,
-  ordersOf,
   useFarming,
   type Category,
 } from "@/services/farmingStore";
 import { Modal, useT } from "@/components/farming/FarmingParts";
 import { type Filters, F0, norm } from "@/data/farmingFilters";
 import { FishCard } from "@/components/farming/FishCard";
-export function Catalog({ language, user }: { language: Lang; user: User }) {
+export function Catalog({ language }: { language: Lang; user: User }) {
   const t = useT(language);
   const s = useFarming();
   const loading = useLoading(500);
@@ -50,7 +48,6 @@ export function Catalog({ language, user }: { language: Lang; user: User }) {
         ...x,
         [k]: e.target.value as Filters[K],
       }));
-  const mine = ordersOf(s, user.email);
   const list = useMemo(() => {
     const q = norm(f.q.trim());
     const r = FISH.filter((x) => {
@@ -88,26 +85,6 @@ export function Catalog({ language, user }: { language: Lang; user: User }) {
   const active = (Object.keys(F0) as (keyof Filters)[]).filter(
     (k) => k !== "sort" && f[k] !== F0[k],
   ).length;
-  const stat = (icon: IconName, n: number, label: string, href?: string) => {
-    const inner = (
-      <>
-        <span>
-          <Icon name={icon} size={20} />
-        </span>
-        <div>
-          <strong>{n}</strong>
-          <small>{label}</small>
-        </div>
-      </>
-    );
-    return href ? (
-      <a className="fm-stat" href={href}>
-        {inner}
-      </a>
-    ) : (
-      <div className="fm-stat">{inner}</div>
-    );
-  };
   const select = (
     label: string,
     k: keyof Filters,
@@ -156,29 +133,6 @@ export function Catalog({ language, user }: { language: Lang; user: User }) {
             {t("Đơn nuôi của tôi", "My farming orders")}
           </a>
         </div>
-      </div>
-
-      <div className="fm-stats" aria-label={t("Tổng quan", "Overview")}>
-        {stat(
-          "fish",
-          FISH.filter((x) => canBook(availOf(x, s))).length,
-          t("Loài cá đang nhận đặt", "Species open for booking"),
-        )}
-        {stat("shield", 3, t("Gói dịch vụ nuôi", "Farming service packages"))}
-        {stat(
-          "waves",
-          mine.filter((o) =>
-            ["confirmed", "preparing", "farming"].includes(o.status),
-          ).length,
-          t("Đơn đang nuôi của bạn", "Your active farming orders"),
-          "#account/farming-orders",
-        )}
-        {stat(
-          "truck",
-          mine.filter((o) => ["ready", "handover"].includes(o.status)).length,
-          t("Đơn sẵn sàng bàn giao", "Orders ready for handover"),
-          "#account/farming-orders",
-        )}
       </div>
 
       <section

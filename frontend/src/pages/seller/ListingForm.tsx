@@ -76,8 +76,8 @@ export function ListingForm({
     return () => window.removeEventListener("beforeunload", f);
   }, [dirty]);
   const crumbs = (label: string): [string, string?][] => [
-    [t("Seller Center"), "#seller"],
-    [t("My Listings"), "#seller/listings"],
+    [t("Seller Center"), "#admin"],
+    [t("My Listings"), "#admin/listings"],
     [label],
   ];
   if (id && !existing) {
@@ -96,7 +96,7 @@ export function ListingForm({
               : t("It may have been deleted or you may not have access to it.")
           }
           actions={
-            <a className="sl-btn sl-btn-primary" href="#seller/listings">
+            <a className="sl-btn sl-btn-primary" href="#admin/listings">
               {t("Back to My Listings")}
             </a>
           }
@@ -104,7 +104,7 @@ export function ListingForm({
       </>
     );
   }
-  if (existing && existing.owner !== user.email)
+  if (existing && user.role !== "Admin" && existing.owner !== user.email)
     return (
       <>
         <Crumbs items={crumbs(id!)} />
@@ -115,7 +115,7 @@ export function ListingForm({
           title={t("Listing not found")}
           body={t("It may have been deleted or you may not have access to it.")}
           actions={
-            <a className="sl-btn sl-btn-primary" href="#seller/listings">
+            <a className="sl-btn sl-btn-primary" href="#admin/listings">
               {t("Back to My Listings")}
             </a>
           }
@@ -135,7 +135,7 @@ export function ListingForm({
           actions={
             <a
               className="sl-btn sl-btn-primary"
-              href={`#seller/listing/${rec.id}`}
+              href={`#admin/listing/${rec.id}`}
             >
               {t("View")}
             </a>
@@ -239,7 +239,7 @@ export function ListingForm({
     }, 900)
       .then((nid) => {
         setDirty(false);
-        go(`seller/listing/${nid}?submitted=1`);
+        go(`admin/listing/${nid}?submitted=1`);
       })
       .catch((x) => {
         setBusy("");
@@ -248,7 +248,7 @@ export function ListingForm({
   };
   const leaveTo = () => {
     if (dirty) setLeave(true);
-    else go(recId ? `seller/listing/${recId}` : "seller/listings");
+    else go(recId ? `admin/listing/${recId}` : "admin/listings");
   };
   const addImgs = (imgs: Img[]) => {
     const merged = [
@@ -821,7 +821,7 @@ export function ListingForm({
           onCancel={() => setLeave(false)}
           onConfirm={() => {
             setDirty(false);
-            go(recId ? `seller/listing/${recId}` : "seller/listings");
+            go(recId ? `admin/listing/${recId}` : "admin/listings");
           }}
         />
       )}

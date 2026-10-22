@@ -1,6 +1,6 @@
 import type { Lang } from "@/hooks/useTranslation";
 import { useSyncExternalStore } from "react";
-import { log, notify } from "@/services/demoStore";
+import { log, notify, currentUser } from "@/services/demoStore";
 
 /* ============ types ============ */
 export type Bi = {
@@ -1132,6 +1132,15 @@ function commit(next: State) {
   }
   subs.forEach((f) => f());
 }
+window.addEventListener("storage", (event) => {
+  if (event.key !== KEY) return;
+  try {
+    state = event.newValue ? (JSON.parse(event.newValue) as State) : seed();
+    subs.forEach((fn) => fn());
+  } catch {
+    /* Ignore malformed updates. */
+  }
+});
 export function useFarming(): State {
   return useSyncExternalStore(
     (cb) => {
@@ -1236,6 +1245,13 @@ export async function submitDeposit(
     },
     seq: state.seq + 1,
   });
+  notify(
+    "Admin",
+    "status",
+    "New farming booking",
+    `${id}: ${input.name}`,
+    `#admin/bookings/${id}`,
+  );
   notify(
     owner,
     "status",
@@ -1424,3 +1440,198 @@ export const ordersOf = (s: State, email: string) =>
   s.orders
     .filter((o) => o.owner === email)
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+
+/* Administration updates the same order records shown to the customer. */
+export const ADMIN_BOOKING_NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
+  pending: "confirmed",
+  confirmed: "preparing",
+  preparing: "farming",
+  farming: "ready",
+  ready: "handover",
+  handover: "completed",
+};
+export function adminSetBookingStatus(id: string, next: OrderStatus) {
+  const admin = currentUser();
+  const order = state.orders.find((item) => item.id === id);
+  if (admin?.role !== "Admin" || !order) throw new Error("Access denied");
+  const cancellable = [
+    "awaiting_deposit",
+    "pending",
+    "confirmed",
+    "preparing",
+  ].includes(order.status);
+  if (
+    ADMIN_BOOKING_NEXT[order.status] !== next &&
+    !(next === "cancelled" && cancellable)
+  )
+    throw new Error("Invalid booking transition");
+  if (
+    next === "confirmed" &&
+    !order.payments.some(
+      (payment) => payment.kind === "deposit" && payment.status === "paid",
+    )
+  )
+    throw new Error("Confirm the deposit before accepting this booking");
+  if (
+    next === "completed" &&
+    order.balance > 0 &&
+    !order.payments.some(
+      (payment) => payment.kind === "balance" && payment.status === "paid",
+    )
+  )
+    throw new Error(
+      "Record the remaining payment before completing the booking",
+    );
+  const release =
+    (next === "completed" || next === "cancelled") &&
+    order.status !== "awaiting_deposit";
+  commit({
+    ...state,
+    used: release
+      ? {
+          ...state.used,
+          [order.fishId]: Math.max(
+            0,
+            (state.used[order.fishId] ?? 0) - order.qty,
+          ),
+        }
+      : state.used,
+    orders: state.orders.map((item) =>
+      item.id === id
+        ? {
+            ...item,
+            status: next,
+            confirmedQty:
+              item.confirmedQty ?? (next === "confirmed" ? item.qty : null),
+            handover:
+              next === "handover"
+                ? {
+                    method: item.delivery,
+                    date: new Date().toISOString().slice(0, 10),
+                    address: item.address,
+                    status: "scheduled",
+                    requestedAt: new Date().toISOString(),
+                  }
+                : next === "completed" && item.handover
+                  ? { ...item.handover, status: "done" }
+                  : item.handover,
+            payments:
+              next === "cancelled"
+                ? item.payments.map((payment) =>
+                    payment.status === "paid"
+                      ? { ...payment, status: "refund_pending" as const }
+                      : payment,
+                  )
+                : item.payments,
+            care: [
+              ...item.care,
+              {
+                id: `admin-${Date.now()}`,
+                at: new Date().toISOString(),
+                type: "note" as const,
+                text: {
+                  vi: `Trang trại cập nhật: ${STATUS_LABEL[next].vi}`,
+                  en: `Farm update: ${STATUS_LABEL[next].en}`,
+                },
+                by: { vi: admin.name, en: admin.name },
+              },
+            ],
+          }
+        : item,
+    ),
+  });
+  log(
+    admin.name,
+    "Admin",
+    `Booking status: ${next}`,
+    id,
+    `#admin/bookings/${id}`,
+  );
+  notify(
+    order.owner,
+    "status",
+    "Farming booking updated",
+    `${id}: ${STATUS_LABEL[next].vi}`,
+    `#account/farming-orders/${id}`,
+  );
+}
+export function adminRecordBookingPayment(
+  id: string,
+  kind: "deposit" | "balance" | "refund",
+  reference: string,
+) {
+  const admin = currentUser();
+  const order = state.orders.find((item) => item.id === id);
+  if (admin?.role !== "Admin" || !order || !reference.trim())
+    throw new Error("Enter a transaction reference");
+  if (kind === "refund") {
+    if (
+      order.status !== "cancelled" ||
+      !order.payments.some((payment) => payment.status === "refund_pending")
+    )
+      throw new Error("No refund is pending");
+    patch(id, (item) => ({
+      ...item,
+      payments: item.payments.map((payment) =>
+        payment.status === "refund_pending"
+          ? { ...payment, status: "refunded", ref: reference.trim() }
+          : payment,
+      ),
+    }));
+  } else {
+    if (
+      order.status === "cancelled" ||
+      order.status === "completed" ||
+      order.payments.some(
+        (payment) => payment.kind === kind && payment.status === "paid",
+      )
+    )
+      throw new Error("Payment cannot be recorded again");
+    const reserve = kind === "deposit" && order.status === "awaiting_deposit";
+    if (reserve && order.qty > remaining(fishById(order.fishId)!, state))
+      throw new Error("Insufficient farming capacity");
+    commit({
+      ...state,
+      used: reserve
+        ? {
+            ...state.used,
+            [order.fishId]: (state.used[order.fishId] ?? 0) + order.qty,
+          }
+        : state.used,
+      orders: state.orders.map((item) =>
+        item.id === id
+          ? {
+              ...item,
+              status: reserve ? "pending" : item.status,
+              payments: [
+                ...item.payments.filter((payment) => payment.kind !== kind),
+                {
+                  id: `${id}-${kind}-${Date.now()}`,
+                  kind,
+                  amount: kind === "deposit" ? item.deposit : item.balance,
+                  method: "bank",
+                  status: "paid",
+                  ref: reference.trim(),
+                  at: new Date().toISOString(),
+                },
+              ],
+            }
+          : item,
+      ),
+    });
+  }
+  log(
+    admin.name,
+    "Admin",
+    `Recorded ${kind}: ${reference.trim()}`,
+    id,
+    `#admin/bookings/${id}`,
+  );
+  notify(
+    order.owner,
+    "status",
+    "Farming payment updated",
+    `${id}: ${kind}`,
+    `#account/farming-orders/${id}`,
+  );
+}

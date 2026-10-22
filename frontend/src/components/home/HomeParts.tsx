@@ -1,3 +1,4 @@
+import { LogoMark } from "@/components/layout/LogoMark";
 import type { listings, sellers } from "@/data/homeData";
 import type { ReactNode, FormEvent } from "react";
 import "./HomeParts.css";
@@ -174,13 +175,7 @@ export function Icon({
 export function Logo({ light = false }: { light?: boolean }) {
   return (
     <a href="#home" className="home-parts-view-2" aria-label="Fishmarket home">
-      <span
-        className={`grid h-10 w-10 place-items-center rounded-xl ${
-          light ? "bg-white/10 text-white" : "bg-[#003152] text-white"
-        }`}
-      >
-        <Icon name="fish" className="home-parts-view-3" />
-      </span>
+      <LogoMark />
       <span
         className={`text-[17px] font-extrabold tracking-[0.08em] ${
           light ? "text-white" : "text-[#003152]"
@@ -334,10 +329,10 @@ export function Hero() {
               <Button
                 variant="secondary"
                 onClick={() => {
-                  window.location.hash = "seller";
+                  window.location.hash = "farming";
                 }}
               >
-                {t("Start Selling")}
+                {t("Farm a Fish")}
               </Button>
             </div>
             <div className="pt-6">
@@ -593,27 +588,27 @@ export function Promo() {
         <div className="home-parts-view-99" />
         <div className="home-parts-view-100">
           <p className="home-parts-view-101">
-            {t("Grow your aquatic business")}
+            {t("Start your fish farming journey")}
           </p>
-          <h2 className="home-parts-view-71">{t("Have Fish to Sell?")}</h2>
+          <h2 className="home-parts-view-71">{t("Raise Your Fish With Us")}</h2>
           <p className="home-parts-view-102">
             {t(
-              "Reach thousands of potential buyers and grow your fish business with our trusted marketplace.",
+              "Choose a farming package, place a deposit, and follow your fish until handover.",
             )}
           </p>
           <div className="home-parts-view-103">
             <Button
               variant="light"
               onClick={() => {
-                window.location.hash = "seller";
+                window.location.hash = "farming";
               }}
             >
-              {t("Start Selling")}{" "}
+              {t("Farm a Fish")}{" "}
               <Icon name="arrow" className="home-parts-view-22" />
             </Button>
             <span className="home-parts-view-104">
               <Icon name="check" className="home-parts-view-105" />{" "}
-              {t("Free to create a seller account")}
+              {t("Receive your fish when the farming cycle ends")}
             </span>
           </div>
         </div>

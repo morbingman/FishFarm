@@ -43,14 +43,14 @@ export function Listings({
   const pageRows = rows.slice((page - 1) * 5, page * 5);
   return (
     <>
-      <Crumbs items={[[t("Seller Center"), "#seller"], [t("My Listings")]]} />
+      <Crumbs items={[[t("Seller Center"), "#admin"], [t("My Listings")]]} />
       <div className="sl-page-head">
         <div>
           <h1>{t("My Listings")}</h1>
         </div>
         <a
           className="sl-btn sl-btn-primary lg listings-view-2"
-          href="#seller/add"
+          href="#admin/add"
         >
           {t("+ Add New Fish")}
         </a>
@@ -76,7 +76,7 @@ export function Listings({
         </div>
         <div className="pt-toolbar">
           <UiLabel className="pt-search">
-            <Icon name="eye" />
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true"><circle cx="10.5" cy="10.5" r="6.5" /><path d="m16 16 5 5" /></svg>
             <UiInput
               value={q}
               onChange={(e) => {
@@ -116,7 +116,7 @@ export function Listings({
                 "Create your first listing to start selling on FISHMARKET.",
               )}
               actions={
-                <a className="sl-btn sl-btn-primary" href="#seller/add">
+                <a className="sl-btn sl-btn-primary" href="#admin/add">
                   {t("Add New Fish")}
                 </a>
               }

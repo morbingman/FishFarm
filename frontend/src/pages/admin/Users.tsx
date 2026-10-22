@@ -1,229 +1,250 @@
-import "./Users.css";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
-import { TableCell as UiTableCell } from "@/components/ui/table";
-import { TableBody as UiTableBody } from "@/components/ui/table";
-import { TableHead as UiTableHead } from "@/components/ui/table";
-import { TableRow as UiTableRow } from "@/components/ui/table";
-import { TableHeader as UiTableHeader } from "@/components/ui/table";
-import { Table as UiTable } from "@/components/ui/table";
-import { Button as UiButton } from "@/components/ui/button";
-import { Input as UiInput } from "@/components/ui/input";
-import { Label as UiLabel } from "@/components/ui/label";
 import { useState } from "react";
+import { MoreHorizontal, Ban, Trash2, Unlock } from "lucide-react";
 import {
-  Icon,
-  StatusBadge,
-  StateBlock,
-  ConfirmDialog,
-  Crumbs,
-  Pager,
-  Skeleton,
-  useLoading,
-} from "@/components/common/Portal";
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+} from "@/components/ui/dropdown-menu";
+import { ConfirmDialog, Pager } from "@/components/common/Portal";
+import { useTranslation } from "@/context/LanguageContext";
 import {
-  request,
-  setUserStatus,
+  manageAccount,
+  isAccountBlocked,
   useStore,
   type User,
+  type BlockKind,
 } from "@/services/demoStore";
 export function Users({
   user,
   show,
 }: {
   user: User;
-  show: (m: string) => void;
+  show: (message: string) => void;
 }) {
-  const s = useStore();
-  const loading = useLoading(450);
-  const [q, setQ] = useState("");
-  const [role, setRole] = useState("all");
+  const { language } = useTranslation();
+  const t = (vi: string, en: string) => (language === "vi" ? vi : en);
+  const store = useStore();
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState("all");
   const [page, setPage] = useState(1);
-  const [target, setTarget] = useState<User | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [target, setTarget] = useState<{
+    user: User;
+    action: BlockKind | "unblock" | "delete";
+  } | null>(null);
+  const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const rows = s.users.filter(
-    (u) =>
-      (role === "all" || u.role === role) &&
-      (!q.trim() ||
-        [u.name, u.email].some((x) =>
-          x.toLowerCase().includes(q.trim().toLowerCase()),
-        )),
+  const actionName = (action: BlockKind | "unblock" | "delete") =>
+    ({
+      "24h": t("Khóa 24 giờ", "Block 24 hours"),
+      "7d": t("Khóa 7 ngày", "Block 7 days"),
+      permanent: t("Khóa vĩnh viễn", "Block permanently"),
+      unblock: t("Mở khóa", "Unblock"),
+      delete: t("Xóa tài khoản", "Delete account"),
+    })[action];
+  const rows = store.users.filter(
+    (account) =>
+      account.role !== "Admin" &&
+      !account.deletedAt &&
+      `${account.name} ${account.email}`
+        .toLowerCase()
+        .includes(search.trim().toLowerCase()) &&
+      (filter === "all" ||
+        (filter === "blocked") === isAccountBlocked(account)),
   );
-  const toggle = async () => {
-    if (!target) return;
-    setBusy(true);
+  const pages = Math.max(1, Math.ceil(rows.length / 10));
+  const safePage = Math.min(page, pages);
+  const select = (account: User, action: BlockKind | "unblock" | "delete") => {
+    setTarget({ user: account, action });
+    setReason("");
     setError("");
-    try {
-      await request(() =>
-        setUserStatus(
-          target.email,
-          target.status === "active" ? "suspended" : "active",
-          user.name,
-        ),
-      );
-      show(
-        target.status === "active"
-          ? `${target.name} suspended`
-          : `${target.name} reactivated`,
-      );
-      setTarget(null);
-    } catch {
-      setError("Network error. The change was not saved. Try again.");
-    }
-    setBusy(false);
   };
   return (
-    <>
-      <Crumbs items={[["Admin", "#admin"], ["Users"]]} />
-      <div className="sl-page-head">
+    <div data-no-translate>
+      <header className="sl-page-head">
         <div>
-          <h1>Users</h1>
+          <span className="sl-eyebrow">{t("Quản trị", "Administration")}</span>
+          <h1>{t("Quản lý người dùng", "User management")}</h1>
           <p>
-            Suspend or reactivate buyer and seller accounts. Admin accounts
-            can't be changed here.
+            {t(
+              "Theo dõi trạng thái truy cập và quản lý tài khoản khách hàng.",
+              "Review customer access and manage their accounts.",
+            )}
           </p>
         </div>
-      </div>
+      </header>
       <section className="sl-card">
-        <div className="pt-toolbar">
-          <UiLabel className="pt-search">
-            <Icon name="search" size={16} />
-            <UiInput
-              value={q}
-              onChange={(e) => {
-                setQ(e.target.value);
-                setPage(1);
-              }}
-              placeholder="Search by name or email"
-              aria-label="Search users"
-            />
-          </UiLabel>
-          <NativeSelect
-            className="pt-select"
-            value={role}
+        <div className="admin-toolbar">
+          <input
+            aria-label={t("Tìm người dùng", "Search users")}
+            placeholder={t(
+              "Tìm theo tên hoặc email",
+              "Search by name or email",
+            )}
+            value={search}
             onChange={(e) => {
-              setRole(e.target.value);
+              setSearch(e.target.value);
               setPage(1);
             }}
-            aria-label="Filter by role"
-          >
-            <NativeSelectOption value="all">All roles</NativeSelectOption>
-            <NativeSelectOption>Buyer</NativeSelectOption>
-            <NativeSelectOption>Seller</NativeSelectOption>
-            <NativeSelectOption>Admin</NativeSelectOption>
-          </NativeSelect>
-        </div>
-        {loading ? (
-          <Skeleton />
-        ) : rows.length === 0 ? (
-          <StateBlock
-            icon="search"
-            tone="info"
-            title="No users found"
-            body="No accounts match your search and filter."
-            actions={
-              <UiButton
-                variant="plain"
-                className="sl-btn sl-btn-ghost"
-                onClick={() => {
-                  setQ("");
-                  setRole("all");
-                }}
-              >
-                Reset filters
-              </UiButton>
-            }
           />
-        ) : (
-          <div className="sl-table-wrap">
-            <UiTable className="sl-table">
-              <UiTableHeader>
-                <UiTableRow>
-                  <UiTableHead>User</UiTableHead>
-                  <UiTableHead>Role</UiTableHead>
-                  <UiTableHead>Status</UiTableHead>
-                  <UiTableHead>Joined</UiTableHead>
-                  <UiTableHead>Listings</UiTableHead>
-                  <UiTableHead />
-                </UiTableRow>
-              </UiTableHeader>
-              <UiTableBody>
-                {rows.slice((page - 1) * 6, page * 6).map((u) => (
-                  <UiTableRow key={u.email}>
-                    <UiTableCell>
-                      <b>{u.name}</b>
-                      <br />
-                      <small className="pt-mini">{u.email}</small>
-                    </UiTableCell>
-                    <UiTableCell>{u.role}</UiTableCell>
-                    <UiTableCell>
-                      <StatusBadge
-                        kind={u.status === "active" ? "active" : "failed"}
-                        label={u.status === "active" ? "Active" : "Suspended"}
-                      />
-                    </UiTableCell>
-                    <UiTableCell>{u.joined}</UiTableCell>
-                    <UiTableCell>
-                      {u.role === "Seller"
-                        ? s.listings.filter((l) => l.owner === u.email).length
-                        : "—"}
-                    </UiTableCell>
-                    <UiTableCell>
-                      {u.role === "Admin" ? (
-                        <span className="pt-mini">Protected</span>
-                      ) : (
-                        <UiButton
-                          variant="plain"
-                          className={
-                            "users-layout-1 " +
-                            "" +
-                            `sl-btn ${
-                              u.status === "active"
-                                ? "sl-btn-outline-danger"
-                                : "sl-btn-ghost"
-                            }`
-                          }
-                          onClick={() => setTarget(u)}
+          <select
+            aria-label={t("Lọc trạng thái", "Filter status")}
+            value={filter}
+            onChange={(e) => {
+              setFilter(e.target.value);
+              setPage(1);
+            }}
+          >
+            <option value="all">
+              {t("Tất cả trạng thái", "All statuses")}
+            </option>
+            <option value="active">{t("Đang hoạt động", "Active")}</option>
+            <option value="blocked">{t("Đã khóa", "Blocked")}</option>
+          </select>
+        </div>
+        <div className="sl-table-wrap">
+          <table className="sl-table">
+            <thead>
+              <tr>
+                <th>{t("Người dùng", "User")}</th>
+                <th>{t("Ngày tham gia", "Joined")}</th>
+                <th>{t("Trạng thái", "Status")}</th>
+                <th>{t("Thao tác trạng thái", "Status actions")}</th>
+              </tr>
+            </thead>
+            <tbody>
+              {rows.slice((safePage - 1) * 10, safePage * 10).map((account) => (
+                <tr key={account.email}>
+                  <td>
+                    <b>{account.name}</b>
+                    <br />
+                    <small>{account.email}</small>
+                  </td>
+                  <td>{account.joined}</td>
+                  <td>
+                    <span
+                      className={`admin-pill ${isAccountBlocked(account) ? "blocked" : "active"}`}
+                    >
+                      {isAccountBlocked(account)
+                        ? t("Đã khóa", "Blocked")
+                        : t("Hoạt động", "Active")}
+                    </span>
+                    {isAccountBlocked(account) && (
+                      <small className="admin-meta">
+                        {account.blockedUntil
+                          ? `${t("Đến", "Until")} ${new Date(account.blockedUntil).toLocaleString(language === "vi" ? "vi-VN" : "en-US")}`
+                          : t("Vĩnh viễn", "Permanent")}
+                      </small>
+                    )}
+                  </td>
+                  <td>
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <button
+                          className="admin-icon-button"
+                          aria-label={`${t("Thao tác", "Actions")}: ${account.name}`}
                         >
-                          {u.status === "active" ? "Suspend" : "Reactivate"}
-                        </UiButton>
-                      )}
-                    </UiTableCell>
-                  </UiTableRow>
-                ))}
-              </UiTableBody>
-            </UiTable>
-          </div>
-        )}
-        {!loading && rows.length > 0 && (
-          <Pager page={page} size={6} total={rows.length} onPage={setPage} />
+                          <MoreHorizontal size={22} />
+                        </button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent
+                        className="admin-actions-menu"
+                        align="end"
+                        sideOffset={8}
+                        data-no-translate
+                      >
+                        {(["24h", "7d", "permanent"] as const).map((action) => (
+                          <DropdownMenuItem
+                            key={action}
+                            onSelect={() => select(account, action)}
+                          >
+                            <Ban size={15} />
+                            {actionName(action)}
+                          </DropdownMenuItem>
+                        ))}
+                        {isAccountBlocked(account) && (
+                          <DropdownMenuItem
+                            onSelect={() => select(account, "unblock")}
+                          >
+                            <Unlock size={15} />
+                            {actionName("unblock")}
+                          </DropdownMenuItem>
+                        )}
+                        <DropdownMenuItem
+                          className="admin-danger"
+                          onSelect={() => select(account, "delete")}
+                        >
+                          <Trash2 size={15} />
+                          {actionName("delete")}
+                        </DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  </td>
+                </tr>
+              ))}
+              {!rows.length && (
+                <tr>
+                  <td colSpan={4}>
+                    {t("Không có người dùng phù hợp.", "No matching users.")}
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+        {rows.length > 0 && (
+          <Pager
+            page={safePage}
+            size={10}
+            total={rows.length}
+            onPage={setPage}
+          />
         )}
       </section>
       {target && (
         <ConfirmDialog
-          danger={target.status === "active"}
-          busy={busy}
+          title={`${actionName(target.action)}: ${target.user.name}`}
+          body={
+            target.action === "delete"
+              ? t(
+                  "Tài khoản sẽ bị xóa khỏi danh sách và không thể đăng nhập. Lịch sử đơn hàng được giữ lại.",
+                  "The account will be removed and cannot sign in. Order history is retained.",
+                )
+              : t(
+                  "Thao tác này thay đổi quyền truy cập tài khoản và được ghi vào nhật ký.",
+                  "This changes account access and is recorded in the activity log.",
+                )
+          }
+          danger={target.action !== "unblock"}
+          confirmLabel={actionName(target.action)}
           error={error}
           onCancel={() => setTarget(null)}
-          onConfirm={toggle}
-          title={
-            target.status === "active"
-              ? `Suspend ${target.name}?`
-              : `Reactivate ${target.name}?`
-          }
-          body={
-            target.status === "active"
-              ? "They will be signed out and unable to sign in until reactivated. Their live listings stay visible unless you take them down."
-              : "They will be able to sign in again."
-          }
-          confirmLabel={
-            target.status === "active" ? "Suspend account" : "Reactivate"
-          }
-        />
+          onConfirm={() => {
+            try {
+              manageAccount(target.user.email, target.action, reason);
+              show(t("Đã cập nhật tài khoản", "Account updated"));
+              setTarget(null);
+            } catch (e) {
+              setError(
+                e instanceof Error
+                  ? e.message
+                  : t("Có lỗi xảy ra", "Action failed"),
+              );
+            }
+          }}
+        >
+          <label className="sl-field">
+            <span>{t("Lý do (bắt buộc)", "Reason (required)")}</span>
+            <textarea
+              aria-label={t("Lý do", "Reason")}
+              required
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              rows={3}
+            />
+          </label>
+        </ConfirmDialog>
       )}
-    </>
+    </div>
   );
 }

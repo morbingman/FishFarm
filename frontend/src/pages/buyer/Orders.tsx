@@ -1,50 +1,59 @@
-import { money } from "@/data/buyerData";
-import { BuyButton, Glyph } from "@/components/buyer/BuyerParts";
 import { useBuyer } from "@/context/BuyerContext";
-import { OrderProduct } from "@/components/buyer/BuyerWidgets";
+import { BuyButton, Glyph } from "@/components/buyer/BuyerParts";
+import { money } from "@/data/buyerData";
 export function Orders() {
-  const { hasOrder, delivered, completed, disputeSent, heading, total, go } =
-    useBuyer();
+  const { sales, user, language, viewPurchase, go, heading } = useBuyer();
+  const t = (vi: string, en: string) => (language === "vi" ? vi : en);
+  const mine = sales.filter((order) => order.owner === user.email);
+  const labels: Record<string, string> = {
+    confirmed: t("Đã xác nhận", "Confirmed"),
+    preparing: t("Trang trại đang chuẩn bị", "Farm preparing"),
+    shipped: t("Đang giao", "Shipped"),
+    delivered: t("Đã giao", "Delivered"),
+    completed: t("Hoàn tất", "Completed"),
+    cancelled: t("Đã hủy", "Cancelled"),
+  };
   return (
-    <>
+    <div data-no-translate>
       <div className="buy-page-heading">
-        <span className="buy-eyebrow">YOUR TRADING JOURNEY</span>
         <h1 ref={heading} tabIndex={-1}>
-          Your Orders<span>.</span>
+          {t("Đơn mua cá của tôi", "Your orders")}
         </h1>
-        <p>Every great find, all in one place.</p>
+        <p>
+          {t(
+            "Theo dõi các đơn mua và cập nhật từ trang trại.",
+            "Track purchases and updates from the farm.",
+          )}
+        </p>
       </div>
-      {hasOrder ? (
-        <section className="buy-panel">
-          <OrderProduct />
+      {mine.map((order) => (
+        <section className="buy-panel" key={order.id}>
+          <h2>{order.id}</h2>
+          <p>{order.items.map((item) => item.name).join(", ")}</p>
           <div className="buy-order-row">
-            <span className="buy-status-pill">
-              {disputeSent
-                ? "Issue reported"
-                : completed
-                  ? "Completed"
-                  : delivered
-                    ? "Delivered"
-                    : "Seller preparing"}
+            <span className="buy-status-pill">{labels[order.status]}</span>
+            <span>
+              {money(order.total)} ·{" "}
+              {order.payment === "paid"
+                ? t("Đã thanh toán", "Paid")
+                : t("Chờ hoàn tiền", "Refund pending")}
             </span>
-            <span>Paid · {money(total)}</span>
-            <BuyButton onClick={() => go("tracking")}>
-              View Order
+            <BuyButton onClick={() => viewPurchase(order.id)}>
+              {t("Xem đơn", "View order")}
               <Glyph name="arrow" />
             </BuyButton>
           </div>
         </section>
-      ) : (
+      ))}
+      {!mine.length && (
         <div className="buy-empty">
           <Glyph name="box" />
-          <h2>Your first great trade starts here.</h2>
-          <p>You haven't placed an order in this session yet.</p>
+          <h2>{t("Bạn chưa có đơn mua cá.", "You have no purchases yet.")}</h2>
           <BuyButton onClick={() => go("marketplace")}>
-            Discover Fish
-            <Glyph name="arrow" />
+            {t("Khám phá cá", "Discover fish")}
           </BuyButton>
         </div>
       )}
-    </>
+    </div>
   );
 }

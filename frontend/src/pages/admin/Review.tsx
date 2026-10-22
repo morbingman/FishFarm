@@ -131,8 +131,8 @@ export function Review({
             REASONS.find((r) => r[0] === reason)![1],
           ),
         mode === "rejected"
-          ? "Listing rejected. The seller was notified."
-          : "Changes requested. The seller was notified.",
+          ? "Listing rejected. The management team was notified."
+          : "Changes requested. The management team was notified.",
       );
     else if (mode === "takedown")
       run(() => {
@@ -166,10 +166,10 @@ export function Review({
         mode === "approve"
           ? `"${d.name}" will go live on the marketplace immediately and ${l.sellerName} will be notified.`
           : mode === "changes"
-            ? "The seller will be asked to edit and resubmit. This is recorded in the listing history."
+            ? "Edit and resubmit the listing from Fish management. This is recorded in the listing history."
             : mode === "rejected"
-              ? "The listing will be rejected. The seller can still edit and resubmit it."
-              : "The listing will disappear from the marketplace and the seller will be notified."
+              ? "The listing will be rejected. You can still edit and resubmit it from Fish management."
+              : "The listing will disappear from the marketplace and the management team will be notified."
       }
       confirmLabel={
         mode === "approve"
@@ -269,7 +269,7 @@ export function Review({
           </div>
           <div className="sl-admin-side">
             <section className="sl-card pad">
-              <h3>Seller information</h3>
+              <h3>Farm / source information</h3>
               <div className="sl-seller-card flat">
                 <span className="sl-avatar">
                   {l.sellerName.slice(0, 2).toUpperCase()}
@@ -277,7 +277,7 @@ export function Review({
                 <div>
                   <b>{l.sellerName}</b>
                   <span>
-                    <Icon name="shield" size={14} /> Verified Seller
+                    <Icon name="shield" size={14} /> Managed by FISHMARKET
                   </span>
                 </div>
               </div>

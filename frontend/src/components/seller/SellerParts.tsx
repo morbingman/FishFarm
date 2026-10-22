@@ -259,7 +259,7 @@ export function useMine(user: User) {
   return useMemo(
     () =>
       s.listings
-        .filter((l) => l.owner === user.email)
+        .filter((l) => user.role === "Admin" || l.owner === user.email)
         .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)),
     [s.listings, user.email],
   );
@@ -291,9 +291,9 @@ export function Table({
               key={l.id}
               className="pt-row-click"
               tabIndex={0}
-              onClick={() => go(`seller/listing/${l.id}`)}
+              onClick={() => go(`admin/listing/${l.id}`)}
               onKeyDown={(e) =>
-                e.key === "Enter" && go(`seller/listing/${l.id}`)
+                e.key === "Enter" && go(`admin/listing/${l.id}`)
               }
             >
               <UiTableCell>

@@ -221,8 +221,8 @@ export function Settings({
               <div>
                 <b>Expire my session now</b>
                 <span>
-                  Shows the session-expired screen you'd see after 15 minutes
-                  idle.
+                  Shows the session-expired screen you'd see when your seven-day
+                  session ends.
                 </span>
               </div>
               <UiButton

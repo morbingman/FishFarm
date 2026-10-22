@@ -599,31 +599,6 @@ function OrderDetail({
         </div>
       </section>
 
-      {next && (
-        <div className="fm-demo">
-          <p>
-            <b className="order-detail-view-34">
-              {t("Điều khiển demo", "Demo control")}
-            </b>
-            <br />
-            {t(
-              "Mô phỏng phía trang trại để xem các trạng thái. Không có ở bản thật.",
-              "Simulates the farm side so you can preview each state. Not in the real product.",
-            )}
-          </p>
-          <UiButton
-            variant="plain"
-            className="sl-btn sl-btn-secondary"
-            onClick={() => {
-              demoAdvance(o.id);
-              show(t("Đã cập nhật trạng thái (demo)", "Status updated (demo)"));
-            }}
-          >
-            {t("Demo:", "Demo:")} {next}
-          </UiButton>
-        </div>
-      )}
-
       {modal === "pay" && (
         <Modal title={t("Thanh toán đặt cọc", "Pay deposit")} onClose={close}>
           <p className="order-detail-view-36">

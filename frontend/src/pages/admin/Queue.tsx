@@ -59,7 +59,7 @@ export function Queue({ initTab }: { initTab: string }) {
       <div className="sl-page-head">
         <div>
           <h1>Moderation queue</h1>
-          <p>Review, approve or send back seller listings.</p>
+          <p>Review, publish or request changes to fish listings.</p>
         </div>
       </div>
       <section className="sl-card">
@@ -90,7 +90,7 @@ export function Queue({ initTab }: { initTab: string }) {
                 setQ(e.target.value);
                 setPage(1);
               }}
-              placeholder="Search by name, ID or seller"
+              placeholder="Search by name, ID or farm"
               aria-label="Search listings"
             />
           </UiLabel>
@@ -141,7 +141,7 @@ export function Queue({ initTab }: { initTab: string }) {
               <UiTableHeader>
                 <UiTableRow>
                   <UiTableHead>Listing</UiTableHead>
-                  <UiTableHead>Seller</UiTableHead>
+                  <UiTableHead>Farm / source</UiTableHead>
                   <UiTableHead>Price</UiTableHead>
                   <UiTableHead>Status</UiTableHead>
                   <UiTableHead>Submitted</UiTableHead>

@@ -1,5 +1,5 @@
 import { useSyncExternalStore } from "react";
-export type Role = "Buyer" | "Seller" | "Admin";
+export type Role = "Buyer" | "Admin";
 export type LStatus =
   "draft" | "pending" | "approved" | "changes" | "rejected" | "paused";
 export type Img = {
@@ -58,6 +58,9 @@ export type User = {
   name: string;
   role: Role;
   status: "active" | "suspended";
+  blockedUntil?: string | null;
+  blockKind?: "24h" | "7d" | "permanent";
+  deletedAt?: string;
   phone: string;
   location: string;
   joined: string;
@@ -84,6 +87,7 @@ export type Activity = {
   id: string;
   actor: string;
   role: Role | "System";
+  legacyRole?: string;
   action: string;
   target?: string;
   link?: string;
@@ -235,7 +239,7 @@ function seed(): State {
       u(
         "seller@fishmarket.demo",
         "Golden Koi Farm",
-        "Seller",
+        "Buyer",
         "active",
         "Seller123",
         "Golden Koi Farm",
@@ -250,7 +254,7 @@ function seed(): State {
       u(
         "lagoon@fishmarket.demo",
         "Blue Lagoon Aquatics",
-        "Seller",
+        "Buyer",
         "active",
         "Demo1234",
         "Blue Lagoon Aquatics",
@@ -258,7 +262,7 @@ function seed(): State {
       u(
         "mekong@fishmarket.demo",
         "Mekong Aroworld",
-        "Seller",
+        "Buyer",
         "active",
         "Demo1234",
         "Mekong Aroworld",
@@ -388,7 +392,7 @@ function seed(): State {
         type: "system",
         title: "Welcome to Seller Center",
         body: "Create your first listing. Every listing is reviewed by our team before it goes live.",
-        link: "#seller/add",
+        link: "#admin/add",
         at: ago(72),
         read: false,
       },
@@ -416,7 +420,8 @@ function seed(): State {
       {
         id: "a2",
         actor: "Blue Lagoon Aquatics",
-        role: "Seller",
+        role: "Buyer",
+        legacyRole: "Seller",
         action: "Submitted listing for review",
         target: "Betta Halfmoon Blue",
         link: "#admin/review/FM-20817",
@@ -426,15 +431,44 @@ function seed(): State {
   };
 }
 const KEY = "fishmarket-data-v2";
+/** Preserve old listings/orders while removing the retired Seller role. */
+function migrateState(input: State): State {
+  const users = input.users.map((user) => ({
+    ...user,
+    role: (String(user.role) === "Seller" ? "Buyer" : user.role) as Role,
+    ...(user.blockedUntil && Date.parse(user.blockedUntil) <= Date.now()
+      ? { status: "active" as const, blockedUntil: null, blockKind: undefined }
+      : {}),
+  }));
+  return {
+    ...input,
+    users,
+    activity: input.activity.map((item) => ({
+      ...item,
+      role: String(item.role) === "Seller" ? ("Buyer" as const) : item.role,
+      ...(String(item.role) === "Seller" ? { legacyRole: "Seller" } : {}),
+      link: item.link?.replace(/^#?seller/, "#admin"),
+    })),
+    notifs: input.notifs.map((item) => ({
+      ...item,
+      link: item.link.replace(/^#?seller/, "#admin"),
+    })),
+  };
+}
 let state: State = (() => {
   try {
     const raw = localStorage.getItem(KEY);
-    if (raw) return JSON.parse(raw) as State;
+    if (raw) return migrateState(JSON.parse(raw) as State);
   } catch {
-    /* ignore corrupt data */
+    /* Invalid saved demo data falls back to seed. */
   }
-  return seed();
+  return migrateState(seed());
 })();
+try {
+  localStorage.setItem(KEY, JSON.stringify(state));
+} catch {
+  /* Storage can be unavailable. */
+}
 const subs = new Set<() => void>();
 function commit(next: State) {
   state = next;
@@ -447,7 +481,7 @@ function commit(next: State) {
 }
 window.addEventListener("storage", (e) => {
   if (e.key === KEY && e.newValue) {
-    state = JSON.parse(e.newValue);
+    state = migrateState(JSON.parse(e.newValue));
     subs.forEach((f) => f());
   }
 });
@@ -580,12 +614,12 @@ export function authenticate(
       reason: "invalid" | "suspended";
     } {
   const u = findUser(email);
-  if (!u || u.password !== password)
+  if (!u || u.deletedAt || u.password !== password)
     return {
       ok: false,
       reason: "invalid",
     };
-  if (u.status === "suspended")
+  if (isAccountBlocked(u))
     return {
       ok: false,
       reason: "suspended",
@@ -616,10 +650,8 @@ export function addUser(u: Omit<User, "joined" | "status" | "prefs">) {
     u.email,
     "system",
     "Welcome to FISHMARKET",
-    u.role === "Seller"
-      ? "Your seller account is ready. Create your first listing."
-      : "Your account is ready. Start exploring the marketplace.",
-    u.role === "Seller" ? "#seller/add" : "#marketplace",
+    "Your account is ready. Start exploring the marketplace.",
+    "#marketplace",
   );
   log(u.name, u.role, "Created an account");
 }
@@ -642,9 +674,11 @@ export function setUserStatus(
   by: string,
 ) {
   const u = findUser(email);
-  if (!u) return;
+  if (!u || u.role === "Admin") return;
   updateUser(email, {
     status,
+    blockedUntil: null,
+    blockKind: status === "suspended" ? "permanent" : undefined,
   });
   log(
     by,
@@ -696,6 +730,7 @@ export function saveDraft(
   id: string | undefined,
   draft: Draft,
 ): string {
+  if (owner.role !== "Admin") throw new Error("Admin access required");
   const existing = id ? getListing(id) : undefined;
   if (existing) {
     patchListing(existing.id, (l) => ({
@@ -733,6 +768,7 @@ export function saveDraft(
   return newId;
 }
 export function submitListing(owner: User, id: string, draft: Draft) {
+  if (owner.role !== "Admin") throw new Error("Admin access required");
   const l = getListing(id);
   if (!l || !["draft", "changes", "rejected", "approved"].includes(l.status))
     return false;
@@ -753,7 +789,7 @@ export function submitListing(owner: User, id: string, draft: Draft) {
     "success",
     "Listing submitted",
     `"${draft.name}" is now pending review. We usually respond within 24 hours.`,
-    `#seller/listing/${id}`,
+    `#admin/listing/${id}`,
   );
   notify(
     "Admin",
@@ -764,14 +800,15 @@ export function submitListing(owner: User, id: string, draft: Draft) {
   );
   log(
     owner.name,
-    "Seller",
+    owner.role,
     resubmit ? "Resubmitted listing" : "Submitted listing for review",
     draft.name,
-    `#seller/listing/${id}`,
+    `#admin/listing/${id}`,
   );
   return true;
 }
 export function withdrawListing(owner: User, id: string) {
+  if (owner.role !== "Admin") throw new Error("Admin access required");
   const l = getListing(id);
   if (!l || l.status !== "pending") return;
   patchListing(id, (x) => ({
@@ -788,13 +825,14 @@ export function withdrawListing(owner: User, id: string) {
   );
   log(
     owner.name,
-    "Seller",
+    owner.role,
     "Withdrew listing from review",
     l.draft.name,
-    `#seller/listing/${id}`,
+    `#admin/listing/${id}`,
   );
 }
 export function setPaused(owner: User, id: string, paused: boolean) {
+  if (owner.role !== "Admin") throw new Error("Admin access required");
   const l = getListing(id);
   if (!l || l.status !== (paused ? "approved" : "paused")) return;
   patchListing(id, (x) => ({
@@ -807,13 +845,14 @@ export function setPaused(owner: User, id: string, paused: boolean) {
   }));
   log(
     owner.name,
-    "Seller",
+    owner.role,
     paused ? "Paused listing" : "Resumed listing",
     l.draft.name,
-    `#seller/listing/${id}`,
+    `#admin/listing/${id}`,
   );
 }
 export function deleteListing(owner: User, id: string) {
+  if (owner.role !== "Admin") throw new Error("Admin access required");
   const l = getListing(id);
   if (!l || l.status === "pending" || l.status === "approved") return;
   commit({
@@ -821,7 +860,7 @@ export function deleteListing(owner: User, id: string) {
     listings: state.listings.filter((x) => x.id !== id),
     deleted: [...state.deleted, id],
   });
-  log(owner.name, "Seller", "Deleted listing", l.draft.name);
+  log(owner.name, owner.role, "Deleted listing", l.draft.name);
 }
 export function decideListing(
   admin: User,
@@ -831,6 +870,7 @@ export function decideListing(
   feedback = "",
   step = 1,
 ) {
+  if (admin.role !== "Admin") throw new Error("Admin access required");
   const l = getListing(id);
   if (!l || l.status !== "pending") return false;
   const at = nowISO();
@@ -860,19 +900,19 @@ export function decideListing(
   }));
   if (kind === "approved")
     notify(
-      l.owner,
+      "Admin",
       "approval",
       "Your listing is now live!",
       `"${l.draft.name}" was approved and is visible to buyers.`,
-      `#seller/listing/${id}`,
+      `#admin/listing/${id}`,
     );
   else
     notify(
-      l.owner,
+      "Admin",
       kind === "rejected" ? "error" : "approval",
       kind === "rejected" ? "Listing rejected" : "Changes requested",
       `${reason}: ${feedback}`,
-      `#seller/listing/${id}`,
+      `#admin/listing/${id}`,
     );
   log(
     admin.name,
@@ -888,6 +928,7 @@ export function decideListing(
   return true;
 }
 export function takedownListing(admin: User, id: string, reason: string) {
+  if (admin.role !== "Admin") throw new Error("Admin access required");
   const l = getListing(id);
   if (!l || (l.status !== "approved" && l.status !== "paused")) return;
   patchListing(id, (x) => ({
@@ -903,11 +944,11 @@ export function takedownListing(admin: User, id: string, reason: string) {
     },
   }));
   notify(
-    l.owner,
+    "Admin",
     "error",
     "Listing removed from marketplace",
     `"${l.draft.name}" was taken down: ${reason}`,
-    `#seller/listing/${id}`,
+    `#admin/listing/${id}`,
   );
   log(
     admin.name,
@@ -920,61 +961,58 @@ export function takedownListing(admin: User, id: string, reason: string) {
 
 /* ---------- session ---------- */
 const SKEY = "fishmarket-session-v2";
+export const SESSION_TTL = 7 * 24 * 60 * 60_000;
 const ssubs = new Set<() => void>();
-type Sess = {
-  email: string;
-  lastActive: number;
-} | null;
-let sess: Sess = (() => {
+type Sess = { email: string; lastActive: number; expiresAt: number } | null;
+function readSession(raw: string | null): Sess {
   try {
-    return JSON.parse(sessionStorage.getItem(SKEY) || "null");
-  } catch {
-    return null;
-  }
-})();
+    const s = JSON.parse(raw || "null");
+    if (!s || typeof s.email !== "string" || !Number.isFinite(s.lastActive)) return null;
+    const expiresAt = s.expiresAt ?? s.lastActive + SESSION_TTL;
+    if (!Number.isFinite(expiresAt)) return null;
+    return { email: s.email, lastActive: s.lastActive, expiresAt };
+  } catch { return null; }
+}
+let sess = readSession(localStorage.getItem(SKEY) ?? sessionStorage.getItem(SKEY));
+// Migrate the previous tab-only login without resetting its original age.
+if (sess) localStorage.setItem(SKEY, JSON.stringify(sess));
+sessionStorage.removeItem(SKEY);
 const setSess = (s: Sess) => {
   sess = s;
-  if (s) sessionStorage.setItem(SKEY, JSON.stringify(s));
-  else sessionStorage.removeItem(SKEY);
+  if (s) localStorage.setItem(SKEY, JSON.stringify(s));
+  else localStorage.removeItem(SKEY);
+  sessionStorage.removeItem(SKEY);
   ssubs.forEach((f) => f());
 };
-export const SESSION_TTL = 15 * 60_000;
+window.addEventListener("storage", (event) => {
+  if (event.key !== SKEY && event.key !== null) return;
+  sess = readSession(localStorage.getItem(SKEY));
+  ssubs.forEach((f) => f());
+});
 export function startSession(email: string) {
-  setSess({
-    email,
-    lastActive: Date.now(),
-  });
+  const now = Date.now();
+  setSess({ email, lastActive: now, expiresAt: now + SESSION_TTL });
 }
-export function endSession() {
-  setSess(null);
-}
+export function endSession() { setSess(null); }
 export function touchSession(force = false) {
-  if (sess && (force || Date.now() - sess.lastActive > 10_000)) {
-    sess = {
-      ...sess,
-      lastActive: Date.now(),
-    };
-    sessionStorage.setItem(SKEY, JSON.stringify(sess));
+  if (!sess || sessionExpired()) return;
+  const now = Date.now();
+  if (force) setSess({ ...sess, lastActive: now, expiresAt: now + SESSION_TTL });
+  else if (now - sess.lastActive > 10_000) {
+    sess = { ...sess, lastActive: now };
+    localStorage.setItem(SKEY, JSON.stringify(sess));
   }
 }
 export function forceExpire() {
-  if (sess) {
-    sess = {
-      ...sess,
-      lastActive: 0,
-    };
-    sessionStorage.setItem(SKEY, JSON.stringify(sess));
-  }
+  if (sess) setSess({ ...sess, expiresAt: 0 });
 }
 export const hasSession = () => !!sess;
-export const remainingMs = () =>
-  sess ? SESSION_TTL - (Date.now() - sess.lastActive) : 0;
-export const sessionExpired = () =>
-  !!sess && Date.now() - sess.lastActive > SESSION_TTL;
+export const remainingMs = () => sess ? Math.max(0, sess.expiresAt - Date.now()) : 0;
+export const sessionExpired = () => !!sess && Date.now() >= sess.expiresAt;
 export function currentUser(): User | null {
-  if (!sess) return null;
+  if (!sess || sessionExpired()) return null;
   const u = findUser(sess.email);
-  return u && u.status === "active" ? u : null;
+  return u && !u.deletedAt && !isAccountBlocked(u) ? u : null;
 }
 export function useUser(): User | null {
   useStore();
@@ -1031,13 +1069,11 @@ const A: Perm[] = [
 ];
 export const PERMS: Record<Role, Perm[]> = {
   Buyer: B,
-  Seller: S,
-  Admin: A,
+  Admin: [...new Set([...A, ...S])],
 };
 export const can = (role: Role | undefined, p: Perm) =>
   !!role && PERMS[role].includes(p);
-export const homeFor = (role: Role) =>
-  role === "Seller" ? "seller" : role === "Admin" ? "admin" : "home";
+export const homeFor = (role: Role) => (role === "Admin" ? "admin" : "home");
 
 /* ---------- flash message + return-to ---------- */
 export const flash = (msg: string) =>
@@ -1099,4 +1135,70 @@ export function request<T>(fn: () => T, ms = 700): Promise<T> {
       resolve(fn());
     }, ms),
   );
+}
+
+/* Account access policies: 24 hours, 7 days, permanent. Orders are retained. */
+export type BlockKind = "24h" | "7d" | "permanent";
+export function isAccountBlocked(user: User) {
+  return (
+    user.status === "suspended" &&
+    (!user.blockedUntil || Date.parse(user.blockedUntil) > Date.now())
+  );
+}
+export function refreshAccountLocks() {
+  if (
+    state.users.some(
+      (u) =>
+        u.blockedUntil &&
+        Date.parse(u.blockedUntil) <= Date.now() &&
+        u.status === "suspended",
+    )
+  )
+    commit(migrateState(state));
+}
+export function manageAccount(
+  email: string,
+  action: BlockKind | "unblock" | "delete",
+  reason: string,
+) {
+  const admin = currentUser();
+  const target = findUser(email);
+  if (
+    admin?.role !== "Admin" ||
+    !target ||
+    target.role === "Admin" ||
+    target.deletedAt
+  )
+    throw new Error("Protected account or access denied");
+  if (!reason.trim()) throw new Error("Please enter a reason");
+  const deleted = action === "delete";
+  const until =
+    action === "24h"
+      ? new Date(Date.now() + 86400000).toISOString()
+      : action === "7d"
+        ? new Date(Date.now() + 7 * 86400000).toISOString()
+        : null;
+  updateUser(email, {
+    status: action === "unblock" ? "active" : "suspended",
+    blockedUntil: until,
+    blockKind: ["24h", "7d", "permanent"].includes(action)
+      ? (action as BlockKind)
+      : undefined,
+    ...(deleted ? { deletedAt: nowISO() } : {}),
+  });
+  log(
+    admin.name,
+    "Admin",
+    `${deleted ? "Deleted" : action === "unblock" ? "Unblocked" : "Blocked (" + action + ")"} account: ${reason.trim()}`,
+    target.name,
+    "#admin/users",
+  );
+  if (!deleted)
+    notify(
+      email,
+      "system",
+      action === "unblock" ? "Account reactivated" : "Account blocked",
+      reason.trim(),
+      "#login",
+    );
 }

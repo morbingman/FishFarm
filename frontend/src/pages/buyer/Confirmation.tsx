@@ -2,7 +2,7 @@ import { BuyButton, Glyph } from "@/components/buyer/BuyerParts";
 import { useBuyer } from "@/context/BuyerContext";
 import { Stepper, OrderProduct } from "@/components/buyer/BuyerWidgets";
 export function Confirmation() {
-  const { shipping, method, heading, go } = useBuyer();
+  const { shipping, method, heading, go, purchaseId } = useBuyer();
   return (
     <div className="buy-success-page">
       <span className="buy-state-icon">
@@ -22,7 +22,7 @@ export function Confirmation() {
         <div className="buy-confirmation-data">
           <div>
             <span>Order ID</span>
-            <strong>#FM-10248</strong>
+            <strong>{purchaseId}</strong>
           </div>
           <div>
             <span>Payment Status</span>

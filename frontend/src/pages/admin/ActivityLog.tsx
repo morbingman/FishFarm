@@ -45,8 +45,8 @@ export function ActivityLog() {
           >
             <NativeSelectOption value="all">All roles</NativeSelectOption>
             <NativeSelectOption>Admin</NativeSelectOption>
-            <NativeSelectOption>Seller</NativeSelectOption>
             <NativeSelectOption>Buyer</NativeSelectOption>
+            <NativeSelectOption>System</NativeSelectOption>
           </NativeSelect>
         </div>
         {loading ? (

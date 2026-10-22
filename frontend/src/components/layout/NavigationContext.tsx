@@ -25,7 +25,7 @@ export function useNavIndicator(active: string) {
     if (!nav) return;
     const measure = () => {
       const link = nav.querySelector<HTMLElement>(
-        '[aria-current], [data-nav-active="true"]',
+        '[aria-current]:not([data-no-indicator]), [data-nav-active="true"]',
       );
       if (!link) {
         setStyle((s) => ({ ...s, opacity: 0 }));

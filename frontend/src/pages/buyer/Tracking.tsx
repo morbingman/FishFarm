@@ -5,6 +5,7 @@ import { OrderProduct } from "@/components/buyer/BuyerWidgets";
 export function Tracking() {
   const {
     setModal,
+    currentPurchase,
     shipping,
     delivered,
     setDelivered,
@@ -21,7 +22,9 @@ export function Tracking() {
         <h1 ref={heading} tabIndex={-1}>
           Track Your Order<span>.</span>
         </h1>
-        <p>From trusted hands to yours. Follow your fish's journey.</p>
+        <p>
+          {currentPurchase?.id} · {currentPurchase?.status}
+        </p>
       </div>
       <div className="buy-tracking-layout">
         <section className="buy-panel">
@@ -34,7 +37,7 @@ export function Tracking() {
                   ? "Order completed"
                   : delivered
                     ? "Delivered"
-                    : "Seller preparing"}
+                    : "Farm preparing"}
             </span>
             <span>
               {delivered
@@ -57,7 +60,7 @@ export function Tracking() {
                 "Payment verified. Your purchase is covered by buyer protection.",
               ],
               [
-                "Seller Preparing",
+                "Farm Preparing",
                 "10 Jul 2026",
                 "11:15 AM",
                 "Health check, oxygen support, and insulated packaging are underway.",
