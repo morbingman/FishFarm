@@ -41,13 +41,26 @@ async function bootstrap() {
       'Marketplace and batch-sponsorship API. Source of truth: backend/REQUIREMENTS.md.',
     )
     .setVersion('1.0.0')
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'access-token')
-    .addCookieAuth(REFRESH_COOKIE, { type: 'apiKey', in: 'cookie' }, 'refresh-token')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'access-token',
+    )
+    .addCookieAuth(
+      REFRESH_COOKIE,
+      { type: 'apiKey', in: 'cookie' },
+      'refresh-token',
+    )
     .build();
-  SwaggerModule.setup('docs', app, SwaggerModule.createDocument(app, swaggerConfig));
+  SwaggerModule.setup(
+    'docs',
+    app,
+    SwaggerModule.createDocument(app, swaggerConfig),
+  );
 
   await app.listen(port);
-  console.log(`FishFarm API listening on http://localhost:${port} (docs: /docs, health: /health)`);
+  console.log(
+    `FishFarm API listening on http://localhost:${port} (docs: /docs, health: /health)`,
+  );
 }
 
 await bootstrap();

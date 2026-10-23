@@ -30,7 +30,9 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<UserRecord | null> {
-    return this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    return this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
   }
 
   toPublicUser(user: UserRecord): PublicUser {
@@ -49,12 +51,18 @@ export class UsersService {
     };
   }
 
-  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<PublicUser> {
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<PublicUser> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppException('error.notFound', HttpStatus.NOT_FOUND);
 
     if (dto.store !== undefined && user.role !== 'Seller') {
-      throw new AppException('profile.storeRequiresSeller', HttpStatus.BAD_REQUEST);
+      throw new AppException(
+        'profile.storeRequiresSeller',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     const updated = await this.prisma.user.update({
@@ -79,7 +87,10 @@ export class UsersService {
     return normalizePrefs(user.prefs);
   }
 
-  async updatePrefs(userId: string, dto: UpdatePrefsDto): Promise<NotificationPrefs> {
+  async updatePrefs(
+    userId: string,
+    dto: UpdatePrefsDto,
+  ): Promise<NotificationPrefs> {
     const current = await this.getPrefs(userId);
     const prefs: NotificationPrefs = {
       status: dto.status ?? current.status,
@@ -97,7 +108,9 @@ export class UsersService {
 }
 
 export function normalizePrefs(value: unknown): NotificationPrefs {
-  const prefs = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+  const prefs = (
+    typeof value === 'object' && value !== null ? value : {}
+  ) as Record<string, unknown>;
   return {
     status: prefs.status !== false,
     system: prefs.system !== false,

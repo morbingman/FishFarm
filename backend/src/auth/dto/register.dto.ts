@@ -32,9 +32,9 @@ export class RegisterDto {
   @MaxLength(80, { message: 'validation.nameLength' })
   name!: string;
 
-  @ApiProperty({ enum: ['Buyer', 'Seller'] })
-  @IsIn(['Buyer', 'Seller'], { message: 'validation.role' })
-  role!: 'Buyer' | 'Seller';
+  @ApiProperty({ enum: ['Buyer'] })
+  @IsIn(['Buyer'], { message: 'validation.role' })
+  role!: 'Buyer';
 
   @ApiPropertyOptional({ example: '+84 90 123 4567' })
   @IsOptional()
@@ -48,7 +48,10 @@ export class RegisterDto {
   @MaxLength(120, { message: 'validation.tooLong' })
   location?: string;
 
-  @ApiPropertyOptional({ example: 'Golden Koi Farm', description: 'Sellers only.' })
+  @ApiPropertyOptional({
+    example: 'Golden Koi Farm',
+    description: 'Sellers only.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(80, { message: 'validation.tooLong' })

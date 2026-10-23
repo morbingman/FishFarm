@@ -21,7 +21,10 @@ export class UpdateProfileDto {
   @MaxLength(120, { message: 'validation.tooLong' })
   location?: string;
 
-  @ApiPropertyOptional({ example: 'Golden Koi Farm', description: 'Sellers only.' })
+  @ApiPropertyOptional({
+    example: 'Golden Koi Farm',
+    description: 'Sellers only.',
+  })
   @IsOptional()
   @IsString()
   @MaxLength(80, { message: 'validation.tooLong' })

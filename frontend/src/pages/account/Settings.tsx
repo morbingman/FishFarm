@@ -18,11 +18,7 @@ import {
   useLoading,
 } from "@/components/common/Portal";
 import {
-  forceExpire,
-  isOffline,
   request,
-  resetDemoData,
-  setOffline,
   setUserStatus,
   signOut,
   updateUser,
@@ -33,11 +29,13 @@ export function Settings({
   language,
   setLanguage,
   show,
+  embedded = false,
 }: {
   user: User;
   language: Lang;
   setLanguage: (l: Lang) => void;
   show: (m: string) => void;
+  embedded?: boolean;
 }) {
   const loading = useLoading(400);
   const [pw, setPw] = useState({
@@ -48,7 +46,6 @@ export function Settings({
   const [tried, setTried] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [offline, setOff] = useState(isOffline());
   const [deact, setDeact] = useState(false);
   const errs: Record<string, string> = {};
   if (!pw.cur) errs.cur = "Enter your current password.";
@@ -119,13 +116,27 @@ export function Settings({
   };
   return (
     <>
-      <Crumbs items={[["Account", "#account/profile"], ["Account Settings"]]} />
-      <div className="sl-page-head">
-        <div>
-          <h1>Account settings</h1>
-          <p>Security, notifications and preferences.</p>
+      {!embedded && (
+        <>
+          <Crumbs
+            items={[["Account", "#account/profile"], ["Account Settings"]]}
+          />
+          <div className="sl-page-head">
+            <div>
+              <h1>Account settings</h1>
+              <p>Security, notifications and preferences.</p>
+            </div>
+          </div>
+        </>
+      )}
+      {embedded && (
+        <div className="sl-page-head">
+          <div>
+            <h2>Account settings</h2>
+            <p>Security, notifications and preferences.</p>
+          </div>
         </div>
-      </div>
+      )}
       {loading ? (
         <section className="sl-card pad">
           <Skeleton rows={6} />
@@ -204,57 +215,6 @@ export function Settings({
               Approval, rejection and security notifications can't be turned
               off.
             </p>
-          </section>
-          <section className="sl-card pad">
-            <h3>Prototype tools</h3>
-            <Toggle
-              label="Simulate network failure"
-              hint="Saving, submitting and approving will fail so you can see the error and retry states."
-              on={offline}
-              onChange={(v) => {
-                setOffline(v);
-                setOff(v);
-                show(v ? "Network failure simulation on" : "Back online");
-              }}
-            />
-            <div className="pt-toggle">
-              <div>
-                <b>Expire my session now</b>
-                <span>
-                  Shows the session-expired screen you'd see when your seven-day
-                  session ends.
-                </span>
-              </div>
-              <UiButton
-                variant="plain"
-                className="sl-btn sl-btn-ghost"
-                onClick={() => {
-                  forceExpire();
-                  window.location.hash = "expired";
-                }}
-              >
-                Expire
-              </UiButton>
-            </div>
-            <div className="pt-toggle settings-view-6">
-              <div>
-                <b>Reset demo data</b>
-                <span>
-                  Restore all listings, users and notifications to their
-                  starting state.
-                </span>
-              </div>
-              <UiButton
-                variant="plain"
-                className="sl-btn sl-btn-ghost"
-                onClick={() => {
-                  resetDemoData();
-                  show("Demo data reset");
-                }}
-              >
-                Reset
-              </UiButton>
-            </div>
           </section>
           {user.role !== "Admin" && (
             <section className="pt-danger-zone">

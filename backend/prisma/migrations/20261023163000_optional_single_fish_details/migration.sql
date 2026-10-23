@@ -1,0 +1,4 @@
+ALTER TABLE "GrowOutBatch"
+ALTER COLUMN "location" DROP NOT NULL,
+ALTER COLUMN "region" DROP NOT NULL,
+ALTER COLUMN "riskDisclosure" DROP NOT NULL;

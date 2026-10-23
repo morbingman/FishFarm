@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { api, authApi, ApiError } from "./api";
 export type Role = "Buyer" | "Admin";
 export type LStatus =
   "draft" | "pending" | "approved" | "changes" | "rejected" | "paused";
@@ -133,6 +134,31 @@ export const EMPTY_DRAFT: Draft = {
   region: "",
   shipping: [],
 };
+export function listingMissingFields(draft: Draft): string[] {
+  const checks: [string, boolean][] = [
+    ["name", Boolean(draft.name.trim())],
+    ["species", Boolean(draft.species)],
+    ["description", draft.description.trim().length >= 20],
+    ["age", Boolean(draft.age.trim())],
+    ["size", Number(draft.size) > 0],
+    ["gender", Boolean(draft.gender)],
+    ["origin", Boolean(draft.origin)],
+    ["health", Boolean(draft.health)],
+    ["price", Number(draft.price) > 0],
+    ["quantity", Number(draft.quantity) >= 1],
+    [
+      "Cloudinary image",
+      draft.images.length > 0 &&
+        draft.images.every((image) =>
+          image.url.startsWith("https://res.cloudinary.com/"),
+        ),
+    ],
+    ["location", Boolean(draft.location.trim())],
+    ["region", Boolean(draft.region)],
+    ["shipping", draft.shipping.length > 0],
+  ];
+  return checks.filter(([, valid]) => !valid).map(([field]) => field);
+}
 const ago = (h: number) => new Date(Date.now() - h * 3600_000).toISOString();
 const GK = {
   email: "seller@fishmarket.demo",
@@ -239,7 +265,7 @@ function seed(): State {
       u(
         "seller@fishmarket.demo",
         "Golden Koi Farm",
-        "Buyer",
+        "Admin",
         "active",
         "Seller123",
         "Golden Koi Farm",
@@ -254,7 +280,7 @@ function seed(): State {
       u(
         "lagoon@fishmarket.demo",
         "Blue Lagoon Aquatics",
-        "Buyer",
+        "Admin",
         "active",
         "Demo1234",
         "Blue Lagoon Aquatics",
@@ -262,7 +288,7 @@ function seed(): State {
       u(
         "mekong@fishmarket.demo",
         "Mekong Aroworld",
-        "Buyer",
+        "Admin",
         "active",
         "Demo1234",
         "Mekong Aroworld",
@@ -377,21 +403,11 @@ function seed(): State {
     deleted: [],
     notifs: [
       {
-        id: "n1",
-        to: "Admin",
-        type: "reminder",
-        title: "2 listings are waiting for review",
-        body: "Betta Halfmoon Blue and Arowana Silver 28 cm have been in the queue for over 20 hours.",
-        link: "#admin/queue?tab=pending",
-        at: ago(1),
-        read: false,
-      },
-      {
         id: "n2",
         to: "seller@fishmarket.demo",
         type: "system",
         title: "Welcome to Seller Center",
-        body: "Create your first listing. Every listing is reviewed by our team before it goes live.",
+        body: "Create and publish your first listing on FISHMARKET.",
         link: "#admin/add",
         at: ago(72),
         read: false,
@@ -430,12 +446,19 @@ function seed(): State {
     ],
   };
 }
-const KEY = "fishmarket-data-v2";
-/** Preserve old listings/orders while removing the retired Seller role. */
+const KEY = "fishmarket-api-cache-v3";
+const emptyState = (): State => ({
+  users: [],
+  listings: [],
+  deleted: [],
+  notifs: [],
+  activity: [],
+  seq: 0,
+});
 function migrateState(input: State): State {
   const users = input.users.map((user) => ({
     ...user,
-    role: (String(user.role) === "Seller" ? "Buyer" : user.role) as Role,
+    role: (String(user.role) === "Seller" ? "Admin" : user.role) as Role,
     ...(user.blockedUntil && Date.parse(user.blockedUntil) <= Date.now()
       ? { status: "active" as const, blockedUntil: null, blockKind: undefined }
       : {}),
@@ -443,16 +466,25 @@ function migrateState(input: State): State {
   return {
     ...input,
     users,
+    listings: input.listings.map((listing) => {
+      if (listing.status === "pending")
+        return { ...listing, status: "approved" as const, decision: null };
+      if (["changes", "rejected"].includes(listing.status))
+        return { ...listing, status: "draft" as const };
+      return listing;
+    }),
     activity: input.activity.map((item) => ({
       ...item,
-      role: String(item.role) === "Seller" ? ("Buyer" as const) : item.role,
+      role: String(item.role) === "Seller" ? ("Admin" as const) : item.role,
       ...(String(item.role) === "Seller" ? { legacyRole: "Seller" } : {}),
       link: item.link?.replace(/^#?seller/, "#admin"),
     })),
-    notifs: input.notifs.map((item) => ({
-      ...item,
-      link: item.link.replace(/^#?seller/, "#admin"),
-    })),
+    notifs: input.notifs
+      .filter((item) => !item.link.includes("admin/queue"))
+      .map((item) => ({
+        ...item,
+        link: item.link.replace(/^#?seller/, "#admin"),
+      })),
   };
 }
 let state: State = (() => {
@@ -462,7 +494,7 @@ let state: State = (() => {
   } catch {
     /* Invalid saved demo data falls back to seed. */
   }
-  return migrateState(seed());
+  return emptyState();
 })();
 try {
   localStorage.setItem(KEY, JSON.stringify(state));
@@ -498,7 +530,8 @@ export function useStore(): State {
 }
 export const getState = () => state;
 export function resetDemoData() {
-  commit(seed());
+  commit(emptyState());
+  void syncFromApi();
 }
 const nid = (p: string) =>
   `${p}${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
@@ -570,6 +603,10 @@ export function markRead(id: string, read = true) {
         : n,
     ),
   });
+  void api(`/notifications/${id}`, {
+    method: "PATCH",
+    body: JSON.stringify({ read }),
+  }).catch(() => undefined);
 }
 export function markAllRead(ids: string[]) {
   commit({
@@ -583,12 +620,16 @@ export function markAllRead(ids: string[]) {
         : n,
     ),
   });
+  void api("/notifications/read-all", { method: "POST" }).catch(
+    () => undefined,
+  );
 }
 export function removeNotif(id: string) {
   commit({
     ...state,
     notifs: state.notifs.filter((n) => n.id !== id),
   });
+  void api(`/notifications/${id}`, { method: "DELETE" }).catch(() => undefined);
 }
 export const notifsFor = (
   s: State,
@@ -601,10 +642,139 @@ export const notifsFor = (
 /* ---------- accounts ---------- */
 export const findUser = (email: string) =>
   state.users.find((u) => u.email.toLowerCase() === email.trim().toLowerCase());
-export function authenticate(
+function acceptApiUser(remote: any): User {
+  const user: User = {
+    email: remote.email,
+    password: "",
+    name: remote.name,
+    role: remote.role === "Buyer" ? "Buyer" : "Admin",
+    status: remote.status,
+    phone: remote.phone ?? "",
+    location: remote.location ?? "",
+    joined: String(remote.joinedAt ?? remote.createdAt ?? nowISO()).slice(
+      0,
+      10,
+    ),
+    store: remote.store ?? undefined,
+    prefs: remote.prefs ?? { status: true, system: true, reminders: true },
+  };
+  commit({
+    ...state,
+    users: [user, ...state.users.filter((x) => x.email !== user.email)],
+  });
+  void syncFromApi(user);
+  return user;
+}
+
+function mapApiListing(item: any): Listing {
+  const d = item.draft ?? {};
+  return {
+    id: item.code,
+    owner: item.owner?.email ?? "",
+    sellerName: item.sellerName,
+    status: item.status,
+    decision: item.decisionKind
+      ? {
+          kind: item.decisionKind,
+          reason: item.decisionReason ?? "",
+          feedback: item.decisionFeedback ?? "",
+          step: item.decisionStep ?? 1,
+          by: item.decisionBy ?? "",
+          at: item.decisionAt,
+        }
+      : null,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+    submittedAt: item.submittedAt,
+    views: item.views,
+    draft: {
+      name: d.name ?? "",
+      species: d.species ?? "",
+      breed: d.breed ?? "",
+      description: d.description ?? "",
+      age: d.ageMonths == null ? "" : `${d.ageMonths} months`,
+      size: d.sizeCm == null ? "" : String(d.sizeCm),
+      gender: d.gender ?? "",
+      origin: d.origin ?? "",
+      health: d.health ?? "",
+      price: String(d.price ?? ""),
+      quantity: String(d.quantity ?? 1),
+      negotiable: Boolean(d.negotiable),
+      images: (d.images ?? []).map((x: any) => ({ id: x.id, url: x.url })),
+      mainId:
+        d.images?.find((x: any) => x.isMain)?.id ?? d.images?.[0]?.id ?? "",
+      location: d.location ?? "",
+      region: d.region ?? "",
+      shipping: d.shipping ?? [],
+    },
+    history: (item.history ?? []).map((x: any) => ({
+      at: x.at,
+      by: x.actorLabel,
+      action: x.action,
+      note: x.note ?? undefined,
+    })),
+  };
+}
+
+export async function syncFromApi(user = currentUser()) {
+  if (!user) return;
+  try {
+    const [listings, notifications] = await Promise.all([
+      user.role === "Admin"
+        ? api<any[]>("/admin/listings")
+        : Promise.resolve([]),
+      api<any[]>("/me/notifications"),
+    ]);
+    const next: State = {
+      ...state,
+      listings: listings.map(mapApiListing),
+      notifs: notifications.map((n: any) => ({
+        id: n.id,
+        to: user.email,
+        type: n.type,
+        title: n.titleKey,
+        body: n.bodyKey,
+        link: n.link ?? "#account/notifications",
+        at: n.createdAt,
+        read: Boolean(n.readAt),
+      })),
+    };
+    if (user.role === "Admin") {
+      const [users, activity] = await Promise.all([
+        api<any[]>("/admin/users"),
+        api<any[]>("/admin/activity"),
+      ]);
+      next.users = users.map((x: any) => ({
+        email: x.email,
+        password: "",
+        name: x.name,
+        role: x.role,
+        status: x.status,
+        phone: x.phone ?? "",
+        location: x.location ?? "",
+        joined: String(x.joinedAt).slice(0, 10),
+        store: x.store ?? undefined,
+        prefs: { status: true, system: true, reminders: true },
+      }));
+      next.activity = activity.map((x: any) => ({
+        id: x.id,
+        actor: x.actorLabel,
+        role: x.role,
+        action: x.action,
+        target: x.target ?? undefined,
+        link: x.link ?? undefined,
+        at: x.createdAt,
+      }));
+    }
+    commit(next);
+  } catch {
+    /* The current screen keeps its loading/empty state and can retry after sign-in. */
+  }
+}
+export async function authenticate(
   email: string,
   password: string,
-):
+): Promise<
   | {
       ok: true;
       user: User;
@@ -612,48 +782,32 @@ export function authenticate(
   | {
       ok: false;
       reason: "invalid" | "suspended";
-    } {
-  const u = findUser(email);
-  if (!u || u.deletedAt || u.password !== password)
+    }
+> {
+  try {
+    const result = await authApi.login(email.trim().toLowerCase(), password);
+    return { ok: true, user: acceptApiUser(result.user) };
+  } catch (error) {
     return {
       ok: false,
-      reason: "invalid",
+      reason:
+        error instanceof ApiError && error.code.includes("suspended")
+          ? "suspended"
+          : "invalid",
     };
-  if (isAccountBlocked(u))
-    return {
-      ok: false,
-      reason: "suspended",
-    };
-  return {
-    ok: true,
-    user: u,
-  };
+  }
 }
-export function addUser(u: Omit<User, "joined" | "status" | "prefs">) {
-  commit({
-    ...state,
-    users: [
-      ...state.users,
-      {
-        ...u,
-        status: "active",
-        joined: nowISO().slice(0, 10),
-        prefs: {
-          status: true,
-          system: true,
-          reminders: true,
-        },
-      },
-    ],
+export async function addUser(u: Omit<User, "joined" | "status" | "prefs">) {
+  const result = await authApi.register({
+    email: u.email,
+    password: u.password,
+    name: u.name,
+    role: u.role,
+    phone: u.phone,
+    location: u.location,
+    store: u.store,
   });
-  notify(
-    u.email,
-    "system",
-    "Welcome to FISHMARKET",
-    "Your account is ready. Start exploring the marketplace.",
-    "#marketplace",
-  );
-  log(u.name, u.role, "Created an account");
+  return acceptApiUser(result.user);
 }
 export function updateUser(email: string, patch: Partial<User>) {
   commit({
@@ -667,6 +821,15 @@ export function updateUser(email: string, patch: Partial<User>) {
         : u,
     ),
   });
+  const body = Object.fromEntries(
+    Object.entries(patch).filter(([key]) =>
+      ["name", "phone", "location", "store"].includes(key),
+    ),
+  );
+  if (Object.keys(body).length)
+    void api("/me", { method: "PATCH", body: JSON.stringify(body) }).catch(
+      () => undefined,
+    );
 }
 export function setUserStatus(
   email: string,
@@ -725,114 +888,57 @@ const hist = (
     },
   ],
 });
-export function saveDraft(
+export async function saveDraft(
   owner: User,
   id: string | undefined,
   draft: Draft,
-): string {
-  if (owner.role !== "Admin") throw new Error("Admin access required");
-  const existing = id ? getListing(id) : undefined;
-  if (existing) {
-    patchListing(existing.id, (l) => ({
-      ...l,
-      draft,
-      updatedAt: nowISO(),
-    }));
-    return existing.id;
-  }
-  const newId = `FM-${state.seq + 1}`;
-  const l: Listing = {
-    id: newId,
-    owner: owner.email,
-    sellerName: owner.store || owner.name,
-    status: "draft",
-    draft,
-    decision: null,
-    createdAt: nowISO(),
-    updatedAt: nowISO(),
-    submittedAt: null,
-    views: 0,
-    history: [
-      {
-        at: nowISO(),
-        by: owner.name,
-        action: "Created draft",
-      },
-    ],
-  };
-  commit({
-    ...state,
-    seq: state.seq + 1,
-    listings: [l, ...state.listings],
-  });
-  return newId;
+): Promise<string> {
+  if (owner.role === "Buyer") throw new Error("Seller access required");
+  const result = await api<any>(
+    id ? `/admin/listings/${id}` : "/admin/listings",
+    {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify({ ...toApiDraft(draft), publish: false }),
+    },
+  );
+  await syncFromApi(owner);
+  return result.code;
 }
-export function submitListing(owner: User, id: string, draft: Draft) {
-  if (owner.role !== "Admin") throw new Error("Admin access required");
-  const l = getListing(id);
-  if (!l || !["draft", "changes", "rejected", "approved"].includes(l.status))
-    return false;
-  const resubmit = l.status !== "draft";
-  patchListing(id, (x) => ({
-    ...hist(
-      x,
-      owner.name,
-      resubmit ? "Resubmitted for review" : "Submitted for review",
-    ),
-    draft,
-    status: "pending",
-    decision: null,
-    submittedAt: nowISO(),
-  }));
+function toApiDraft(draft: Draft) {
+  return {
+    ...draft,
+    ageMonths: Number(draft.age.replace(/\D/g, "")) || null,
+    sizeCm: Number(draft.size) || null,
+    price: Number(draft.price),
+    quantity: Number(draft.quantity),
+    images: draft.images,
+  };
+}
+export async function publishListing(
+  owner: User,
+  id: string | undefined,
+  draft: Draft,
+) {
+  if (owner.role === "Buyer") throw new Error("Seller access required");
+  const result = await api<any>(
+    id ? `/admin/listings/${id}` : "/admin/listings",
+    {
+      method: id ? "PATCH" : "POST",
+      body: JSON.stringify({ ...toApiDraft(draft), publish: true }),
+    },
+  );
+  await syncFromApi(owner);
   notify(
     owner.email,
     "success",
-    "Listing submitted",
-    `"${draft.name}" is now pending review. We usually respond within 24 hours.`,
-    `#admin/listing/${id}`,
+    "Listing published",
+    `"${draft.name}" is now live on the marketplace.`,
+    `#admin/listing/${result.code}`,
   );
-  notify(
-    "Admin",
-    "status",
-    resubmit ? "Listing resubmitted for review" : "New listing awaiting review",
-    `${l.sellerName} submitted "${draft.name}" (${id}).`,
-    `#admin/review/${id}`,
-  );
-  log(
-    owner.name,
-    owner.role,
-    resubmit ? "Resubmitted listing" : "Submitted listing for review",
-    draft.name,
-    `#admin/listing/${id}`,
-  );
-  return true;
-}
-export function withdrawListing(owner: User, id: string) {
-  if (owner.role !== "Admin") throw new Error("Admin access required");
-  const l = getListing(id);
-  if (!l || l.status !== "pending") return;
-  patchListing(id, (x) => ({
-    ...hist(x, owner.name, "Withdrawn from review"),
-    status: "draft",
-    submittedAt: null,
-  }));
-  notify(
-    "Admin",
-    "status",
-    "Listing withdrawn",
-    `${l.sellerName} withdrew "${l.draft.name}" (${id}) from review.`,
-    "#admin/queue",
-  );
-  log(
-    owner.name,
-    owner.role,
-    "Withdrew listing from review",
-    l.draft.name,
-    `#admin/listing/${id}`,
-  );
+  return result.code as string;
 }
 export function setPaused(owner: User, id: string, paused: boolean) {
-  if (owner.role !== "Admin") throw new Error("Admin access required");
+  if (owner.role === "Buyer") throw new Error("Seller access required");
   const l = getListing(id);
   if (!l || l.status !== (paused ? "approved" : "paused")) return;
   patchListing(id, (x) => ({
@@ -850,9 +956,15 @@ export function setPaused(owner: User, id: string, paused: boolean) {
     l.draft.name,
     `#admin/listing/${id}`,
   );
+  void api(`/admin/listings/${id}/${paused ? "pause" : "resume"}`, {
+    method: "POST",
+    body: "{}",
+  })
+    .then(() => syncFromApi(owner))
+    .catch(() => undefined);
 }
 export function deleteListing(owner: User, id: string) {
-  if (owner.role !== "Admin") throw new Error("Admin access required");
+  if (owner.role === "Buyer") throw new Error("Seller access required");
   const l = getListing(id);
   if (!l || l.status === "pending" || l.status === "approved") return;
   commit({
@@ -861,104 +973,10 @@ export function deleteListing(owner: User, id: string) {
     deleted: [...state.deleted, id],
   });
   log(owner.name, owner.role, "Deleted listing", l.draft.name);
+  void api(`/admin/listings/${id}`, { method: "DELETE" })
+    .then(() => syncFromApi(owner))
+    .catch(() => undefined);
 }
-export function decideListing(
-  admin: User,
-  id: string,
-  kind: "approved" | "rejected" | "changes",
-  reason = "",
-  feedback = "",
-  step = 1,
-) {
-  if (admin.role !== "Admin") throw new Error("Admin access required");
-  const l = getListing(id);
-  if (!l || l.status !== "pending") return false;
-  const at = nowISO();
-  patchListing(id, (x) => ({
-    ...hist(
-      x,
-      admin.name,
-      kind === "approved"
-        ? "Approved"
-        : kind === "rejected"
-          ? "Rejected"
-          : "Changes requested",
-      feedback || undefined,
-    ),
-    status: kind,
-    decision:
-      kind === "approved"
-        ? null
-        : {
-            kind,
-            reason,
-            feedback,
-            step,
-            by: admin.name,
-            at,
-          },
-  }));
-  if (kind === "approved")
-    notify(
-      "Admin",
-      "approval",
-      "Your listing is now live!",
-      `"${l.draft.name}" was approved and is visible to buyers.`,
-      `#admin/listing/${id}`,
-    );
-  else
-    notify(
-      "Admin",
-      kind === "rejected" ? "error" : "approval",
-      kind === "rejected" ? "Listing rejected" : "Changes requested",
-      `${reason}: ${feedback}`,
-      `#admin/listing/${id}`,
-    );
-  log(
-    admin.name,
-    "Admin",
-    kind === "approved"
-      ? "Approved listing"
-      : kind === "rejected"
-        ? "Rejected listing"
-        : "Requested changes",
-    l.draft.name,
-    `#admin/review/${id}`,
-  );
-  return true;
-}
-export function takedownListing(admin: User, id: string, reason: string) {
-  if (admin.role !== "Admin") throw new Error("Admin access required");
-  const l = getListing(id);
-  if (!l || (l.status !== "approved" && l.status !== "paused")) return;
-  patchListing(id, (x) => ({
-    ...hist(x, admin.name, "Taken down", reason),
-    status: "rejected",
-    decision: {
-      kind: "rejected",
-      reason: "Policy violation",
-      feedback: reason,
-      step: 1,
-      by: admin.name,
-      at: nowISO(),
-    },
-  }));
-  notify(
-    "Admin",
-    "error",
-    "Listing removed from marketplace",
-    `"${l.draft.name}" was taken down: ${reason}`,
-    `#admin/listing/${id}`,
-  );
-  log(
-    admin.name,
-    "Admin",
-    "Took down listing",
-    l.draft.name,
-    `#admin/review/${id}`,
-  );
-}
-
 /* ---------- session ---------- */
 const SKEY = "fishmarket-session-v2";
 export const SESSION_TTL = 7 * 24 * 60 * 60_000;
@@ -967,13 +985,18 @@ type Sess = { email: string; lastActive: number; expiresAt: number } | null;
 function readSession(raw: string | null): Sess {
   try {
     const s = JSON.parse(raw || "null");
-    if (!s || typeof s.email !== "string" || !Number.isFinite(s.lastActive)) return null;
+    if (!s || typeof s.email !== "string" || !Number.isFinite(s.lastActive))
+      return null;
     const expiresAt = s.expiresAt ?? s.lastActive + SESSION_TTL;
     if (!Number.isFinite(expiresAt)) return null;
     return { email: s.email, lastActive: s.lastActive, expiresAt };
-  } catch { return null; }
+  } catch {
+    return null;
+  }
 }
-let sess = readSession(localStorage.getItem(SKEY) ?? sessionStorage.getItem(SKEY));
+let sess = readSession(
+  localStorage.getItem(SKEY) ?? sessionStorage.getItem(SKEY),
+);
 // Migrate the previous tab-only login without resetting its original age.
 if (sess) localStorage.setItem(SKEY, JSON.stringify(sess));
 sessionStorage.removeItem(SKEY);
@@ -993,11 +1016,15 @@ export function startSession(email: string) {
   const now = Date.now();
   setSess({ email, lastActive: now, expiresAt: now + SESSION_TTL });
 }
-export function endSession() { setSess(null); }
+export function endSession() {
+  setSess(null);
+  void authApi.logout().catch(() => undefined);
+}
 export function touchSession(force = false) {
   if (!sess || sessionExpired()) return;
   const now = Date.now();
-  if (force) setSess({ ...sess, lastActive: now, expiresAt: now + SESSION_TTL });
+  if (force)
+    setSess({ ...sess, lastActive: now, expiresAt: now + SESSION_TTL });
   else if (now - sess.lastActive > 10_000) {
     sess = { ...sess, lastActive: now };
     localStorage.setItem(SKEY, JSON.stringify(sess));
@@ -1007,7 +1034,8 @@ export function forceExpire() {
   if (sess) setSess({ ...sess, expiresAt: 0 });
 }
 export const hasSession = () => !!sess;
-export const remainingMs = () => sess ? Math.max(0, sess.expiresAt - Date.now()) : 0;
+export const remainingMs = () =>
+  sess ? Math.max(0, sess.expiresAt - Date.now()) : 0;
 export const sessionExpired = () => !!sess && Date.now() >= sess.expiresAt;
 export function currentUser(): User | null {
   if (!sess || sessionExpired()) return null;
@@ -1090,11 +1118,10 @@ export const takeReturnTo = () => {
   sessionStorage.removeItem("fishmarket-return");
   return m;
 };
-export function signOut(message = "You've been signed out.") {
+export function signOut(_message?: string) {
   const u = currentUser();
   if (u) log(u.name, u.role, "Signed out");
   endSession();
-  flash(message);
   window.location.hash = "home";
 }
 
@@ -1201,4 +1228,13 @@ export function manageAccount(
       reason.trim(),
       "#login",
     );
+  void api(`/admin/users/${encodeURIComponent(email)}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({
+      status: action === "unblock" ? "active" : "suspended",
+      reason,
+    }),
+  })
+    .then(() => syncFromApi(admin))
+    .catch(() => undefined);
 }

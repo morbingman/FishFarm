@@ -71,7 +71,12 @@ function Detail({ id, language }: { id: string; language: Lang }) {
   const tabs: [typeof tab, string][] = [
     ["info", t("Thông tin cá", "Fish information")],
     ["care", t("Quy trình chăm sóc", "Care process")],
-    ["pkg", t("Gói dịch vụ", "Service packages")],
+    ...(fish.singleFish
+      ? []
+      : ([["pkg", t("Gói dịch vụ", "Service packages")]] as [
+          typeof tab,
+          string,
+        ][])),
     ["terms", t("Điều khoản đặt nuôi", "Farming terms")],
   ];
   const fac = fish.facilities.map(facilityOf);
@@ -163,59 +168,89 @@ function Detail({ id, language }: { id: string; language: Lang }) {
                   <b>{fish.sizeStart} cm</b>
                 </div>
                 <div>
-                  <small>{t("Chu kỳ nuôi dự kiến", "Estimated cycle")}</small>
-                  <b>{t(`~${fish.months} tháng`, `~${fish.months} months`)}</b>
-                </div>
-                <div>
-                  <small>{t("Số lượng còn nhận", "Available quantity")}</small>
+                  <small>
+                    {fish.singleFish
+                      ? t("Kích thước mục tiêu", "Target size")
+                      : t("Chu kỳ nuôi dự kiến", "Estimated cycle")}
+                  </small>
                   <b>
-                    {fish.paused
-                      ? "—"
-                      : `${fmtNum(rem, language)} ${t("con", "fish")}`}
+                    {fish.singleFish
+                      ? `${fish.sizeTarget} cm`
+                      : t(`~${fish.months} tháng`, `~${fish.months} months`)}
                   </b>
                 </div>
                 <div>
-                  <small>{t("Giá cá giống", "Starting fish price")}</small>
+                  <small>
+                    {fish.singleFish
+                      ? t("Trạng thái đầu tư", "Sponsorship status")
+                      : t("Số lượng còn nhận", "Available quantity")}
+                  </small>
                   <b>
-                    {fmtMoney(fish.fishPrice, language)} {t("/ con", "/ fish")}
+                    {fish.singleFish
+                      ? ok
+                        ? t("Đang nhận đầu tư", "Open for sponsorship")
+                        : t("Đã có người đầu tư", "Already sponsored")
+                      : fish.paused
+                        ? "—"
+                        : `${fmtNum(rem, language)} ${t("con", "fish")}`}
                   </b>
                 </div>
                 <div>
-                  <small>{t("Phí dịch vụ từ", "Service from")}</small>
+                  <small>
+                    {fish.singleFish
+                      ? t("Tổng chi phí đầu tư nuôi", "Total sponsorship cost")
+                      : t("Giá cá giống", "Starting fish price")}
+                  </small>
                   <b>
-                    {unit(1)} {t("/ con / tháng", "/ fish / mo.")}
+                    {fmtMoney(fish.fishPrice, language)}{" "}
+                    {!fish.singleFish && t("/ con", "/ fish")}
                   </b>
                 </div>
+                {!fish.singleFish && (
+                  <div>
+                    <small>{t("Phí dịch vụ từ", "Service from")}</small>
+                    <b>
+                      {unit(1)} {t("/ con / tháng", "/ fish / mo.")}
+                    </b>
+                  </div>
+                )}
               </div>
-              <div className="sl-card pad detail-view-12">
-                <b className="detail-view-14">
-                  <Icon name="map" size={16} />
-                  {t("Cơ sở nuôi", "Farming facility")}
-                </b>
-                {fac.map((f) => (
-                  <p key={f.id} className="detail-view-16">
-                    <b>{L(f.name, language)}</b> —{" "}
-                    <span className="detail-view-18">
-                      {L(f.address, language)}
-                    </span>
+              {(fac.length > 0 || fish.deliveryAreas.length > 0) && (
+                <div className="sl-card pad detail-view-12">
+                  <b className="detail-view-14">
+                    <Icon name="map" size={16} />
+                    {t("Cơ sở nuôi", "Farming facility")}
+                  </b>
+                  {fac.map((f) => (
+                    <p key={f.id} className="detail-view-16">
+                      <b>{L(f.name, language)}</b> —{" "}
+                      <span className="detail-view-18">
+                        {L(f.address, language)}
+                      </span>
+                    </p>
+                  ))}
+                  <p className="detail-view-20">
+                    {fish.deliveryAreas.length
+                      ? t(
+                          `Hỗ trợ giao tận nơi: ${fish.deliveryAreas.join(", ")}.`,
+                          `Home delivery: ${fish.deliveryAreas.join(", ")}.`,
+                        )
+                      : t("Chỉ nhận cá tại trang trại.", "Farm pickup only.")}
                   </p>
-                ))}
-                <p className="detail-view-20">
-                  {fish.deliveryAreas.length
-                    ? t(
-                        `Hỗ trợ giao tận nơi: ${fish.deliveryAreas.join(", ")}.`,
-                        `Home delivery: ${fish.deliveryAreas.join(", ")}.`,
-                      )
-                    : t("Chỉ nhận cá tại trang trại.", "Farm pickup only.")}
-                </p>
-              </div>
+                </div>
+              )}
               {!ok && (
                 <Banner tone="warn">
                   {a === "full"
-                    ? t(
-                        "Đợt nuôi này đã kín chỗ. Vui lòng quay lại khi có đợt mới.",
-                        "This batch is fully booked. Check back when a new batch opens.",
-                      )
+                    ? fish.singleFish
+                      ? t(
+                          "Cá này đã có người đầu tư nuôi.",
+                          "This fish already has an investor.",
+                        )
+                      : t(
+                          "Đợt nuôi này đã kín chỗ. Vui lòng quay lại khi có đợt mới.",
+                          "This batch is fully booked. Check back when a new batch opens.",
+                        )
                     : t(
                         "Loài cá này tạm ngừng nhận đặt nuôi.",
                         "Bookings for this species are temporarily unavailable.",
@@ -228,7 +263,9 @@ function Detail({ id, language }: { id: string; language: Lang }) {
                     className="sl-btn sl-btn-primary lg"
                     href={`#farming/booking?fish=${fish.id}`}
                   >
-                    {t("Tiến hành đặt nuôi", "Start booking")}
+                    {fish.singleFish
+                      ? t("Đầu tư nuôi cá này", "Sponsor this fish")
+                      : t("Tiến hành đặt nuôi", "Start booking")}
                     <Icon name="arrow" size={16} />
                   </a>
                 ) : (
@@ -237,20 +274,15 @@ function Detail({ id, language }: { id: string; language: Lang }) {
                     className="sl-btn sl-btn-primary lg"
                     disabled
                   >
-                    {t("Tiến hành đặt nuôi", "Start booking")}
+                    {fish.singleFish
+                      ? t("Cá đã có người đầu tư", "Fish already sponsored")
+                      : t("Tiến hành đặt nuôi", "Start booking")}
                   </UiButton>
                 )}
                 <a className="sl-btn sl-btn-ghost lg" href="#farming">
                   {t("Quay lại danh sách", "Back to list")}
                 </a>
               </div>
-              <p className="fm-demo-note detail-view-22">
-                <Icon name="info" size={14} />
-                {t(
-                  "Giá, số lượng và thông số là dữ liệu minh họa.",
-                  "Prices, quantities and specs are demonstration data.",
-                )}
-              </p>
             </div>
           </div>
 

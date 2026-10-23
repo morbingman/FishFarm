@@ -11,9 +11,12 @@ function uniqueEmail(label: string): string {
 }
 
 function refreshCookieValue(response: Response): string {
-  const header = response.headers['set-cookie'] as unknown as string[] | string | undefined;
+  const header = response.headers['set-cookie'] as unknown as
+    string[] | string | undefined;
   const cookies = Array.isArray(header) ? header : header ? [header] : [];
-  const cookie = cookies.find((value) => value.startsWith(`${REFRESH_COOKIE}=`));
+  const cookie = cookies.find((value) =>
+    value.startsWith(`${REFRESH_COOKIE}=`),
+  );
   if (!cookie) throw new Error('refresh cookie was not set');
   return cookie.split(';', 1)[0];
 }
@@ -36,7 +39,11 @@ describe('Auth and users (e2e)', () => {
   });
 
   async function register(
-    overrides: Partial<{ email: string; role: 'Buyer' | 'Seller'; store: string }> = {},
+    overrides: Partial<{
+      email: string;
+      role: 'Buyer' | 'Seller';
+      store: string;
+    }> = {},
   ) {
     const email = overrides.email ?? uniqueEmail('buyer');
     const response = await request(app.getHttpServer())
@@ -105,13 +112,20 @@ describe('Auth and users (e2e)', () => {
         })
         .expect(400);
 
-      expect(response.body).toMatchObject({ code: 'profile.storeRequiresSeller' });
+      expect(response.body).toMatchObject({
+        code: 'profile.storeRequiresSeller',
+      });
     });
 
     it('rejects malformed registration input with i18n keys', async () => {
       const response = await request(app.getHttpServer())
         .post('/v1/auth/register')
-        .send({ email: 'not-an-email', password: 'short', name: '', role: 'Admin' })
+        .send({
+          email: 'not-an-email',
+          password: 'short',
+          name: '',
+          role: 'Admin',
+        })
         .expect(400);
 
       expect(response.body.code).toBe('validation.failed');
@@ -129,7 +143,11 @@ describe('Auth and users (e2e)', () => {
       const response = await request(app.getHttpServer())
         .patch('/v1/me')
         .set('Authorization', `Bearer ${accessToken}`)
-        .send({ name: 'Updated Buyer', phone: '+84 90 000 0000', location: 'Can Tho' })
+        .send({
+          name: 'Updated Buyer',
+          phone: '+84 90 000 0000',
+          location: 'Can Tho',
+        })
         .expect(200);
 
       expect(response.body).toMatchObject({
@@ -146,7 +164,9 @@ describe('Auth and users (e2e)', () => {
         .send({ store: 'Buyer Store' })
         .expect(400);
 
-      expect(response.body).toMatchObject({ code: 'profile.storeRequiresSeller' });
+      expect(response.body).toMatchObject({
+        code: 'profile.storeRequiresSeller',
+      });
     });
 
     it('partially updates notification prefs', async () => {
@@ -156,14 +176,22 @@ describe('Auth and users (e2e)', () => {
         .send({ status: false })
         .expect(200);
 
-      expect(updated.body).toEqual({ status: false, system: true, reminders: true });
+      expect(updated.body).toEqual({
+        status: false,
+        system: true,
+        reminders: true,
+      });
 
       const fetched = await request(app.getHttpServer())
         .get('/v1/me/prefs')
         .set('Authorization', `Bearer ${accessToken}`)
         .expect(200);
 
-      expect(fetched.body).toEqual({ status: false, system: true, reminders: true });
+      expect(fetched.body).toEqual({
+        status: false,
+        system: true,
+        reminders: true,
+      });
     });
 
     it('rotates the refresh token and invalidates the old one', async () => {
@@ -209,7 +237,9 @@ describe('Auth and users (e2e)', () => {
 
   describe('authentication guards', () => {
     it('requires a bearer token for protected routes', async () => {
-      const response = await request(app.getHttpServer()).get('/v1/me').expect(401);
+      const response = await request(app.getHttpServer())
+        .get('/v1/me')
+        .expect(401);
       expect(response.body).toMatchObject({ code: 'auth.missingToken' });
     });
 
@@ -235,7 +265,10 @@ describe('Auth and users (e2e)', () => {
       const { email, response } = await register();
       const cookie = refreshCookieValue(response);
 
-      await prisma.user.update({ where: { email }, data: { status: 'suspended' } });
+      await prisma.user.update({
+        where: { email },
+        data: { status: 'suspended' },
+      });
 
       const login = await request(app.getHttpServer())
         .post('/v1/auth/login')
@@ -332,7 +365,11 @@ describe('Auth and users (e2e)', () => {
 
       const response = await request(app.getHttpServer())
         .post('/v1/auth/reset-password')
-        .send({ email, code: requested.body.devCode as string, newPassword: 'AnotherPass456' })
+        .send({
+          email,
+          code: requested.body.devCode as string,
+          newPassword: 'AnotherPass456',
+        })
         .expect(400);
       expect(response.body).toMatchObject({ code: 'auth.codeExpired' });
     });
@@ -354,7 +391,11 @@ describe('Auth and users (e2e)', () => {
 
       const blocked = await request(app.getHttpServer())
         .post('/v1/auth/reset-password')
-        .send({ email, code: requested.body.devCode as string, newPassword: 'AnotherPass456' })
+        .send({
+          email,
+          code: requested.body.devCode as string,
+          newPassword: 'AnotherPass456',
+        })
         .expect(429);
       expect(blocked.body).toMatchObject({ code: 'auth.tooManyAttempts' });
     });

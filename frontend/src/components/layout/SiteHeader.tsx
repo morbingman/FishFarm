@@ -14,13 +14,10 @@ const VI: Record<string, string> = {
   Home: "Trang chủ",
   Categories: "Danh mục",
   "Featured Fish": "Cá nổi bật",
-  Sellers: "Trang trại",
   "How it works": "Cách hoạt động",
-  Insights: "Kiến thức",
   "Farm a Fish": "Đặt nuôi cá",
   "Sign In": "Đăng nhập",
   "Safe trading": "Giao dịch an toàn",
-  Community: "Cộng đồng",
   "About us": "Về chúng tôi",
   More: "Thêm",
   Marketplace: "Chợ cá",
@@ -34,13 +31,10 @@ const PRIMARY_SECTIONS = [
   { key: "top", label: "Home" },
   { key: "categories", label: "Categories" },
   { key: "featured", label: "Featured Fish" },
-  { key: "sellers", label: "Sellers" },
   { key: "how", label: "How it works" },
-  { key: "insights", label: "Insights" },
 ];
 const EXTRA_SECTIONS = [
   { key: "safety", label: "Safe trading" },
-  { key: "reviews", label: "Community" },
   { key: "about", label: "About us" },
 ];
 const SECTIONS = [...PRIMARY_SECTIONS, ...EXTRA_SECTIONS];
@@ -229,7 +223,7 @@ export function SiteHeader({
         )}
         <a
           className="ds-brand"
-          href={isAdmin ? "#admin" : "#home"}
+          href={isAdmin ? "#admin/listings" : "#home"}
           aria-label="FISHMARKET"
         >
           <LogoMark />
@@ -256,11 +250,7 @@ export function SiteHeader({
                   className={active === s.key ? "on" : ""}
                   aria-current={active === s.key ? "location" : undefined}
                 >
-                  {s.key === "sellers"
-                    ? language === "vi"
-                      ? "Trang trại"
-                      : "Farms"
-                    : tr(language, s.label)}
+                  {tr(language, s.label)}
                 </a>
               ))}
           {!isAdmin && (
@@ -393,11 +383,7 @@ export function SiteHeader({
                   aria-current={active === s.key ? "location" : undefined}
                   onClick={(e) => navigateSection(e, s.key)}
                 >
-                  {s.key === "sellers"
-                    ? language === "vi"
-                      ? "Trang trại"
-                      : "Farms"
-                    : tr(language, s.label)}
+                  {tr(language, s.label)}
                 </a>
               ))}
           {(!user || user.role === "Buyer") && (
@@ -418,9 +404,7 @@ export function SiteFooter({ language }: { language: Lang }) {
           {footerUser?.role === "Admin" ? (
             <>
               {ADMIN_NAV.filter((item) =>
-                ["#admin/users", "#admin/bookings", "#admin/activity"].includes(
-                  item.href,
-                ),
+                ["#admin/users", "#admin/bookings"].includes(item.href),
               ).map((item) => (
                 <a key={item.href} href={item.href}>
                   {adminLabel(item.label, language)}

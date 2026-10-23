@@ -75,7 +75,7 @@ export function Seller({
         id={id}
         t={t}
         show={show}
-        submitted={params.get("submitted") === "1"}
+        published={params.get("published") === "1"}
       />
     );
   else if (

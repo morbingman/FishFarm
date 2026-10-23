@@ -9,17 +9,23 @@ const REQUIRED = ['DATABASE_URL', 'JWT_ACCESS_SECRET'] as const;
 export function validateEnv(config: RawEnv): RawEnv {
   const missing = REQUIRED.filter((key) => !config[key]);
   if (missing.length > 0) {
-    throw new Error(`Missing required environment variables: ${missing.join(', ')}`);
+    throw new Error(
+      `Missing required environment variables: ${missing.join(', ')}`,
+    );
   }
 
   const port = Number(config.PORT ?? 4000);
   if (!Number.isInteger(port) || port < 1 || port > 65535) {
-    throw new Error(`PORT must be a valid TCP port, received: ${String(config.PORT)}`);
+    throw new Error(
+      `PORT must be a valid TCP port, received: ${String(config.PORT)}`,
+    );
   }
 
   const idleMinutes = Number(config.SESSION_IDLE_MINUTES ?? 30);
   if (!Number.isInteger(idleMinutes) || idleMinutes < 1) {
-    throw new Error(`SESSION_IDLE_MINUTES must be a positive integer, received: ${String(config.SESSION_IDLE_MINUTES)}`);
+    throw new Error(
+      `SESSION_IDLE_MINUTES must be a positive integer, received: ${String(config.SESSION_IDLE_MINUTES)}`,
+    );
   }
 
   const accessTtl = Number(config.JWT_ACCESS_TTL_SECONDS ?? 900);

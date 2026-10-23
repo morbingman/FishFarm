@@ -8,7 +8,6 @@ import {
   STATUS_LABEL,
   useLoading,
 } from "@/components/common/Portal";
-import { SAMPLE_PHOTOS } from "@/services/demoStore";
 import { useMine, Icon, Table } from "@/components/seller/SellerParts";
 export function Dashboard({ user, t }: { user: User; t: TFn }) {
   const mine = useMine(user);
@@ -101,7 +100,12 @@ export function Dashboard({ user, t }: { user: User; t: TFn }) {
           )}
         </section>
         <aside className="sl-promo">
-          <img src={SAMPLE_PHOTOS[1].url} alt="Koi in a clear pond" />
+          {mine[0]?.draft.images[0]?.url && (
+            <img
+              src={mine[0].draft.images[0].url}
+              alt={mine[0].draft.name || "Latest fish listing"}
+            />
+          )}
           <div>
             <h2>{t("Next actions")}</h2>
             {todo.length === 0 ? (

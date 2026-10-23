@@ -1,4 +1,9 @@
-import { hasPermission, PERMISSIONS, permissionsFor, ROLE_PERMISSIONS } from './permissions.js';
+import {
+  hasPermission,
+  PERMISSIONS,
+  permissionsFor,
+  ROLE_PERMISSIONS,
+} from './permissions.js';
 
 describe('permission matrix (REQUIREMENTS.md §2)', () => {
   it('grants buyers ordering but not self-managed listings', () => {
@@ -32,7 +37,7 @@ describe('permission matrix (REQUIREMENTS.md §2)', () => {
     expect(hasPermission('Seller', 'user.manage')).toBe(false);
   });
 
-  it('gives admins moderation and user management, not seller or buyer actions', () => {
+  it('gives admins moderation, user management, and listing management', () => {
     for (const permission of [
       'queue.view',
       'listing.approve',
@@ -42,10 +47,15 @@ describe('permission matrix (REQUIREMENTS.md §2)', () => {
       'user.manage',
       'activity.view',
       'profile.update',
+      'listing.create',
+      'listing.update',
+      'listing.delete',
+      'listing.submit',
+      'listing.pause',
+      'order.fulfill',
     ] as const) {
       expect(hasPermission('Admin', permission)).toBe(true);
     }
-    expect(hasPermission('Admin', 'listing.create')).toBe(false);
     expect(hasPermission('Admin', 'order.create')).toBe(false);
     expect(hasPermission('Admin', 'batch.sponsor')).toBe(false);
   });
@@ -62,7 +72,8 @@ describe('permission matrix (REQUIREMENTS.md §2)', () => {
 
     expect(hasPermission('Admin', 'batch.review')).toBe(true);
     expect(hasPermission('Admin', 'batch.settle')).toBe(true);
-    expect(hasPermission('Admin', 'batch.create')).toBe(false);
+    expect(hasPermission('Admin', 'batch.create')).toBe(true);
+    expect(hasPermission('Admin', 'batch.update')).toBe(true);
   });
 
   it('lets every role browse the market and edit their profile', () => {

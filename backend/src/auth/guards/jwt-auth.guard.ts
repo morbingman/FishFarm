@@ -1,4 +1,9 @@
-import { CanActivate, ExecutionContext, HttpStatus, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  HttpStatus,
+  Injectable,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Reflector } from '@nestjs/core';
 import { JwtService } from '@nestjs/jwt';
@@ -27,13 +32,15 @@ export class JwtAuthGuard implements CanActivate {
 
     const request = context.switchToHttp().getRequest<AuthenticatedRequest>();
     const token = this.extractToken(request);
-    if (!token) throw new AppException('auth.missingToken', HttpStatus.UNAUTHORIZED);
+    if (!token)
+      throw new AppException('auth.missingToken', HttpStatus.UNAUTHORIZED);
 
     let claims: AccessTokenClaims;
     try {
       claims = await this.jwt.verifyAsync<AccessTokenClaims>(token);
     } catch (error) {
-      const expired = error instanceof Error && error.name === 'TokenExpiredError';
+      const expired =
+        error instanceof Error && error.name === 'TokenExpiredError';
       throw new AppException(
         expired ? 'auth.tokenExpired' : 'auth.invalidToken',
         HttpStatus.UNAUTHORIZED,
@@ -45,7 +52,11 @@ export class JwtAuthGuard implements CanActivate {
       include: { user: true },
     });
 
-    if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {
+    if (
+      !session ||
+      session.revokedAt ||
+      session.expiresAt.getTime() <= Date.now()
+    ) {
       throw new AppException('auth.sessionExpired', HttpStatus.UNAUTHORIZED);
     }
 

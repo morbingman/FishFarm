@@ -1,5 +1,5 @@
 import { LogoMark } from "@/components/layout/LogoMark";
-import type { listings, sellers } from "@/data/homeData";
+import type { HomeCategory, HomeListing, HomeSeller } from "@/data/homeData";
 import type { ReactNode, FormEvent } from "react";
 import "./HomeParts.css";
 import {
@@ -13,6 +13,7 @@ import { SiteHeader } from "@/components/layout/SiteHeader";
 import { useState } from "react";
 import { useTranslation } from "@/context/LanguageContext";
 import { photos } from "@/data/homeData";
+import { domainApi } from "@/services/api";
 export type IconName =
   | "arrow"
   | "bell"
@@ -300,7 +301,15 @@ export function SearchPanel() {
     </form>
   );
 }
-export function Hero() {
+export function Hero({
+  activeListings,
+  verifiedSellers,
+  image,
+}: {
+  activeListings: number;
+  verifiedSellers: number;
+  image: string | null;
+}) {
   const { t } = useTranslation();
   return (
     <section id="top" className="market-hero home-parts-view-23">
@@ -322,7 +331,11 @@ export function Hero() {
               )}
             </p>
             <div className="home-parts-view-32">
-              <Button>
+              <Button
+                onClick={() => {
+                  window.location.hash = "marketplace";
+                }}
+              >
                 {t("Explore Marketplace")}{" "}
                 <Icon name="arrow" className="home-parts-view-22" />
               </Button>
@@ -337,8 +350,8 @@ export function Hero() {
             </div>
             <div className="pt-6">
               {[
-                "10,000+ Fish Listed",
-                "2,500+ Verified Sellers",
+                `${activeListings.toLocaleString()} ${t("Fish Listed")}`,
+                `${verifiedSellers.toLocaleString()} ${t("Verified Sellers")}`,
                 "Secure Transactions",
               ].map((item) => (
                 <span key={item} className="home-parts-view-34">
@@ -352,12 +365,14 @@ export function Hero() {
           </div>
         </div>
         <div className="home-parts-view-37">
-          <img
-            src={photos.hero}
-            alt="Koi fish photographed in dark water"
-            className="home-parts-view-38"
-            fetchPriority="high"
-          />
+          {image && (
+            <img
+              src={image}
+              alt={t("Koi fish")}
+              className="home-parts-view-38"
+              fetchPriority="high"
+            />
+          )}
           <div className="home-parts-view-39" />
           <div className="home-parts-view-40">
             <div className="home-parts-view-41">
@@ -381,17 +396,19 @@ export function Hero() {
     </section>
   );
 }
-export function CategoryCard({ item }: { item: string[] }) {
+export function CategoryCard({ item }: { item: HomeCategory }) {
   const { t } = useTranslation();
   return (
-    <a href="#home?section=featured" className="group home-parts-view-47">
-      <img src={item[2]} alt={item[0]} className="home-parts-view-48" />
+    <a href="#marketplace" className="group home-parts-view-47">
+      {item.image && (
+        <img src={item.image} alt={item.name} className="home-parts-view-48" />
+      )}
       <div className="home-parts-view-49" />
       <div className="home-parts-view-50">
         <div>
-          <h3 className="home-parts-view-51">{t(item[0])}</h3>
+          <h3 className="home-parts-view-51">{t(item.name)}</h3>
           <p className="home-parts-view-52">
-            {item[1].replace("listings", t("listings"))}
+            {item.count.toLocaleString()} {t("listings")}
           </p>
         </div>
         <span className="home-parts-view-53">
@@ -401,27 +418,36 @@ export function CategoryCard({ item }: { item: string[] }) {
     </a>
   );
 }
-export function ListingCard({
-  item,
-  index,
-}: {
-  item: (typeof listings)[0];
-  index: number;
-}) {
+export function ListingCard({ item }: { item: HomeListing }) {
   const [favorite, setFavorite] = useState(false);
-  const { t } = useTranslation();
+  const { language, t } = useTranslation();
+  const detail = [item.size ? `${item.size} cm` : null, item.origin]
+    .filter(Boolean)
+    .join(" · ");
+  const price = `${new Intl.NumberFormat(language === "vi" ? "vi-VN" : "en-US").format(item.price)} ₫`;
   return (
     <article className="market-listing group home-parts-view-54">
       <div className="home-parts-view-55">
-        <img
-          src={item.image}
-          alt={item.name}
-          loading="lazy"
-          className="home-parts-view-48"
-        />
+        {item.image && (
+          <img
+            src={item.image}
+            alt={item.name}
+            loading="lazy"
+            className="home-parts-view-48"
+          />
+        )}
         <UiButton
           variant="plain"
-          onClick={() => setFavorite(!favorite)}
+          onClick={() => {
+            const request = favorite
+              ? domainApi.removeFavorite(item.id)
+              : domainApi.addFavorite(item.id);
+            void request
+              .then(() => setFavorite(!favorite))
+              .catch(() => {
+                window.location.hash = "login";
+              });
+          }}
           aria-label={`${t("Favorite")} ${item.name}`}
           aria-pressed={favorite}
           className={`absolute right-4 top-4 grid h-10 w-10 place-items-center rounded-full bg-white/90 shadow-md backdrop-blur transition ${
@@ -433,14 +459,14 @@ export function ListingCard({
             className={`h-[18px] w-[18px] ${favorite ? "fill-current" : ""}`}
           />
         </UiButton>
-        <span className="home-parts-view-56">ID FM-{2048 + index * 187}</span>
+        <span className="home-parts-view-56">ID {item.id}</span>
       </div>
       <div className="home-parts-view-57">
         <VerifiedBadge />
         <p className="home-parts-view-58">{item.species}</p>
         <h3 className="home-parts-view-59">{item.name}</h3>
         <div className="home-parts-view-60">
-          <span>{t(item.detail)}</span>
+          <span>{detail}</span>
           <span className="home-parts-view-61" />
           <span className="home-parts-view-62">
             <Icon name="location" className="home-parts-view-5" />
@@ -450,14 +476,20 @@ export function ListingCard({
         <div className="pt-4">
           <div>
             <p className="home-parts-view-64">{item.seller}</p>
-            <Rating value={item.rating} />
+            <Rating value={item.rating.toFixed(1)} />
           </div>
           <div className="home-parts-view-65">
             <p className="home-parts-view-66">{t("From")}</p>
-            <p className="home-parts-view-67">{item.price}</p>
+            <p className="home-parts-view-67">{price}</p>
           </div>
         </div>
-        <Button variant="secondary" className="home-parts-view-68">
+        <Button
+          variant="secondary"
+          className="home-parts-view-68"
+          onClick={() => {
+            window.location.hash = "marketplace";
+          }}
+        >
           {t("View Details")}{" "}
           <Icon name="arrow" className="home-parts-view-22" />
         </Button>
@@ -465,16 +497,25 @@ export function ListingCard({
     </article>
   );
 }
-export function Stats() {
+export function Stats({
+  stats,
+}: {
+  stats: {
+    activeListings: number;
+    verifiedSellers: number;
+    successfulTrades: number;
+    satisfiedPercent: number;
+  };
+}) {
   const { t } = useTranslation();
   return (
     <section className="home-parts-view-69">
       <div className="home-parts-view-70">
         {[
-          ["10,000+", "Active Listings"],
-          ["2,500+", "Verified Sellers"],
-          ["15,000+", "Successful Trades"],
-          ["98%", "Satisfied Buyers"],
+          [stats.activeListings.toLocaleString(), "Active Listings"],
+          [stats.verifiedSellers.toLocaleString(), "Verified Sellers"],
+          [stats.successfulTrades.toLocaleString(), "Successful Trades"],
+          [`${stats.satisfiedPercent}%`, "Satisfied Buyers"],
         ].map(([num, label], i) => (
           <div
             key={label}
@@ -490,12 +531,14 @@ export function Stats() {
     </section>
   );
 }
-export function SellerCard({ seller }: { seller: (typeof sellers)[0] }) {
+export function SellerCard({ seller }: { seller: HomeSeller }) {
   const { t } = useTranslation();
   return (
     <article className="home-parts-view-73">
       <div className="home-parts-view-74">
-        <img src={seller.image} alt="" className="home-parts-view-75" />
+        {seller.image && (
+          <img src={seller.image} alt="" className="home-parts-view-75" />
+        )}
         <div className="home-parts-view-76">
           <div className="home-parts-view-77">
             <h3 className="home-parts-view-78">{seller.name}</h3>
@@ -511,13 +554,19 @@ export function SellerCard({ seller }: { seller: (typeof sellers)[0] }) {
           <Icon name="location" className="home-parts-view-22" />
           {seller.location}
         </span>
-        <Rating value={seller.rating} />
+        <Rating value={seller.rating.toFixed(1)} />
       </div>
       <div className="home-parts-view-83">
         <span className="home-parts-view-84">
-          {seller.listings.replace("Listings", t("Listings"))}
+          {seller.count.toLocaleString()} {t("Listings")}
         </span>
-        <UiButton variant="plain" className="home-parts-view-85">
+        <UiButton
+          variant="plain"
+          className="home-parts-view-85"
+          onClick={() => {
+            window.location.hash = "marketplace";
+          }}
+        >
           {t("View Store")} <Icon name="arrow" className="home-parts-view-5" />
         </UiButton>
       </div>
@@ -619,13 +668,7 @@ export function Promo() {
 export function Footer() {
   const { t } = useTranslation();
   const columns = [
-    [
-      "Marketplace",
-      "Browse Fish",
-      "Categories",
-      "Featured Listings",
-      "Trusted Sellers",
-    ],
+    ["Marketplace", "Browse Fish", "Categories", "Featured Listings"],
     [
       "For Sellers",
       "Sell Your Fish",

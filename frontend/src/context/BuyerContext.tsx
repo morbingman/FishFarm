@@ -1,4 +1,4 @@
-import { recordPurchase, useSales } from "@/services/commerceStore";
+import { refreshSales, useSales } from "@/services/commerceStore";
 import { useSessionState } from "@/hooks/useSessionState";
 import { pageTitles } from "@/data/buyerData";
 import type { ReactNode as Node } from "react";
@@ -11,13 +11,39 @@ import { buyerVi } from "@/data/translations";
 import { notify, useStore } from "@/services/demoStore";
 import {
   type Fish,
-  baseStock,
-  pictures,
   type Page,
   type Shipping,
   emptyShipping,
 } from "@/data/buyerData";
+import { domainApi } from "@/services/api";
 import { createContext, useContext } from "react";
+
+function listingToFish(item: any): Fish {
+  return {
+    id: Number(String(item.id).replace(/\D/g, "")),
+    apiId: item.id,
+    code: item.id,
+    name: item.name,
+    species: item.species,
+    breed: item.breed || item.species,
+    size: Number(item.size) || 0,
+    price: Number(item.price) || 0,
+    location: item.location ?? "",
+    seller: item.seller,
+    rating: Number(item.rating) || 0,
+    image: item.image ?? "",
+    label: item.saleMode === "pre_order" ? "PRE-ORDER" : "IN STOCK",
+    age: item.age ? `${item.age} months` : "",
+    gender: item.gender ?? "",
+    origin: item.origin ?? "",
+    description: item.description ?? "",
+    health: item.health ?? "",
+    quantity: Number(item.quantity) || 0,
+    reviewCount: Number(item.reviewCount) || 0,
+    images: (item.images ?? []).map((image: any) => image.url),
+  };
+}
+
 function useBuyerState({
   user,
   language,
@@ -30,27 +56,32 @@ function useBuyerState({
   useDomTranslation(language, buyerVi);
   const store = useStore();
   const sales = useSales();
-  const stock: Fish[] = [
-    ...baseStock,
-    ...store.listings
-      .filter((l) => l.status === "approved")
-      .map((l): Fish => ({
-        id: 1000 + Number(l.id.replace(/\D/g, "")),
-        name: l.draft.name,
-        species: l.draft.species,
-        breed: l.draft.breed || l.draft.species,
-        size: Number(l.draft.size) || 0,
-        price: Number(l.draft.price) || 0,
-        location: `${l.draft.region}, Vietnam`,
-        seller: l.sellerName,
-        rating: 4.8,
-        image: l.draft.images[0]?.url ?? pictures.kohaku,
-        label: "NEW LISTING",
-        age: l.draft.age,
-        gender: l.draft.gender,
-        origin: l.draft.origin,
-      })),
-  ];
+  const emptyFish: Fish = {
+    id: 0,
+    name: "",
+    species: "",
+    breed: "",
+    size: 0,
+    price: 0,
+    location: "",
+    seller: "",
+    rating: 0,
+    image: "",
+    label: "",
+    age: "",
+    gender: "",
+    origin: "",
+    images: [],
+  };
+  const [stock, setStock] = useState<Fish[]>([]);
+  async function refreshMarketplace() {
+    const { items: listings } = await domainApi.listings();
+    setStock(listings.map(listingToFish));
+  }
+  useEffect(() => {
+    void refreshMarketplace()
+      .catch(() => setToast("Unable to load marketplace data."));
+  }, []);
   const routePage = (): Page => {
     const part = window.location.hash
       .replace(/^#/, "")
@@ -73,12 +104,36 @@ function useBuyerState({
   }, []);
   const [selected, setSelected] = useSessionState(
     draftKey("selected"),
-    stock[0],
+    emptyFish,
   );
   const [favorites, setFavorites] = useSessionState<number[]>(
     draftKey("favorites"),
     [],
   );
+  useEffect(() => {
+    if (!stock.length) return;
+    setSelected((current) => (current.id ? current : stock[0]));
+    void domainApi
+      .favorites()
+      .then((items) =>
+        setFavorites(
+          items.map((item: any) => Number(String(item.id).replace(/\D/g, ""))),
+        ),
+      )
+      .catch(() => undefined);
+    void domainApi
+      .cart()
+      .then((rows) =>
+        setCart(
+          rows
+            .map((row: any) =>
+              stock.find((fish) => fish.apiId === row.listing.code),
+            )
+            .filter(Boolean) as Fish[],
+        ),
+      )
+      .catch(() => undefined);
+  }, [stock.length]);
   const [favoritesOnly, setFavoritesOnly] = useState(false);
   const [query, setQuery] = useState("");
   const [species, setSpecies] = useState<string[]>([]);
@@ -91,9 +146,7 @@ function useBuyerState({
   const [sort, setSort] = useState("Recommended");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [cart, setCart] = useSessionState<Fish[]>(draftKey("cart"), []);
-  const [items, setItems] = useSessionState<Fish[]>(draftKey("items"), [
-    stock[0],
-  ]);
+  const [items, setItems] = useSessionState<Fish[]>(draftKey("items"), []);
   const [gallery, setGallery] = useState(0);
   const [modal, setModal] = useState<
     "messages" | "notifications" | "zoom" | "support" | null
@@ -115,7 +168,6 @@ function useBuyerState({
   const [paymentState, setPaymentState] = useState<"ready" | "failed" | "paid">(
     "ready",
   );
-  const [simulateFailure, setSimulateFailure] = useState(false);
   const [purchaseId, setPurchaseId] = useSessionState(
     draftKey("purchaseId"),
     "",
@@ -152,15 +204,11 @@ function useBuyerState({
   const subtotal = items.reduce((sum, fish) => sum + fish.price, 0);
   const fee = Math.round(subtotal * 0.02 * 100) / 100;
   const total = subtotal + shippingPrice + fee;
-  const galleryImages = [
-    selected.image,
-    selected.species === "Koi"
-      ? pictures.koi
-      : selected.species === "Betta"
-        ? pictures.red
-        : selected.image,
-    selected.species === "Koi" ? pictures.ogon : selected.image,
-  ];
+  const galleryImages = selected.images?.length
+    ? selected.images
+    : selected.image
+      ? [selected.image]
+      : [];
   useEffect(
     () => () => {
       if (processingTimer.current) clearTimeout(processingTimer.current);
@@ -193,6 +241,13 @@ function useBuyerState({
     go("detail");
   }
   function favorite(id: number) {
+    const fish = stock.find((item) => item.id === id);
+    if (fish?.apiId)
+      void (
+        favorites.includes(id)
+          ? domainApi.removeFavorite(fish.apiId)
+          : domainApi.addFavorite(fish.apiId)
+      ).catch(() => setToast("Could not update favorite."));
     setFavorites((old) =>
       old.includes(id) ? old.filter((x) => x !== id) : [...old, id],
     );
@@ -217,6 +272,30 @@ function useBuyerState({
     setItems(fish);
     go("checkout");
   }
+  async function addToCart(fish: Fish) {
+    if (!fish.apiId) {
+      setToast("This fish is currently unavailable.");
+      return;
+    }
+    try {
+      await domainApi.putCart(fish.apiId, 1);
+      setCart((old) =>
+        old.some((item) => item.id === fish.id) ? old : [...old, fish],
+      );
+      setToast(`${fish.name} added to your cart.`);
+    } catch {
+      setToast("Could not add this fish. It may have just been sold.");
+      await refreshMarketplace().catch(() => undefined);
+    }
+  }
+  async function removeFromCart(fish: Fish) {
+    try {
+      if (fish.apiId) await domainApi.removeCart(fish.apiId);
+      setCart((old) => old.filter((item) => item.id !== fish.id));
+    } catch {
+      setToast("Could not remove this fish from your cart.");
+    }
+  }
   function checkout(e: FormEvent) {
     e.preventDefault();
     const nextErrors: Record<string, string> = {};
@@ -231,7 +310,7 @@ function useBuyerState({
       go("payment");
     }
   }
-  function pay(e: FormEvent<HTMLFormElement>) {
+  async function pay(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget)) as Record<
       string,
@@ -240,7 +319,7 @@ function useBuyerState({
     const nextErrors: Record<string, string> = {};
     if (paymentMethod === "Bank Card") {
       if (!/^\d{16}$/.test((data.card || "").replace(/\s/g, "")))
-        nextErrors.card = "Enter 16 digits. Demo: 4242 4242 4242 4242.";
+        nextErrors.card = "Enter a valid 16-digit card number.";
       if (!/^(0[1-9]|1[0-2])\/\d{2}$/.test(data.expiry || ""))
         nextErrors.expiry = "Use MM/YY, for example 12/30.";
       else {
@@ -256,31 +335,42 @@ function useBuyerState({
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
     setProcessing(true);
-    processingTimer.current = setTimeout(() => {
-      setProcessing(false);
-      if (simulateFailure) {
+    try {
+      for (const item of items)
+        if (item.apiId) await domainApi.putCart(item.apiId, 1);
+      const order = await domainApi.createOrder({
+        listingCodes: items
+          .map((item) => item.apiId)
+          .filter((code): code is string => Boolean(code)),
+        recipientName: shipping.name,
+        phone: shipping.phone,
+        address: shipping.address,
+        city: shipping.city,
+        province: shipping.province,
+        deliveryMethod: method,
+        shippingFee: shippingPrice,
+      });
+      const payment = await domainApi.payOrder(order.code, {
+        method:
+          paymentMethod === "Bank Card"
+            ? "bank_card"
+            : paymentMethod === "E-Wallet"
+              ? "e_wallet"
+              : "bank_transfer",
+        idempotencyKey: `${order.id}-initial`,
+      });
+      if (payment.state === "failed") {
         setPaymentState("failed");
-        setSimulateFailure(false);
       } else {
         setPaymentState("paid");
         setHasOrder(true);
-        const purchase = recordPurchase({
-          owner: user.email,
-          items: items.map(({ id, name, price, image }) => ({
-            id,
-            name,
-            price,
-            image,
-          })),
-          total,
-          shipping,
-        });
-        setPurchaseId(purchase.id);
+        setPurchaseId(order.code);
+        await Promise.all([refreshSales(), refreshMarketplace()]);
         notify(
           user.email,
           "success",
           "Order confirmed",
-          `Your order ${purchase.id} is confirmed. Follow its progress in your orders.`,
+          `Your order ${order.code} is confirmed. Follow its progress in your orders.`,
           "#marketplace",
         );
         setCart((old) =>
@@ -288,7 +378,14 @@ function useBuyerState({
         );
         go("confirmation");
       }
-    }, 1600);
+    } catch {
+      setPaymentState("failed");
+      setErrors({
+        payment: "Payment could not be completed. Please try again.",
+      });
+    } finally {
+      setProcessing(false);
+    }
   }
   function viewPurchase(id: string) {
     const order = sales.find(
@@ -307,6 +404,35 @@ function useBuyerState({
     setDelivered(["delivered", "completed"].includes(order.status));
     setCompleted(order.status === "completed");
     go("tracking");
+  }
+  async function submitReview() {
+    if (!purchaseId) return;
+    await domainApi.reviewOrder(purchaseId, { rating, text: review });
+    setReviewSent(true);
+  }
+  async function submitDispute() {
+    if (!purchaseId) return;
+    const uploaded = await Promise.all(
+      files.map((file) => domainApi.uploadImage(file, "dispute_attachment")),
+    );
+    await domainApi.disputeOrder(purchaseId, {
+      reason,
+      description: problem,
+      attachments: uploaded.map((item) => item.url),
+    });
+    setDisputeSent(true);
+  }
+  async function confirmDelivery() {
+    if (!purchaseId) return;
+    await domainApi.confirmDelivery(purchaseId);
+    setDelivered(true);
+    setCompleted(true);
+  }
+  async function sendSellerMessage(text: string) {
+    if (!selected.apiId) return;
+    const conversation = await domainApi.startConversation(selected.apiId);
+    await domainApi.sendMessage(conversation.id, text);
+    setSent((old) => [...old, text]);
   }
   useEffect(() => {
     if (currentPurchase) {
@@ -405,8 +531,6 @@ function useBuyerState({
     setProcessing,
     paymentState,
     setPaymentState,
-    simulateFailure,
-    setSimulateFailure,
     hasOrder,
     setHasOrder,
     sales,
@@ -417,16 +541,20 @@ function useBuyerState({
     setDelivered,
     completed,
     setCompleted,
+    confirmDelivery,
     rating,
     setRating,
     review,
     setReview,
     reviewSent,
     setReviewSent,
+    submitReview,
     files,
     setFiles,
     disputeSent,
     setDisputeSent,
+    submitDispute,
+    sendSellerMessage,
     reason,
     setReason,
     problem,
@@ -444,6 +572,8 @@ function useBuyerState({
     favorite,
     clearFilters,
     beginCheckout,
+    addToCart,
+    removeFromCart,
     checkout,
     pay,
     filtered,

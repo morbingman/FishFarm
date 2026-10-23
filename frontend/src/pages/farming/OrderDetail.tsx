@@ -1,6 +1,5 @@
 import type { Order } from "@/services/farmingStore";
 import type { Lang } from "@/hooks/useTranslation";
-import { type CSSProperties } from "react";
 import "./OrderDetail.css";
 import { TableCell as UiTableCell } from "@/components/ui/table";
 import { TableBody as UiTableBody } from "@/components/ui/table";
@@ -10,9 +9,8 @@ import { TableHeader as UiTableHeader } from "@/components/ui/table";
 import { Table as UiTable } from "@/components/ui/table";
 import { Button as UiButton } from "@/components/ui/button";
 import { useState } from "react";
-import { Icon, StateBlock, Banner, Crumbs } from "@/components/common/Portal";
+import { Icon, Banner, Crumbs } from "@/components/common/Portal";
 import {
-  CARE_LABEL,
   METHOD_LABEL,
   PKG_LABEL,
   STATUS_LABEL,
@@ -26,7 +24,6 @@ import {
   fmtNum,
   fmtTime,
   payPendingDeposit,
-  type CareType,
   type OrderStatus,
 } from "@/services/farmingStore";
 import {
@@ -37,7 +34,7 @@ import {
   PayPanel,
   useT,
 } from "@/components/farming/FarmingParts";
-import { CUR, CARE_ICON } from "@/data/farmingOrderData";
+import { CUR } from "@/data/farmingOrderData";
 import { HandoverForm } from "@/pages/farming/HandoverForm";
 export /* ---------------------------------- detail ---------------------------------- */
 function OrderDetail({
@@ -54,10 +51,6 @@ function OrderDetail({
   const [modal, setModal] = useState<"pay" | "cancel" | "handover" | null>(
     null,
   );
-  const [metric, setMetric] = useState<"sizeCm" | "weightG" | "survival">(
-    "sizeCm",
-  );
-  const [careFilter, setCareFilter] = useState<"all" | CareType>("all");
   const close = () => setModal(null);
   const cur = CUR[o.status];
   const steps = [
@@ -68,14 +61,6 @@ function OrderDetail({
     t("Sẵn sàng", "Ready"),
     t("Bàn giao", "Handover"),
   ];
-  const growing = o.meas.length > 0;
-  const unit = metric === "sizeCm" ? "cm" : metric === "weightG" ? "g" : "%";
-  const maxV = Math.max(1, ...o.meas.map((m) => m[metric]));
-  const last = o.meas[o.meas.length - 1];
-  const careList = o.care
-    .filter((c) => careFilter === "all" || c.type === careFilter)
-    .slice()
-    .sort((a, b) => b.at.localeCompare(a.at));
   const payTotal = o.payments.filter(
     (p) => p.kind === "deposit" && p.status !== "failed",
   ).length;
@@ -288,179 +273,6 @@ function OrderDetail({
             "The farming period is an estimate and may change.",
           )}
         </p>
-      </section>
-
-      <section className="sl-card fm-section">
-        <header>
-          <h2>{t("Theo dõi tăng trưởng", "Growth monitoring")}</h2>
-          <Badge tone="muted">{t("Dữ liệu mẫu", "Sample data")}</Badge>
-        </header>
-        {!growing ? (
-          <StateBlock
-            icon="activity"
-            tone="info"
-            title={t("Chưa có số liệu tăng trưởng", "No growth data yet")}
-            body={
-              o.status === "cancelled"
-                ? t(
-                    "Đơn đã hủy nên không có số liệu.",
-                    "This order was cancelled, so there is no data.",
-                  )
-                : t(
-                    "Số liệu sẽ xuất hiện khi trang trại bắt đầu nuôi và đo cá.",
-                    "Measurements appear once the farm starts raising and measuring your fish.",
-                  )
-            }
-          />
-        ) : (
-          <div className="fm-growth">
-            <div className="order-detail-view-12">
-              <div
-                className="fm-chips"
-                role="group"
-                aria-label={t("Chỉ số", "Metric")}
-              >
-                {(
-                  [
-                    ["sizeCm", t("Kích thước", "Size")],
-                    ["weightG", t("Cân nặng", "Weight")],
-                    ["survival", t("Tỷ lệ sống", "Survival")],
-                  ] as ["sizeCm" | "weightG" | "survival", string][]
-                ).map(([k, l]) => (
-                  <UiButton
-                    variant="plain"
-                    key={k}
-                    className={`fm-chip ${metric === k ? "on" : ""}`}
-                    aria-pressed={metric === k}
-                    onClick={() => setMetric(k)}
-                  >
-                    {l}
-                  </UiButton>
-                ))}
-              </div>
-              <div className="fm-kv order-detail-view-14">
-                <small>{t("Số đo gần nhất", "Latest measurement")}</small>
-                <b>
-                  {last.sizeCm} cm · {last.weightG} g · {last.survival}%{" "}
-                  {t("sống", "survival")}
-                </b>
-              </div>
-              <div className="fm-kv order-detail-view-16">
-                <small>
-                  {t("Kích thước mục tiêu bàn giao", "Target handover size")}
-                </small>
-                <b>~{f.sizeTarget} cm</b>
-              </div>
-              <p className="fm-demo-note order-detail-view-18">
-                <Icon name="info" size={14} />
-                {t(
-                  "Số liệu minh họa; thực tế có thể khác. Tỷ lệ sống phản ánh hao hụt thực tế.",
-                  "Illustrative figures; actual results may differ. Survival reflects real losses.",
-                )}
-              </p>
-            </div>
-            <div>
-              <div
-                className="fm-chart"
-                role="img"
-                aria-label={t("Biểu đồ tăng trưởng", "Growth chart")}
-              >
-                {o.meas.map((m) => (
-                  <div key={m.at}>
-                    <span>
-                      {m[metric]}
-                      {unit}
-                    </span>
-                    <i
-                      style={
-                        {
-                          "--order-detail-layout-19-height": `${Math.max(4, (m[metric] / maxV) * 100)}%`,
-                        } as CSSProperties
-                      }
-                      className="order-detail-view-20"
-                    />
-                  </div>
-                ))}
-              </div>
-              <div className="fm-chart-x">
-                {o.meas.map((m) => (
-                  <span key={m.at}>{fmtDay(m.at, language).slice(0, 5)}</span>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
-
-      <section className="sl-card fm-section">
-        <header>
-          <h2>{t("Lịch sử chăm sóc", "Care history")}</h2>
-          {o.care.length > 0 && (
-            <div
-              className="fm-chips"
-              role="group"
-              aria-label={t("Lọc", "Filter")}
-            >
-              {(
-                ["all", "feeding", "water", "health", "photo", "note"] as const
-              ).map((k) => (
-                <UiButton
-                  variant="plain"
-                  key={k}
-                  className={`fm-chip ${careFilter === k ? "on" : ""}`}
-                  aria-pressed={careFilter === k}
-                  onClick={() => setCareFilter(k)}
-                >
-                  {k === "all"
-                    ? t("Tất cả", "All")
-                    : L(CARE_LABEL[k], language)}
-                </UiButton>
-              ))}
-            </div>
-          )}
-        </header>
-        {o.care.length === 0 ? (
-          <StateBlock
-            icon="clipboard"
-            tone="info"
-            title={t("Chưa có hoạt động chăm sóc", "No care activity yet")}
-            body={t(
-              "Nhật ký cho ăn, kiểm tra nước và sức khỏe sẽ hiện ở đây sau khi bắt đầu nuôi.",
-              "Feeding, water and health logs show here once farming starts.",
-            )}
-          />
-        ) : careList.length === 0 ? (
-          <p className="order-detail-view-22">
-            {t(
-              "Không có hoạt động thuộc loại này.",
-              "No activity of this type.",
-            )}
-          </p>
-        ) : (
-          <ul className="fm-care">
-            {careList.map((c) => (
-              <li key={c.id}>
-                <span className={`ic ${c.type}`}>
-                  <Icon name={CARE_ICON[c.type]} size={16} />
-                </span>
-                <div>
-                  <b>{L(CARE_LABEL[c.type], language)}</b>
-                  <small>
-                    {fmtTime(c.at, language)} · {L(c.by, language)}
-                  </small>
-                  <p>{L(c.text, language)}</p>
-                  {c.photo && (
-                    <img
-                      src={c.photo}
-                      alt={`${L(f.name, language)}, ${fmtDay(c.at, language)}`}
-                      loading="lazy"
-                    />
-                  )}
-                </div>
-              </li>
-            ))}
-          </ul>
-        )}
       </section>
 
       <section className="sl-card fm-section">

@@ -186,6 +186,13 @@ html {
 .workspace-sidebar {
   transition: flex-basis 0.38s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-.workspace-indicator { background: #addef1; box-shadow: inset 3px 0 #fff; }
-.workspace-nav a[aria-current] { color: #003152; }
-.workspace-nav a { color: #addef1; }
+.workspace-indicator {
+  background: #addef1;
+  box-shadow: inset 3px 0 #fff;
+}
+.workspace-nav a[aria-current] {
+  color: #003152;
+}
+.workspace-nav a {
+  color: #addef1;
+}

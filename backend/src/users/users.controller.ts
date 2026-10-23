@@ -27,7 +27,10 @@ export class UsersController {
   @Patch()
   @RequirePermissions('profile.update')
   @ApiOperation({ summary: 'Update own profile' })
-  update(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdateProfileDto) {
+  update(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdateProfileDto,
+  ) {
     return this.users.updateProfile(user.id, dto);
   }
 
@@ -41,7 +44,10 @@ export class UsersController {
   @Patch('prefs')
   @RequirePermissions('profile.update')
   @ApiOperation({ summary: 'Update notification preferences' })
-  updatePrefs(@CurrentUser() user: AuthenticatedUser, @Body() dto: UpdatePrefsDto) {
+  updatePrefs(
+    @CurrentUser() user: AuthenticatedUser,
+    @Body() dto: UpdatePrefsDto,
+  ) {
     return this.users.updatePrefs(user.id, dto);
   }
 }

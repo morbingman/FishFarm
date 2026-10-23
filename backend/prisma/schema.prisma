@@ -577,14 +577,20 @@ model GrowOutBatch {
   sellerId String
   seller   User   @relation(fields: [sellerId], references: [id], onDelete: Restrict)
 
-  title       String
-  species     String
-  breed       String?
-  description String
+  title         String
+  species       String
+  breed         String?
+  description   String
+  ageMonths     Int?
+  currentSizeCm Float?
+  targetSizeCm  Float?
+  gender        String?
+  health        String?
+  carePlan      String?
 
   status   BatchStatus @default(draft)
-  location String
-  region   String
+  location String?
+  region   String?
 
   stockingDate        DateTime?
   expectedHarvestDate DateTime?
@@ -597,8 +603,8 @@ model GrowOutBatch {
   sharesAvailable        Int
 
   packagePricePerShare Int // full care cost per share, VND
-  contingencyPct       Int    @default(10)
-  riskDisclosure       String
+  contingencyPct       Int     @default(10)
+  riskDisclosure       String?
   termsVersion         String
 
   // Verification snapshot shown publicly.
@@ -679,8 +685,10 @@ model BatchUpdatePhoto {
 enum SponsorshipStatus {
   pending_payment
   funded
+  preparing
   growing
   ready_for_delivery
+  handover
   delivered
   settled
   cancelled

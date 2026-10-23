@@ -57,6 +57,12 @@ const SELLER: readonly Permission[] = [
 
 const ADMIN: readonly Permission[] = [
   'market.view',
+  'listing.create',
+  'listing.update',
+  'listing.delete',
+  'listing.submit',
+  'listing.pause',
+  'order.fulfill',
   'queue.view',
   'listing.approve',
   'listing.reject',
@@ -66,6 +72,8 @@ const ADMIN: readonly Permission[] = [
   'activity.view',
   'profile.update',
   'batch.browse',
+  'batch.create',
+  'batch.update',
   'batch.review',
   'batch.settle',
 ];

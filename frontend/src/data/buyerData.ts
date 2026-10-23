@@ -22,6 +22,8 @@ export const pictures = {
 };
 export type Fish = {
   id: number;
+  apiId?: string;
+  code?: string;
   name: string;
   species: string;
   breed: string;
@@ -35,111 +37,17 @@ export type Fish = {
   age: string;
   gender: string;
   origin: string;
+  description?: string;
+  health?: string;
+  quantity?: number;
+  reviewCount?: number;
+  images?: string[];
 };
-export const baseStock: Fish[] = [
-  {
-    id: 1,
-    name: "Premium Kohaku Koi",
-    species: "Koi",
-    breed: "Kohaku",
-    size: 45,
-    price: 850,
-    location: "Long An, Vietnam",
-    seller: "Golden Koi Farm",
-    rating: 4.9,
-    image: pictures.kohaku,
-    label: "SELECT GRADE",
-    age: "18 months",
-    gender: "Female",
-    origin: "Japan",
-  },
-  {
-    id: 2,
-    name: "Galaxy Halfmoon Betta",
-    species: "Betta",
-    breed: "Halfmoon",
-    size: 7,
-    price: 120,
-    location: "Bangkok, Thailand",
-    seller: "Siam Betta House",
-    rating: 4.9,
-    image: pictures.betta,
-    label: "BREEDER'S PICK",
-    age: "6 months",
-    gender: "Male",
-    origin: "Thailand",
-  },
-  {
-    id: 3,
-    name: "Japanese Sanke Koi",
-    species: "Koi",
-    breed: "Sanke",
-    size: 38,
-    price: 620,
-    location: "Ho Chi Minh City, Vietnam",
-    seller: "Nishikigoi Collective",
-    rating: 4.8,
-    image: pictures.koi,
-    label: "JAPAN IMPORT",
-    age: "12 months",
-    gender: "Female",
-    origin: "Japan",
-  },
-  {
-    id: 4,
-    name: "Red Veiltail Betta",
-    species: "Betta",
-    breed: "Veiltail",
-    size: 6,
-    price: 65,
-    location: "Bangkok, Thailand",
-    seller: "Siam Betta House",
-    rating: 4.9,
-    image: pictures.red,
-    label: "IN STOCK",
-    age: "5 months",
-    gender: "Male",
-    origin: "Thailand",
-  },
-  {
-    id: 5,
-    name: "Platinum Ogon Koi",
-    species: "Koi",
-    breed: "Ogon",
-    size: 32,
-    price: 480,
-    location: "Long An, Vietnam",
-    seller: "Golden Koi Farm",
-    rating: 4.9,
-    image: pictures.ogon,
-    label: "FARM RAISED",
-    age: "10 months",
-    gender: "Male",
-    origin: "Japan",
-  },
-  {
-    id: 6,
-    name: "Pearl White Goldfish",
-    species: "Goldfish",
-    breed: "Fantail",
-    size: 12,
-    price: 95,
-    location: "Da Nang, Vietnam",
-    seller: "Pearl River Aquatics",
-    rating: 4.7,
-    image: pictures.gold,
-    label: "NEW ARRIVAL",
-    age: "8 months",
-    gender: "Female",
-    origin: "Vietnam",
-  },
-];
 export const money = (n: number) =>
-  n.toLocaleString("en-US", {
+  n.toLocaleString("vi-VN", {
     style: "currency",
-    currency: "USD",
-    maximumFractionDigits: 2,
-    minimumFractionDigits: n % 1 ? 2 : 0,
+    currency: "VND",
+    maximumFractionDigits: 0,
   });
 export const pageTitles: Record<Page, string> = {
   marketplace: "Marketplace",

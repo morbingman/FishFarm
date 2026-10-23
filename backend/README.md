@@ -8,24 +8,22 @@ this file covers how to run the service.
 
 - Node.js 22+
 - pnpm 12+ (the build allowlist uses pnpm 12's `allowBuilds` setting)
-- Docker Desktop (local Postgres)
+- A Supabase project (PostgreSQL database)
+- A Cloudinary product environment (uploaded images)
 
 ## First-time setup
 
 ```bash
 cd backend
 pnpm install                 # also runs `prisma generate`
-cp .env.example .env         # then fill in JWT_ACCESS_SECRET
-pnpm db:migrate              # create the schema
+cp .env.example .env         # fill Supabase, JWT, email and Cloudinary values
+pnpm db:migrate:deploy       # apply committed migrations to Supabase
 pnpm db:seed                 # demo users, listings, one sponsorship batch
 pnpm start:dev               # http://localhost:4000
 ```
 
-Docker Postgres:
-
-```bash
-docker compose up -d
-```
+Use Supabase's transaction pooler URL for `DATABASE_URL` (runtime) and its direct database URL for
+`DIRECT_URL` (migrations/seed). Prisma migrations should never run through the transaction pooler.
 
 The API listens on **4000**: 3000 and 3001 are used by the PlotFarm project (frontend and API
 respectively). Change `PORT` in `.env` if needed.
@@ -33,6 +31,11 @@ respectively). Change `PORT` in `.env` if needed.
 The FishFarm frontend is a Vite app whose exported config uses port **8443** (`strictPort`).
 `CORS_ORIGINS` therefore allows 8443 and 5173; if you override the frontend port with
 `PORT=5173 pnpm dev`, both are covered.
+
+For image uploads, copy the cloud name, API key and API secret from Cloudinary into
+`CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY` and `CLOUDINARY_API_SECRET`. These values belong in
+the backend environment only. The browser requests a short-lived signature from the API, uploads
+directly to Cloudinary, and the API records the returned HTTPS URL in PostgreSQL.
 
 ## Endpoints
 
@@ -43,6 +46,8 @@ The FishFarm frontend is a Vite app whose exported config uses port **8443** (`s
 | `GET /docs` | Swagger UI (OpenAPI JSON at `/docs-json`) |
 | `POST /v1/auth/*` | register, login, refresh, logout, verify-email, forgot-password, reset-password |
 | `GET/PATCH /v1/me` | Current profile; `GET/PATCH /v1/me/prefs` for notification prefs |
+| `POST /v1/uploads/signature` | Create an authenticated, purpose-scoped Cloudinary upload signature |
+| `POST /v1/uploads/complete` | Validate and record an uploaded Cloudinary image |
 | `/v1/marketplace`, ... | Feature endpoints (see §5 of the requirements) |
 
 All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps are ISO 8601 UTC.
@@ -71,10 +76,10 @@ All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps
 | Email | Password | Role |
 | --- | --- | --- |
 | `buyer@fishmarket.demo` | `Buyer123` | Buyer |
-| `seller@fishmarket.demo` | `Seller123` | Seller (Golden Koi Farm) |
+| `seller@fishmarket.demo` | `Seller123` | Admin (Golden Koi Farm) |
 | `admin@fishmarket.demo` | `Admin123` | Admin |
-| `lagoon@fishmarket.demo` | `Demo1234` | Seller |
-| `mekong@fishmarket.demo` | `Demo1234` | Seller |
+| `lagoon@fishmarket.demo` | `Demo1234` | Admin |
+| `mekong@fishmarket.demo` | `Demo1234` | Admin |
 | `linh@fishmarket.demo` | `Demo1234` | Buyer |
 | `minh@fishmarket.demo` | `Demo1234` | Buyer (suspended) |
 

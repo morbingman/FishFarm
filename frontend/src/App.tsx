@@ -93,7 +93,7 @@ export default function App() {
     user?.role === "Admin" && !["admin", "expired"].includes(requestedTop);
   const top = adminRedirect ? "admin" : requestedTop;
   useEffect(() => {
-    if (adminRedirect) window.location.replace("#admin");
+    if (adminRedirect) window.location.replace("#admin/listings");
     else if (requestedTop === "seller")
       window.location.replace(
         user?.role === "Admin" ? "#admin/listings" : "#home",
@@ -123,7 +123,10 @@ export default function App() {
   useEffect(() => {
     if (gated) {
       setReturnTo(hash.replace(/^#/, ""));
-      flash("Please sign in to continue.");
+      // The login page already communicates that authentication is required.
+      // Do not persist this message and replay it after a successful sign-in.
+      const pending = takeFlash();
+      if (pending && pending !== "Please sign in to continue.") flash(pending);
     }
     if (user === null && hasSession()) {
       endSession();

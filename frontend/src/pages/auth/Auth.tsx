@@ -9,7 +9,6 @@ import { Textarea as UiTextarea } from "@/components/ui/textarea";
 import { Input as UiInput } from "@/components/ui/input";
 import { Label as UiLabel } from "@/components/ui/label";
 import { Button as UiButton } from "@/components/ui/button";
-import { DEMO_ACCOUNTS } from "@/data/demoAccounts";
 import {
   addUser,
   authenticate,
@@ -21,7 +20,6 @@ import {
   startSession,
   takeFlash,
   takeReturnTo,
-  updateUser,
   type Role,
 } from "@/services/demoStore";
 import { useEffect, useRef, useState } from "react";
@@ -29,6 +27,7 @@ import { useDomTranslation } from "@/hooks/useTranslation";
 import { authVi } from "@/data/translations";
 import "@/pages/auth/Auth.css";
 import { type Screen, screenMeta } from "@/data/authData";
+import { authApi } from "@/services/api";
 import { Symbol, Field, Action } from "@/components/auth/AuthParts";
 export default function Auth({
   language,
@@ -45,7 +44,7 @@ export default function Auth({
   const [info] = useState(() => takeFlash() ?? "");
   const regRef = useRef<Record<string, string> | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [email, setEmail] = useState("alex@example.com");
+  const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [password, setPassword] = useState("");
@@ -113,7 +112,11 @@ export default function Auth({
       top === "marketplace" ||
       top === "account";
     window.location.hash =
-      r === "Admin" ? (top === "admin" && back ? back : "admin") : "home";
+      r === "Admin"
+        ? top === "admin" && back && back !== "admin"
+          ? back
+          : "admin/listings"
+        : "home";
   }
   function pending(callback: () => void) {
     setBusy(true);
@@ -122,7 +125,7 @@ export default function Auth({
       callback();
     }, 900);
   }
-  function submit(e: FormEvent<HTMLFormElement>) {
+  async function submit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
     const data = Object.fromEntries(new FormData(e.currentTarget)) as Record<
       string,
@@ -159,19 +162,19 @@ export default function Auth({
     if (screen === "verify") {
       if (Date.now() > expiry)
         nextErrors.otp = "This code has expired. Request a new one.";
-      else if (otp.join("") !== "123456")
-        nextErrors.otp = "That code isn't correct. Please try again.";
+      else if (!/^\d{6}$/.test(otp.join("")))
+        nextErrors.otp = "Enter the 6-digit code sent to your email.";
     }
     let matched: Role | null = null;
     if (screen === "login" && !Object.keys(nextErrors).length) {
-      const res = authenticate(data.email, data.password);
+      setBusy(true);
+      const res = await authenticate(data.email, data.password);
+      setBusy(false);
       if (!res.ok) {
         if (res.reason === "suspended")
           nextErrors.email =
             "This account is suspended. Contact support to appeal.";
-        else
-          nextErrors.password =
-            "Incorrect email or password. Use a demo account below.";
+        else nextErrors.password = "Incorrect email or password.";
       } else {
         matched = res.user.role;
       }
@@ -186,6 +189,68 @@ export default function Auth({
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
     if (data.email) setEmail(data.email);
+    if (screen === "register") {
+      setBusy(true);
+      try {
+        regRef.current = data;
+        await addUser({
+          email: data.email.trim().toLowerCase(),
+          password: data.password,
+          name: data.name.trim(),
+          role: "Buyer",
+          phone: data.phone,
+          location: data.location,
+          store: undefined,
+        });
+        const verification = await authApi.verifyEmail(data.email);
+        go("verify");
+        if (verification.devCode)
+          setNotice(`Development code: ${verification.devCode}`);
+      } catch {
+        setErrors({
+          email:
+            "This email is already registered or the server is unavailable.",
+        });
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    if (screen === "verify") {
+      setBusy(true);
+      try {
+        await authApi.verifyEmail(email, otp.join(""));
+        go("created");
+      } catch {
+        setErrors({ otp: "That code is invalid or expired." });
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    if (screen === "forgot") {
+      setBusy(true);
+      try {
+        const reset = await authApi.forgotPassword(data.email);
+        go("email");
+        if (reset.devCode) setNotice(`Development code: ${reset.devCode}`);
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
+    if (screen === "reset") {
+      setBusy(true);
+      try {
+        await authApi.resetPassword(email, data.code, data.password);
+        go("updated");
+      } catch {
+        setErrors({ code: "That reset code is invalid or expired." });
+      } finally {
+        setBusy(false);
+      }
+      return;
+    }
     pending(() => {
       if (screen === "login") {
         if (matched) setRole(matched);
@@ -193,37 +258,11 @@ export default function Auth({
         timer.current = setTimeout(() => {
           // Commit the route and session together. A gated page must not
           // unmount Auth before its delayed redirect has run.
-          redirectAfterLogin(matched ?? role);
           startSession(data.email.trim().toLowerCase());
+          redirectAfterLogin(matched ?? role);
           const signedIn = currentUser();
           if (signedIn) log(signedIn.name, signedIn.role, "Signed in");
         }, 700);
-      }
-      if (screen === "register") {
-        regRef.current = data;
-        go("verify");
-      }
-      if (screen === "verify") {
-        const r = regRef.current;
-        if (r)
-          addUser({
-            email: r.email.trim().toLowerCase(),
-            password: r.password,
-            name: r.name.trim(),
-            role,
-            phone: r.phone,
-            location: r.location,
-            store: undefined,
-          });
-        go("created");
-      }
-      if (screen === "forgot") go("email");
-      if (screen === "reset") {
-        if (findUser(email))
-          updateUser(findUser(email)!.email, {
-            password: data.password,
-          });
-        go("updated");
       }
     });
   }
@@ -340,23 +379,19 @@ export default function Auth({
                 )}
                 <form noValidate onSubmit={submit} className="auth-form">
                   <Field
-                    key={`e-${role}`}
                     label="Email Address"
                     name="email"
                     type="email"
                     placeholder="you@example.com"
                     autoComplete="email"
-                    defaultValue={DEMO_ACCOUNTS[role].email}
                     error={errors.email}
                   />
                   <Field
-                    key={`p-${role}`}
                     label="Password"
                     name="password"
                     type="password"
                     placeholder="Enter your password"
                     autoComplete="current-password"
-                    defaultValue={DEMO_ACCOUNTS[role].password}
                     error={errors.password}
                   />
                   <div className="auth-options">
@@ -386,36 +421,6 @@ export default function Auth({
                     )}
                   </Action>
                 </form>
-                <div className="auth-divider">
-                  <span />
-                  or continue with
-                  <span />
-                </div>
-                <Action
-                  secondary
-                  disabled={busy}
-                  onClick={() =>
-                    pending(() => {
-                      const acct = DEMO_ACCOUNTS[role];
-
-                      setNotice(
-                        "Demo Google sign-in complete. Taking you to your dashboard…",
-                      );
-                      timer.current = setTimeout(() => {
-                        redirectAfterLogin(role);
-                        startSession(acct.email);
-                        log(acct.name, role, "Signed in with Google");
-                      }, 700);
-                    })
-                  }
-                >
-                  <svg className="auth-google" viewBox="0 0 24 24" width="20" height="20" aria-hidden="true">
-                    <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.39-.18-2.05H12v3.88h5.38a4.6 4.6 0 0 1-2 3.02v2.51h3.24c1.89-1.74 2.98-4.3 2.98-7.36Z" />
-                    <path fill="#34A853" d="M12 22c2.7 0 4.96-.9 6.62-2.41l-3.24-2.51c-.9.6-2.05.97-3.38.97-2.6 0-4.8-1.76-5.59-4.12H3.07v2.59A10 10 0 0 0 12 22Z" />
-                    <path fill="#FBBC05" d="M6.41 13.93a6 6 0 0 1 0-3.86V7.48H3.07a10 10 0 0 0 0 9.04l3.34-2.59Z" />
-                    <path fill="#EA4335" d="M12 5.95c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.63 9.63 0 0 0 12 2a10 10 0 0 0-8.93 5.48l3.34 2.59C7.2 7.71 9.4 5.95 12 5.95Z" />
-                  </svg> Continue with Google
-                </Action>
                 <p className="auth-bottom-question">
                   Don't have an account?{" "}
                   <UiButton
@@ -426,45 +431,6 @@ export default function Auth({
                     Create Account <span>↗</span>
                   </UiButton>
                 </p>
-                <div className="auth-demo">
-                  <div>
-                    <span className="auth-demo-dot" />
-                    <strong>Explore the prototype</strong>
-                    <span>No real credentials needed</span>
-                  </div>
-                  <div
-                    className="auth-role-tabs"
-                    aria-label="Demo account role"
-                  >
-                    {(["Buyer", "Admin"] as Role[]).map((r) => (
-                      <UiButton
-                        variant="plain"
-                        key={r}
-                        type="button"
-                        aria-pressed={role === r}
-                        onClick={() => {
-                          setRole(r);
-                          setErrors({});
-                        }}
-                      >
-                        {r}
-                      </UiButton>
-                    ))}
-                  </div>
-                  <dl className="auth-demo-cred" data-no-translate>
-                    <div>
-                      <dt>Email</dt>
-                      <dd>{DEMO_ACCOUNTS[role].email}</dd>
-                    </div>
-                    <div>
-                      <dt>Password</dt>
-                      <dd>{DEMO_ACCOUNTS[role].password}</dd>
-                    </div>
-                  </dl>
-                  <p>
-                    Pick a role to fill in its demo account, then press Sign In.
-                  </p>
-                </div>
               </>
             )}
 
@@ -642,34 +608,32 @@ export default function Auth({
                     type="button"
                     className="auth-text-button"
                     disabled={seconds > 0}
-                    onClick={() => {
+                    onClick={async () => {
+                      setBusy(true);
                       setSeconds(45);
                       setExpiry(Date.now() + 5 * 60_000);
                       setErrors({});
                       setOtp(Array(6).fill(""));
-                      setNotice("A fresh demo code is ready: 123456.");
+                      try {
+                        const verification = await authApi.verifyEmail(email);
+                        setNotice(
+                          verification.devCode
+                            ? `Development code: ${verification.devCode}`
+                            : "A new verification code was sent to your email.",
+                        );
+                      } catch {
+                        setErrors({
+                          otp: "Unable to send a new code. Please try again.",
+                        });
+                        setSeconds(0);
+                      } finally {
+                        setBusy(false);
+                      }
                     }}
                   >
                     Resend Code{seconds > 0 ? ` (${seconds}s)` : ""}
                   </UiButton>
                 </p>
-                <div className="auth-prototype-note">
-                  Prototype code: <strong>123456</strong> · Valid for 5 minutes.
-                  <UiButton
-                    variant="plain"
-                    type="button"
-                    className="auth-text-button"
-                    onClick={() => {
-                      setExpiry(0);
-                      setErrors({
-                        otp: "This code has expired. Request a new one.",
-                      });
-                      setSeconds(0);
-                    }}
-                  >
-                    Preview expired code
-                  </UiButton>
-                </div>
               </form>
             )}
 
@@ -700,27 +664,29 @@ export default function Auth({
                   {email}
                 </div>
                 <p className="auth-help-copy">
-                  Check your inbox and spam folder. Follow the link in your
-                  email to securely reset your password.
+                  Check your inbox and spam folder for the 6-digit password
+                  reset code.
                 </p>
-                <div className="auth-prototype-note">
-                  No email is sent in this prototype. Preview the next step
-                  below.
-                </div>
                 <Action onClick={() => go("reset")}>
-                  Open Demo Reset Link
+                  Enter Reset Code
                   <Symbol name="arrow" />
                 </Action>
                 <Action
                   secondary
                   disabled={busy}
-                  onClick={() =>
-                    pending(() =>
+                  onClick={async () => {
+                    setBusy(true);
+                    try {
+                      const reset = await authApi.forgotPassword(email);
                       setNotice(
-                        "Demo reset link sent again. Please check your inbox.",
-                      ),
-                    )
-                  }
+                        reset.devCode
+                          ? `Development code: ${reset.devCode}`
+                          : "A new password reset code was sent to your email.",
+                      );
+                    } finally {
+                      setBusy(false);
+                    }
+                  }}
                 >
                   {busy ? "Sending…" : "Resend Email"}
                 </Action>
@@ -728,6 +694,13 @@ export default function Auth({
             )}
             {screen === "reset" && (
               <form noValidate onSubmit={submit} className="auth-form">
+                <Field
+                  label="Reset Code"
+                  name="code"
+                  placeholder="Enter the 6-digit code"
+                  autoComplete="one-time-code"
+                  error={errors.code}
+                />
                 <Field
                   label="New Password"
                   name="password"
@@ -780,8 +753,8 @@ export default function Auth({
                   </strong>
                   <p>
                     {screen === "created"
-                      ? `${email} is now verified in this prototype.`
-                      : "Your password reset is complete in this prototype."}
+                      ? `${email} is now verified.`
+                      : "Your password reset is complete."}
                   </p>
                 </div>
                 <Action onClick={() => go("login")}>
@@ -806,11 +779,7 @@ export default function Auth({
                 </Action>
                 <Action
                   secondary
-                  onClick={() =>
-                    signOut(
-                      "Signed out. Sign in with another demo account to continue.",
-                    )
-                  }
+                  onClick={() => signOut("Signed out successfully.")}
                 >
                   Sign out
                 </Action>
@@ -859,8 +828,8 @@ export default function Auth({
               <h2>{legal}</h2>
               <p>
                 {legal === "Need a hand?"
-                  ? "This is an interactive authentication prototype. Use any valid email and password to sign in, and 123456 for verification. No personal data is sent or stored."
-                  : "This prototype does not collect personal information or create real accounts. Final legal policies will be available before the platform launches. Do not enter real passwords or sensitive information."}
+                  ? "Contact the FISHMARKET support team if you need help signing in, verifying your email, or resetting your password."
+                  : "Your account information is used to provide marketplace, order, and support services. Never share your password or verification code with anyone."}
               </p>
               <Action onClick={() => setLegal(null)}>Got it</Action>
             </div>

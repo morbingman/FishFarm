@@ -23,7 +23,9 @@ describe('FishFarm API (e2e)', () => {
   });
 
   it('GET /health reports the database as up', async () => {
-    const response = await request(app.getHttpServer()).get('/health').expect(200);
+    const response = await request(app.getHttpServer())
+      .get('/health')
+      .expect(200);
 
     expect(response.body).toMatchObject({ status: 'ok', db: 'up' });
   });

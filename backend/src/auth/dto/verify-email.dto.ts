@@ -12,7 +12,8 @@ export class VerifyEmailDto {
 
   @ApiPropertyOptional({
     example: '123456',
-    description: 'Omit to request a new code. Provide it to confirm the address.',
+    description:
+      'Omit to request a new code. Provide it to confirm the address.',
   })
   @IsOptional()
   @Matches(/^\d{6}$/, { message: 'validation.codeFormat' })

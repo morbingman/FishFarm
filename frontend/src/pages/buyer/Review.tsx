@@ -15,8 +15,9 @@ export function Review() {
     review,
     setReview,
     reviewSent,
-    setReviewSent,
+    submitReview,
     files,
+    purchaseId,
     heading,
     go,
   } = useBuyer();
@@ -73,7 +74,7 @@ export function Review() {
           <span className="buy-state-icon">
             <Glyph name="star" />
           </span>
-          <span className="buy-eyebrow">ORDER COMPLETED · #FM-10248</span>
+          <span className="buy-eyebrow">ORDER COMPLETED · {purchaseId}</span>
           <h1 ref={heading} tabIndex={-1}>
             How was your experience?
           </h1>
@@ -91,7 +92,12 @@ export function Review() {
               if (review.trim().length < 10)
                 next.review = "Tell us a little more (at least 10 characters).";
               setErrors(next);
-              if (!Object.keys(next).length) setReviewSent(true);
+              if (!Object.keys(next).length)
+                void submitReview().catch(() =>
+                  setErrors({
+                    review: "Could not save your review. Please try again.",
+                  }),
+                );
             }}
           >
             <div className="buy-review-seller">

@@ -2712,14 +2712,30 @@
   backdrop-filter: blur(5px);
   overflow-y: auto;
 }
+.dialog-view-1 {
+  z-index: 200 !important;
+}
 .buy-modal {
-  position: relative;
+  position: fixed;
+  z-index: 201 !important;
+  top: 58%;
+  left: 50%;
+  transform: translate(-50%, -50%);
   width: min(100%, 480px);
   background: white;
   border-radius: 15px;
   padding: 32px;
-  max-height: calc(100dvh - 50px);
+  max-height: calc(100dvh - 180px);
   overflow-y: auto;
+}
+.dialog-view-2.buyer-app.buy-modal {
+  top: 58% !important;
+  transform: translate(-50%, -50%) !important;
+  display: block;
+  width: min(calc(100vw - 32px), 560px);
+  min-height: 0;
+  max-height: calc(100dvh - 32px);
+  padding: 24px;
 }
 .buy-modal-close {
   position: absolute;
@@ -2742,13 +2758,14 @@
   font-size: 22px;
   font-weight: 800;
   letter-spacing: -0.03em;
-  line-height: 1.5;
-  margin-bottom: 12px;
+  line-height: 1.25;
+  margin: 0 0 8px;
 }
 .buy-modal > p {
+  margin: 0;
   font-size: 13px;
   color: #63879c;
-  line-height: 1.9;
+  line-height: 1.55;
 }
 .buy-modal > .buy-button {
   width: 100%;
@@ -2757,20 +2774,19 @@
 .buy-modal .buy-state-icon {
   height: 48px;
   width: 48px;
-  margin-left: 0;
-  margin-top: 5px;
+  margin: 0 0 14px;
 }
 .buy-modal .buy-state-icon > svg {
   width: 21px;
   height: 21px;
 }
 .buy-chat-history {
-  margin-block: 23px;
+  margin-block: 14px;
   border: 1px solid var(--buy-border);
   border-radius: 8px;
-  padding: 15px;
+  padding: 12px;
   background: #f6fbfe;
-  max-height: 200px;
+  max-height: 110px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
@@ -2798,11 +2814,16 @@
 }
 .buy-modal form > .buy-button {
   width: 100%;
-  margin-top: 14px;
+  margin-top: 10px;
 }
 .buy-modal p.buy-fine-print {
   font-size: 12px;
-  margin-top: 17px;
+  margin-top: 10px;
+}
+.buy-modal .buy-field textarea {
+  min-height: 76px;
+  height: 76px;
+  resize: none;
 }
 .buy-zoom-modal {
   width: min(100%, 1000px);
@@ -3826,8 +3847,14 @@
     padding: 17px;
   }
   .buy-modal {
+    top: 55%;
     padding: 29px 23px 23px;
-    max-height: calc(100dvh - 34px);
+    max-height: calc(100dvh - 118px);
+  }
+  .dialog-view-2.buyer-app.buy-modal {
+    top: 55% !important;
+    max-height: calc(100dvh - 20px);
+    padding: 20px;
   }
   .buy-modal h2 {
     font-size: 21px;

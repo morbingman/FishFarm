@@ -16,81 +16,54 @@ export const photos = {
     "https://images.unsplash.com/photo-1669048014031-e3664a627ab4?auto=format&fit=crop&w=900&q=82",
   farm: "https://images.unsplash.com/photo-1717468394948-fbd4eb0afc16?auto=format&fit=crop&w=1200&q=82",
 };
-export const categories = [
-  ["Ornamental Fish", "2,840 listings", photos.blue],
-  ["Freshwater Fish", "1,960 listings", photos.koi],
-  ["Saltwater Fish", "1,420 listings", photos.clown],
-  ["Koi Fish", "1,180 listings", photos.koiSchool],
-  ["Betta Fish", "980 listings", photos.yellow],
-  ["Goldfish", "760 listings", photos.goldfish],
-  ["Tropical Fish", "1,640 listings", photos.coral],
-  ["Farmed Fish", "1,220 listings", photos.school],
-];
-export const listings = [
-  {
-    name: "Premium Kohaku Koi",
-    species: "Nishikigoi · Grade A",
-    detail: "45 cm · Japan",
-    location: "Long An, VN",
-    seller: "Golden Koi Farm",
-    rating: "4.9",
-    price: "$850",
-    image: photos.koi,
-  },
-  {
-    name: "Galaxy Betta",
-    species: "Betta splendens",
-    detail: "Male · 6 months",
-    location: "Bangkok, TH",
-    seller: "Betta House",
-    rating: "4.9",
-    price: "$120",
-    image: photos.blue,
-  },
-  {
-    name: "Blue Arowana",
-    species: "Scleropages formosus",
-    detail: "30 cm · Farm Raised",
-    location: "Singapore",
-    seller: "Ocean Blue Aquatics",
-    rating: "4.8",
-    price: "$1,200",
-    image: photos.yellow,
-  },
-  {
-    name: "Redtail Catfish",
-    species: "Phractocephalus",
-    detail: "25 cm · Vietnam",
-    location: "Ho Chi Minh City",
-    seller: "Mekong Aquatics",
-    rating: "4.7",
-    price: "$350",
-    image: photos.coral,
-  },
-];
-export const sellers = [
-  {
-    name: "Ocean Blue Aquatics",
-    location: "Ho Chi Minh City",
-    rating: "4.9",
-    listings: "128 Listings",
-    image: photos.blue,
-    specialty: "Rare freshwater",
-  },
-  {
-    name: "Golden Koi Farm",
-    location: "Long An",
-    rating: "4.8",
-    listings: "86 Listings",
-    image: photos.koiSchool,
-    specialty: "Premium koi",
-  },
-  {
-    name: "Premium Betta House",
-    location: "Ho Chi Minh City",
-    rating: "4.9",
-    listings: "214 Listings",
-    image: photos.yellow,
-    specialty: "Show-grade betta",
-  },
-];
+export type HomeCategory = {
+  name: string;
+  count: number;
+  image: string | null;
+};
+
+export type HomeListing = {
+  id: string;
+  name: string;
+  species: string;
+  breed: string;
+  size: number | null;
+  age: number | null;
+  gender: string | null;
+  origin: string | null;
+  price: number;
+  location: string | null;
+  seller: string;
+  rating: number;
+  image: string | null;
+};
+
+export type HomeSeller = {
+  id: string;
+  name: string;
+  location: string;
+  count: number;
+  image: string | null;
+  specialty: string;
+  rating: number;
+};
+
+export type HomeData = {
+  categories: HomeCategory[];
+  featured: HomeListing[];
+  sellers: HomeSeller[];
+  stats: {
+    activeListings: number;
+    verifiedSellers: number;
+    successfulTrades: number;
+    satisfiedPercent: number;
+  };
+  reviews: {
+    id: string;
+    buyerName: string;
+    rating: number;
+    text: string;
+    orderCode: string;
+    createdAt: string;
+  }[];
+};

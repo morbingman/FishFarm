@@ -14,17 +14,14 @@ import {
 } from "@/components/common/Portal";
 import {
   EMPTY_DRAFT,
-  SAMPLE_PHOTOS,
   getListing,
-  request,
+  publishListing,
   saveDraft,
-  submitListing,
   useStore,
   type Draft,
 } from "@/services/demoStore";
 import {
   SPECIES,
-  SAMPLE,
   GENDERS,
   ORIGINS,
   HEALTH,
@@ -32,6 +29,7 @@ import {
   SHIPPING,
   STEPS,
 } from "@/data/sellerData";
+import { domainApi } from "@/services/api";
 import { Field, Select, Icon } from "@/components/seller/SellerParts";
 import { ListingView } from "@/pages/seller/ListingView";
 export function ListingForm({
@@ -60,6 +58,7 @@ export function ListingForm({
   const [leave, setLeave] = useState(false);
   const [dragIdx, setDragIdx] = useState<number | null>(null);
   const [dropZone, setDropZone] = useState(false);
+  const [uploading, setUploading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const rec = recId ? s.listings.find((x) => x.id === recId) : undefined;
   useEffect(() => {
@@ -122,30 +121,8 @@ export function ListingForm({
         />
       </>
     );
-  if (rec && rec.status === "pending")
-    return (
-      <>
-        <Crumbs items={crumbs(rec.draft.name)} />
-        <StateBlock
-          card
-          icon="clock"
-          tone="info"
-          title={t("This listing is under review")}
-          body={t("Withdraw it first if you want to make changes.")}
-          actions={
-            <a
-              className="sl-btn sl-btn-primary"
-              href={`#admin/listing/${rec.id}`}
-            >
-              {t("View")}
-            </a>
-          }
-        />
-      </>
-    );
   const status: LStatus | null = rec?.status ?? null;
-  const resubmit =
-    status === "changes" || status === "rejected" || status === "approved";
+  const editingPublished = status === "approved";
   const decision = rec?.decision;
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => {
     setDraft((d) => ({
@@ -200,7 +177,7 @@ export function ListingForm({
         ? "Your session expired. Please sign in again."
         : "Network error — your changes are still here. Check your connection and try again.",
     );
-  const saveNow = () => {
+  const saveNow = async () => {
     if (busy) return;
     if (!draft.name.trim()) {
       setStep(1);
@@ -209,19 +186,18 @@ export function ListingForm({
     }
     setBusy("save");
     setErr("");
-    request(() => saveDraft(user, recId, draft), 600)
-      .then((nid) => {
-        setRecId(nid);
-        setDirty(false);
-        setBusy("");
-        show("Draft saved");
-      })
-      .catch((x) => {
-        setBusy("");
-        fail(x);
-      });
+    try {
+      const nid = await saveDraft(user, recId, draft);
+      setRecId(nid);
+      setDirty(false);
+      show("Draft saved");
+    } catch (error) {
+      fail(error as Error);
+    } finally {
+      setBusy("");
+    }
   };
-  const submit = () => {
+  const submit = async () => {
     if (busy) return;
     for (let i = 1; i <= 5; i++)
       if (e[i].length) {
@@ -232,19 +208,14 @@ export function ListingForm({
       }
     setBusy("submit");
     setErr("");
-    request(() => {
-      const nid = saveDraft(user, recId, draft);
-      submitListing(user, nid, draft);
-      return nid;
-    }, 900)
-      .then((nid) => {
-        setDirty(false);
-        go(`admin/listing/${nid}?submitted=1`);
-      })
-      .catch((x) => {
-        setBusy("");
-        fail(x);
-      });
+    try {
+      const nid = await publishListing(user, recId, draft);
+      setDirty(false);
+      go(`admin/listing/${nid}?published=1`);
+    } catch (error) {
+      setBusy("");
+      fail(error as Error);
+    }
   };
   const leaveTo = () => {
     if (dirty) setLeave(true);
@@ -262,16 +233,36 @@ export function ListingForm({
     }));
     setDirty(true);
   };
-  const addFiles = (files: FileList | null) => {
+  const addFiles = async (files: FileList | null) => {
     if (!files) return;
-    addImgs(
-      [...files]
-        .filter((f) => f.type.startsWith("image/"))
-        .map((f) => ({
-          id: `u${Date.now()}${Math.random().toString(36).slice(2, 6)}`,
-          url: URL.createObjectURL(f),
-        })),
-    );
+    const available = Math.max(0, 8 - draft.images.length);
+    const selected = [...files]
+      .filter(
+        (file) =>
+          ["image/jpeg", "image/png", "image/webp"].includes(file.type) &&
+          file.size <= 5 * 1024 * 1024,
+      )
+      .slice(0, available);
+
+    if (!selected.length) {
+      setErr("Choose JPG, PNG, or WebP images under 5 MB each.");
+      return;
+    }
+
+    setUploading(true);
+    setErr("");
+    try {
+      const uploaded = await Promise.all(
+        selected.map((file) => domainApi.uploadImage(file, "listing_image")),
+      );
+      addImgs(uploaded);
+    } catch {
+      setErr(
+        "Image upload failed. Check the Cloudinary configuration and try again.",
+      );
+    } finally {
+      setUploading(false);
+    }
   };
   const removeImg = (iid: string) => {
     const images = draft.images.filter((i) => i.id !== iid);
@@ -317,22 +308,6 @@ export function ListingForm({
                 placeholder={t("e.g. Showa, Kohaku, Halfmoon")}
               />
             </Field>
-            <div className="sl-sample">
-              <UiButton
-                variant="plain"
-                type="button"
-                className="sl-link"
-                onClick={() => {
-                  setDraft((d) => ({
-                    ...d,
-                    ...SAMPLE,
-                  }));
-                  setDirty(true);
-                }}
-              >
-                <Icon name="fish" /> {t("Use sample koi data")}
-              </UiButton>
-            </div>
             <div className="sl-span2">
               <Field
                 t={t}
@@ -474,7 +449,7 @@ export function ListingForm({
               onDrop={(x) => {
                 x.preventDefault();
                 setDropZone(false);
-                addFiles(x.dataTransfer.files);
+                void addFiles(x.dataTransfer.files);
               }}
             >
               <Icon name="upload" />
@@ -484,9 +459,10 @@ export function ListingForm({
                 variant="plain"
                 type="button"
                 className="sl-btn sl-btn-ghost"
+                disabled={uploading || draft.images.length >= 8}
                 onClick={() => fileRef.current?.click()}
               >
-                {t("Browse files")}
+                {uploading ? t("Uploading...") : t("Browse files")}
               </UiButton>
               <UiInput
                 ref={fileRef}
@@ -495,13 +471,13 @@ export function ListingForm({
                 multiple
                 hidden
                 onChange={(x) => {
-                  addFiles(x.target.files);
+                  void addFiles(x.target.files);
                   x.target.value = "";
                 }}
               />
               <small>
                 {t(
-                  "JPG or PNG, up to 8 photos. The first photo is your cover.",
+                  "JPG, PNG, or WebP, max 5 MB each, up to 8 photos. The first photo is your cover.",
                 )}
               </small>
             </div>
@@ -510,20 +486,6 @@ export function ListingForm({
                 {t("Required")}: {t("Upload Fish Images")}
               </p>
             )}
-            <div className="sl-samples">
-              <span>{t("Or start with sample photos")}</span>
-              {SAMPLE_PHOTOS.map((p) => (
-                <UiButton
-                  variant="plain"
-                  key={p.id}
-                  disabled={draft.images.some((i) => i.id === p.id)}
-                  onClick={() => addImgs([p])}
-                  aria-label="Add sample photo"
-                >
-                  <img src={p.url} alt="" />
-                </UiButton>
-              ))}
-            </div>
             {draft.images.length > 0 && (
               <ul className="sl-thumbs">
                 {draft.images.map((img, i) => {
@@ -687,11 +649,7 @@ export function ListingForm({
         </Banner>
       )}
       {status === "approved" && (
-        <Banner tone="warn">
-          {t(
-            "Editing a live listing sends it back to review and hides it until approved.",
-          )}
-        </Banner>
+        <Banner tone="info">{t("Changes are published immediately.")}</Banner>
       )}
       {err && (
         <Banner
@@ -796,20 +754,20 @@ export function ListingForm({
             <UiButton
               variant="plain"
               className="sl-btn sl-btn-primary"
-              disabled={!!busy || (resubmit && !dirty)}
+              disabled={!!busy || (editingPublished && !dirty)}
               onClick={submit}
             >
               {busy === "submit"
-                ? t("Submitting…")
-                : t(resubmit ? "Resubmit for Review" : "Submit for Review")}
+                ? t("Publishing…")
+                : t(editingPublished ? "Update Listing" : "Publish Listing")}
               <Icon name="arrow" />
             </UiButton>
           )}
         </div>
       </div>
-      {resubmit && step === 6 && !dirty && (
+      {editingPublished && step === 6 && !dirty && (
         <p className="sl-hint right">
-          {t("Edit Listing")} → {t("Resubmit for Review")}
+          {t("Edit Listing")} → {t("Update Listing")}
         </p>
       )}
       {leave && (

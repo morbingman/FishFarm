@@ -134,8 +134,10 @@ export const vi: Record<string, string> = {
   "Save Draft": "Lưu nháp",
   "Draft saved": "Đã lưu nháp",
   "Edit Listing": "Sửa tin đăng",
-  "Submit for Review": "Gửi duyệt",
-  "Resubmit for Review": "Gửi duyệt lại",
+  "Publish Listing": "Đăng cá",
+  "Update Listing": "Cập nhật tin",
+  "Publishing…": "Đang đăng…",
+  "Changes are published immediately.": "Thay đổi sẽ được đăng ngay lập tức.",
   "This is exactly how buyers will see your listing.":
     "Đây chính xác là cách người mua sẽ thấy tin đăng của bạn.",
   "Buyer view": "Giao diện người mua",
@@ -352,27 +354,13 @@ export const xvi: Record<string, string> = {
   "Submitting…": "Đang gửi…",
   "Saving…": "Đang lưu…",
   "Try again": "Thử lại",
-  "Submitted for review": "Đã gửi để duyệt",
-  "Your listing is waiting for an admin. You will be notified as soon as there is a decision.":
-    "Tin đăng của bạn đang chờ quản trị viên. Bạn sẽ được báo ngay khi có quyết định.",
   "Nothing here yet": "Chưa có gì ở đây",
   "Back to My Listings": "Về Tin đăng của tôi",
   "Required fields are marked": "Các trường bắt buộc được đánh dấu",
-  "This listing is under review": "Tin đăng đang được xem xét",
-  "Withdraw it first if you want to make changes.":
-    "Hãy rút lại trước nếu bạn muốn chỉnh sửa.",
-  "Editing a live listing sends it back to review and hides it until approved.":
-    "Chỉnh sửa tin đang bán sẽ gửi lại để duyệt và ẩn đến khi được chấp thuận.",
 };
 export const TABS: [string, string, (l: Listing) => boolean][] = [
   ["all", "All", () => true],
   ["approved", "Live", (l) => l.status === "approved"],
-  ["pending", "Pending Review", (l) => l.status === "pending"],
-  [
-    "attention",
-    "Needs attention",
-    (l) => l.status === "changes" || l.status === "rejected",
-  ],
   ["draft", "Drafts", (l) => l.status === "draft"],
   ["paused", "Paused", (l) => l.status === "paused"],
 ];

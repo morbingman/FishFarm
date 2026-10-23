@@ -26,45 +26,45 @@ locked or recorded as defaults (§9, §11.8); there are no open items. Implement
 | `backend/` | Empty except this requirements doc. Owned by me. |
 
 Because the frontend has **zero network calls**, every operation it performs today is local
-state mutation. The backend must eventually replace `src/store.ts` function-for-function.
+state mutation. The NestJS API is now the source of truth; the legacy stores remain compatibility adapters while screens migrate.
 
 ---
 
 ## 2. Roles
 
-Three roles, fixed (not user-definable). `Buyer`, `Seller`, `Admin`.
+Two application roles, fixed (not user-definable): `Buyer` and `Admin`.
 
-- A `Seller` is a `Buyer` plus listing capabilities; separation is by role, not multi-role.
+- Admin is also the selling/operator role: Admin creates and fulfils listings as well as moderating the marketplace.
 - Users have a `status`: `active` | `suspended`. Suspended users cannot authenticate.
-- Sellers have an optional `store` name; listings surface `sellerName = store || name`.
-- Buyers/sellers belong to Vietnam-market locations (HCMC, Hanoi, Da Nang, Can Tho, Dong Nai).
+- Admin operators may have an optional `store` name; listings surface `sellerName = store || name`.
+- Buyers/admin operators belong to Vietnam-market locations (HCMC, Hanoi, Da Nang, Can Tho, Dong Nai).
 
 ### Permission matrix (verbatim from `Admin.tsx` `MATRIX`, enforced today client-side only)
 
-| Capability | Type | Buyer | Seller | Admin |
-| --- | --- | --- | --- | --- |
-| Browse marketplace | View | ✓ | ✓ | ✓ |
-| Place orders | Create | ✓ | — | — |
-| View own orders | View | ✓ | — | — |
-| Create listings | Create | — | ✓ | — |
-| Edit own listings | Edit | — | ✓ | — |
-| Delete own listings | Delete | — | ✓ | — |
-| Submit listings for review | Create | — | ✓ | — |
-| Pause / resume live listings | Edit | — | ✓ | — |
-| Open moderation queue | View | — | — | ✓ |
-| Approve listings | Approve | — | — | ✓ |
-| Reject / request changes | Reject | — | — | ✓ |
-| Take down live listings | Manage | — | — | ✓ |
-| View users | View | — | — | ✓ |
-| Suspend / reactivate users | Manage | — | — | ✓ |
-| View platform activity | View | — | — | ✓ |
-| Edit own profile | Edit | ✓ | ✓ | ✓ |
+| Capability | Type | Buyer | Admin |
+| --- | --- | --- | --- |
+| Browse marketplace | View | ✓ | ✓ |
+| Place orders | Create | ✓ | — |
+| View own orders | View | ✓ | — |
+| Create listings | Create | — | ✓ |
+| Edit own listings | Edit | — | ✓ |
+| Delete own listings | Delete | — | ✓ |
+| Submit listings for review | Create | — | ✓ |
+| Pause / resume live listings | Edit | — | ✓ |
+| Open moderation queue | View | — | ✓ |
+| Approve listings | Approve | — | ✓ |
+| Reject / request changes | Reject | — | ✓ |
+| Take down live listings | Manage | — | ✓ |
+| View users | View | — | ✓ |
+| Suspend / reactivate users | Manage | — | ✓ |
+| View platform activity | View | — | ✓ |
+| Edit own profile | Edit | ✓ | ✓ |
 
 **Requirement:** this matrix is currently advisory (client-side `can()`). The backend must be
 the enforcement point — the same permission keys (`market.view`, `listing.approve`, …) applied
 server-side per endpoint, so a forged request cannot exceed the role.
 
-**Confirmed:** ordering is Buyer-only. Sellers and Admins cannot place orders, even though they
+**Confirmed:** ordering is Buyer-only. Admins cannot place orders, even though they
 can browse the marketplace. Do not widen this without an explicit product decision.
 
 ---
@@ -75,7 +75,7 @@ Field names below are taken from the frontend verbatim so the eventual API maps 
 
 ### 3.1 User
 ```
-email (PK, unique)  password  name  role: Buyer|Seller|Admin
+email (PK, unique)  password  name  role: Buyer|Admin
 status: active|suspended   phone  location   joined (date)
 store?   prefs: { status, system, reminders }   # notification preferences
 ```

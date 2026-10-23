@@ -13,8 +13,7 @@ export function Payment() {
     processing,
     paymentState,
     setPaymentState,
-    simulateFailure,
-    setSimulateFailure,
+    purchaseId,
     heading,
     total,
     go,
@@ -42,7 +41,7 @@ export function Payment() {
           <div className="buy-payment-overview">
             <div>
               <span>Order ID</span>
-              <strong>#FM-10248</strong>
+              <strong>{purchaseId || "Assigned after confirmation"}</strong>
             </div>
             <div>
               <span>Payment Method</span>
@@ -60,8 +59,8 @@ export function Payment() {
               </span>
               <h2>Payment Failed</h2>
               <p>
-                Your demo payment couldn't be completed. No money has been
-                charged. Your order details are safe.
+                Your payment couldn't be completed. Your order details are safe;
+                please try again.
               </p>
               <BuyButton
                 onClick={() => {
@@ -75,16 +74,6 @@ export function Payment() {
             </div>
           ) : (
             <form noValidate onSubmit={pay}>
-              <div className="buy-demo-payment">
-                <Glyph name="shield" />
-                <div>
-                  <strong>You're in a safe demo environment.</strong>
-                  <p>
-                    Don't enter real financial information. Use the test details
-                    below.
-                  </p>
-                </div>
-              </div>
               {paymentMethod === "Bank Card" ? (
                 <div className="buy-input-grid">
                   <div className="buy-field full-width">
@@ -92,7 +81,7 @@ export function Payment() {
                     <UiInput
                       id="card"
                       name="card"
-                      placeholder="4242 4242 4242 4242"
+                      placeholder="Card number"
                       inputMode="numeric"
                       maxLength={19}
                       aria-invalid={!!errors.card}
@@ -107,7 +96,7 @@ export function Payment() {
                     <UiInput
                       id="holder"
                       name="holder"
-                      placeholder="Demo Buyer"
+                      placeholder="Name on card"
                       aria-invalid={!!errors.holder}
                       disabled={processing}
                     />
@@ -151,25 +140,16 @@ export function Payment() {
                   <Glyph name={paymentMethod === "E-Wallet" ? "bag" : "card"} />
                   <h3>
                     {paymentMethod === "E-Wallet"
-                      ? "Demo wallet connected"
-                      : "Demo bank transfer"}
+                      ? "E-wallet payment"
+                      : "Bank transfer"}
                   </h3>
                   <p>
                     {paymentMethod === "E-Wallet"
-                      ? "Confirm below to simulate a successful wallet authorization."
-                      : "Reference: FM-10248. Confirm below to simulate receipt of a bank transfer. Do not send money."}
+                      ? "Confirm below to authorize the payment with your selected wallet."
+                      : "Use the order reference shown above when completing your bank transfer."}
                   </p>
                 </div>
               )}
-              <UiLabel className="buy-test-failure">
-                <UiInput
-                  type="checkbox"
-                  checked={simulateFailure}
-                  disabled={processing}
-                  onChange={(e) => setSimulateFailure(e.target.checked)}
-                />
-                Simulate a failed payment to preview retry
-              </UiLabel>
               <BuyButton type="submit" disabled={processing}>
                 {processing ? (
                   <>
@@ -185,7 +165,7 @@ export function Payment() {
               </BuyButton>
               <p className="buy-encryption">
                 <Glyph name="lock" />
-                Encrypted Transaction · Prototype only
+                Secure transaction
               </p>
             </form>
           )}

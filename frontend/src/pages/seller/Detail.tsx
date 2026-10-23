@@ -15,11 +15,12 @@ import {
   deleteListing,
   flash,
   fmtDate,
+  listingMissingFields,
+  publishListing,
   request,
   setPaused,
   timeAgo,
   useStore,
-  withdrawListing,
 } from "@/services/demoStore";
 import { money } from "@/data/sellerData";
 import { Icon } from "@/components/seller/SellerParts";
@@ -29,19 +30,17 @@ export function Detail({
   id,
   t,
   show,
-  submitted,
+  published,
 }: {
   user: User;
   id: string;
   t: TFn;
   show: Toast;
-  submitted: boolean;
+  published: boolean;
 }) {
   const s = useStore();
   const l = s.listings.find((x) => x.id === id);
-  const [dlg, setDlg] = useState<
-    null | "withdraw" | "pause" | "delete" | "edit"
-  >(null);
+  const [dlg, setDlg] = useState<null | "pause" | "delete" | "edit">(null);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [preview, setPreview] = useState(false);
@@ -86,6 +85,7 @@ export function Detail({
         />
       </>
     );
+  const missingFields = listingMissingFields(l.draft);
   const run = (fn: () => void, msg: string) => {
     setBusy(true);
     setErr("");
@@ -104,6 +104,29 @@ export function Detail({
         );
       });
   };
+  const publishNow = async () => {
+    if (missingFields.length) {
+      setErr(
+        `Complete these fields before publishing: ${missingFields.join(", ")}.`,
+      );
+      return;
+    }
+    setBusy(true);
+    setErr("");
+    try {
+      await publishListing(user, l.id, l.draft);
+      show("Listing published.");
+      go(`admin/listing/${l.id}?published=1`);
+    } catch (error) {
+      setErr(
+        error instanceof Error && error.message === "expired"
+          ? "Your session expired. Please sign in again."
+          : "Could not publish the listing. Check the required fields and try again.",
+      );
+    } finally {
+      setBusy(false);
+    }
+  };
   const st = l.status;
   const d = l.decision;
   return (
@@ -120,19 +143,8 @@ export function Detail({
         </div>
         <StatusChip s={st} />
       </div>
-      {submitted && st === "pending" && (
-        <Banner tone="ok">
-          {t("Submitted for review")}.{" "}
-          {t(
-            "Your listing is waiting for an admin. You will be notified as soon as there is a decision.",
-          )}
-        </Banner>
-      )}
-      {st === "pending" && !submitted && (
-        <Banner tone="info">
-          {t("This listing is under review")}.{" "}
-          {t("Withdraw it first if you want to make changes.")}
-        </Banner>
+      {published && st === "approved" && (
+        <Banner tone="ok">{t("Your listing is now live!")}</Banner>
       )}
       {(st === "changes" || st === "rejected") && d && (
         <Banner
@@ -150,15 +162,19 @@ export function Detail({
           — {d.feedback}
         </Banner>
       )}
-      {st === "approved" && (
+      {st === "approved" && !published && (
         <Banner tone="ok">
           {t("Your listing is now live!")}{" "}
-          {t(
-            "Editing a live listing sends it back to review and hides it until approved.",
-          )}
+          {t("Changes are published immediately.")}
         </Banner>
       )}
       {st === "paused" && <Banner tone="info">{t("Paused")}</Banner>}
+      {st === "draft" && missingFields.length > 0 && (
+        <Banner tone="warn">
+          {t("Complete all required information before publishing")}:{" "}
+          {missingFields.join(", ")}.
+        </Banner>
+      )}
       {err && !dlg && (
         <Banner
           tone="error"
@@ -179,8 +195,18 @@ export function Detail({
         {(st === "draft" || st === "changes" || st === "rejected") && (
           <a className="sl-btn sl-btn-primary" href={`#admin/edit/${l.id}`}>
             <Icon name="edit" />
-            {st === "draft" ? t("Edit listing") : t("Edit & resubmit")}
+            {t("Edit listing")}
           </a>
+        )}
+        {(st === "draft" || st === "changes" || st === "rejected") && (
+          <UiButton
+            variant="plain"
+            className="sl-btn sl-btn-primary"
+            disabled={busy || missingFields.length > 0}
+            onClick={() => void publishNow()}
+          >
+            {busy ? t("Publishing…") : t("Publish Listing")}
+          </UiButton>
         )}
         {st === "approved" && (
           <a className="sl-btn sl-btn-primary" href="#marketplace">
@@ -217,16 +243,7 @@ export function Detail({
             {busy ? "…" : t("Resume listing")}
           </UiButton>
         )}
-        {st === "pending" && (
-          <UiButton
-            variant="plain"
-            className="sl-btn sl-btn-ghost"
-            onClick={() => setDlg("withdraw")}
-          >
-            {t("Withdraw from review")}
-          </UiButton>
-        )}
-        {st !== "pending" && st !== "approved" && (
+        {st !== "approved" && (
           <UiButton
             variant="plain"
             className="sl-btn sl-btn-outline-danger"
@@ -264,25 +281,6 @@ export function Detail({
           ))}
         </ol>
       </section>
-      {dlg === "withdraw" && (
-        <ConfirmDialog
-          title="Withdraw from review?"
-          body="The listing returns to Draft and the admin queue is updated. You can edit and submit it again."
-          confirmLabel="Withdraw"
-          busy={busy}
-          error={err}
-          onCancel={() => {
-            setDlg(null);
-            setErr("");
-          }}
-          onConfirm={() =>
-            run(
-              () => withdrawListing(user, l.id),
-              "Listing withdrawn and saved as a draft.",
-            )
-          }
-        />
-      )}
       {dlg === "pause" && (
         <ConfirmDialog
           title="Pause this listing?"
@@ -333,7 +331,7 @@ export function Detail({
       {dlg === "edit" && (
         <ConfirmDialog
           title="Edit this live listing?"
-          body="Saving changes sends the listing back to review and hides it from buyers until it is approved again."
+          body="Changes will be published immediately when you update the listing."
           confirmLabel="Continue to edit"
           onCancel={() => setDlg(null)}
           onConfirm={() => go(`admin/edit/${l.id}`)}

@@ -52,7 +52,10 @@ export class ApiExceptionFilter implements ExceptionFilter {
       const statusCode = exception.getStatus();
       const payload = exception.getResponse();
 
-      if (statusCode === HttpStatus.BAD_REQUEST && this.isValidationPayload(payload)) {
+      if (
+        statusCode === HttpStatus.BAD_REQUEST &&
+        this.isValidationPayload(payload)
+      ) {
         return {
           statusCode,
           code: 'validation.failed',
@@ -71,10 +74,16 @@ export class ApiExceptionFilter implements ExceptionFilter {
       return { statusCode, code, params: { status: statusCode } };
     }
 
-    return { statusCode: HttpStatus.INTERNAL_SERVER_ERROR, code: 'error.internal', params: {} };
+    return {
+      statusCode: HttpStatus.INTERNAL_SERVER_ERROR,
+      code: 'error.internal',
+      params: {},
+    };
   }
 
-  private isValidationPayload(payload: unknown): payload is { message: string[] } {
+  private isValidationPayload(
+    payload: unknown,
+  ): payload is { message: string[] } {
     return (
       typeof payload === 'object' &&
       payload !== null &&

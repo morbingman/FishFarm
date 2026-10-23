@@ -33,8 +33,13 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Create a Buyer or Seller account and start a session' })
-  @ApiCreatedResponse({ description: 'Access token in the body; refresh token in an httpOnly cookie.' })
+  @ApiOperation({
+    summary: 'Create a Buyer or Seller account and start a session',
+  })
+  @ApiCreatedResponse({
+    description:
+      'Access token in the body; refresh token in an httpOnly cookie.',
+  })
   async register(
     @Body() dto: RegisterDto,
     @Req() req: Request,
@@ -49,7 +54,10 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('login')
   @ApiOperation({ summary: 'Log in; rejects suspended accounts' })
-  @ApiOkResponse({ description: 'Access token in the body; refresh token in an httpOnly cookie.' })
+  @ApiOkResponse({
+    description:
+      'Access token in the body; refresh token in an httpOnly cookie.',
+  })
   async login(
     @Body() dto: LoginDto,
     @Req() req: Request,
@@ -64,13 +72,18 @@ export class AuthController {
   @HttpCode(HttpStatus.OK)
   @Post('refresh')
   @ApiCookieAuth('refresh-token')
-  @ApiOperation({ summary: 'Rotate the refresh token and issue a new access token' })
+  @ApiOperation({
+    summary: 'Rotate the refresh token and issue a new access token',
+  })
   async refresh(
     @Req() req: Request,
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthPayload> {
     try {
-      const result = await this.auth.refresh(this.readRefreshToken(req), this.meta(req));
+      const result = await this.auth.refresh(
+        this.readRefreshToken(req),
+        this.meta(req),
+      );
       this.setRefreshCookie(res, result.refreshToken);
       return result.payload;
     } catch (error) {
@@ -84,7 +97,10 @@ export class AuthController {
   @Post('logout')
   @ApiCookieAuth('refresh-token')
   @ApiOperation({ summary: 'Revoke the current refresh token' })
-  async logout(@Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<void> {
+  async logout(
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<void> {
     await this.auth.logout(this.readRefreshToken(req));
     this.clearRefreshCookie(res);
   }
@@ -104,7 +120,10 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.ACCEPTED)
   @Post('forgot-password')
-  @ApiOperation({ summary: 'Send a password reset code (response is identical for unknown emails)' })
+  @ApiOperation({
+    summary:
+      'Send a password reset code (response is identical for unknown emails)',
+  })
   forgotPassword(@Body() dto: ForgotPasswordDto) {
     return this.auth.requestPasswordReset(dto);
   }
@@ -112,7 +131,9 @@ export class AuthController {
   @Public()
   @HttpCode(HttpStatus.NO_CONTENT)
   @Post('reset-password')
-  @ApiOperation({ summary: 'Set a new password using a reset code; revokes all sessions' })
+  @ApiOperation({
+    summary: 'Set a new password using a reset code; revokes all sessions',
+  })
   async resetPassword(@Body() dto: ResetPasswordDto): Promise<void> {
     await this.auth.resetPassword(dto);
   }
@@ -122,7 +143,8 @@ export class AuthController {
   }
 
   private readRefreshToken(req: Request): string | undefined {
-    const cookies = req.cookies as Record<string, string | undefined> | undefined;
+    const cookies = req.cookies as
+      Record<string, string | undefined> | undefined;
     return cookies?.[REFRESH_COOKIE];
   }
 
@@ -134,7 +156,7 @@ export class AuthController {
     res.clearCookie(REFRESH_COOKIE, {
       httpOnly: true,
       secure: this.auth.isProduction,
-      sameSite: 'lax',
+      sameSite: this.auth.isProduction ? 'none' : 'lax',
       path: this.auth.refreshCookiePath,
     });
   }
@@ -143,7 +165,7 @@ export class AuthController {
     return {
       httpOnly: true,
       secure: this.auth.isProduction,
-      sameSite: 'lax',
+      sameSite: this.auth.isProduction ? 'none' : 'lax',
       path: this.auth.refreshCookiePath,
       maxAge: this.auth.refreshCookieMaxAgeMs,
     };

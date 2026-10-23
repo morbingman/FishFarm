@@ -7,13 +7,8 @@ import {
   useToast,
   useHash,
 } from "@/components/common/Portal";
-import { useStore } from "@/services/demoStore";
 import { portalVi } from "@/data/portalTranslations";
-import { Overview } from "@/pages/admin/Overview";
-import { Queue } from "@/pages/admin/Queue";
-import { Review } from "@/pages/admin/Review";
 import { Users } from "@/pages/admin/Users";
-import { ActivityLog } from "@/pages/admin/ActivityLog";
 import { Listings } from "@/pages/seller/Listings";
 import { ListingForm } from "@/pages/seller/ListingForm";
 import { Detail } from "@/pages/seller/Detail";
@@ -30,7 +25,6 @@ export default function Admin({
   language: Lang;
   setLanguage: (l: Lang) => void;
 }) {
-  const s = useStore();
   const dictionary = {
     ...portalVi,
     ...vi,
@@ -52,27 +46,18 @@ export default function Admin({
         }[value] ?? value);
   const { parts, params } = useHash();
   const [toast, show] = useToast();
-  const pending = s.listings.filter((l) => l.status === "pending").length;
   const sec = parts[1] ?? "";
   useEffect(() => {
+    if (sec === "") window.location.replace("#admin/listings");
     if (sec === "roles") window.location.replace("#admin/users");
+    if (sec === "queue" || sec === "review" || sec === "activity")
+      window.location.replace("#admin/listings");
     window.scrollTo({ top: 0, behavior: "instant" });
   }, [sec, parts[2]]);
-  const active =
-    sec === "" ? "#admin" : sec === "review" ? "#admin/queue" : `#admin/${sec}`;
+  const active = sec === "" ? "#admin/listings" : `#admin/${sec}`;
   let body;
-  if (sec === "") body = <Overview />;
-  else if (sec === "queue")
-    body = (
-      <Queue
-        key={params.get("tab") ?? "pending"}
-        initTab={params.get("tab") ?? "pending"}
-      />
-    );
-  else if (sec === "review" && parts[2])
-    body = <Review key={parts[2]} id={parts[2]} user={user} show={show} />;
+  if (sec === "") body = <Listings user={user} t={text} initTab="all" />;
   else if (sec === "users") body = <Users user={user} show={show} />;
-  else if (sec === "activity") body = <ActivityLog />;
   else if (sec === "listings")
     body = (
       <Listings user={user} t={text} initTab={params.get("tab") ?? "all"} />
@@ -97,7 +82,7 @@ export default function Admin({
         user={user}
         t={text}
         show={show}
-        submitted={params.get("submitted") === "1"}
+        published={params.get("published") === "1"}
       />
     );
   else if (sec === "bookings") body = <Bookings id={parts[2]} show={show} />;
@@ -113,8 +98,8 @@ export default function Admin({
         title="Page not found"
         body="This admin page doesn't exist."
         actions={
-          <a className="sl-btn sl-btn-primary" href="#admin">
-            Back to overview
+          <a className="sl-btn sl-btn-primary" href="#admin/listings">
+            Back to fish management
           </a>
         }
       />
@@ -126,9 +111,7 @@ export default function Admin({
       language={language}
       setLanguage={setLanguage}
       dict={portalVi}
-      badges={{
-        "#admin/queue": pending,
-      }}
+      badges={{}}
       toast={toast}
     >
       {body}

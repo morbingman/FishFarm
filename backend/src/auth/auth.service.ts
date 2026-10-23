@@ -1,11 +1,17 @@
-import { HttpStatus, Injectable, Logger } from '@nestjs/common';
+import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import { createHash, randomBytes, randomInt, timingSafeEqual } from 'node:crypto';
+import {
+  createHash,
+  randomBytes,
+  randomInt,
+  timingSafeEqual,
+} from 'node:crypto';
 import { AppException } from '../common/exceptions/app.exception.js';
 import type { VerificationPurpose } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
+import { MailService } from '../mail/mail.service.js';
 import { UsersService, type UserRecord } from '../users/users.service.js';
 import type { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
@@ -26,13 +32,12 @@ export interface CodeIssue {
 
 @Injectable()
 export class AuthService {
-  private readonly logger = new Logger(AuthService.name);
-
   constructor(
     private readonly prisma: PrismaService,
     private readonly jwt: JwtService,
     private readonly config: ConfigService,
     private readonly users: UsersService,
+    private readonly mail: MailService,
   ) {}
 
   get refreshCookiePath(): string {
@@ -56,8 +61,11 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<AuthResult> {
-    if (dto.store && dto.role !== 'Seller') {
-      throw new AppException('profile.storeRequiresSeller', HttpStatus.BAD_REQUEST);
+    if (dto.store) {
+      throw new AppException(
+        'profile.storeRequiresSeller',
+        HttpStatus.BAD_REQUEST,
+      );
     }
 
     if (await this.users.findByEmail(dto.email)) {
@@ -76,7 +84,7 @@ export class AuthService {
             role: dto.role,
             phone: dto.phone,
             location: dto.location,
-            store: dto.role === 'Seller' ? dto.store : null,
+            store: null,
           },
         });
 
@@ -115,12 +123,18 @@ export class AuthService {
   async login(dto: LoginDto, meta: SessionMeta): Promise<AuthResult> {
     const user = await this.users.findByEmail(dto.email);
     if (!user) {
-      throw new AppException('auth.invalidCredentials', HttpStatus.UNAUTHORIZED);
+      throw new AppException(
+        'auth.invalidCredentials',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     const passwordOk = await argon2.verify(user.passwordHash, dto.password);
     if (!passwordOk) {
-      throw new AppException('auth.invalidCredentials', HttpStatus.UNAUTHORIZED);
+      throw new AppException(
+        'auth.invalidCredentials',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     if (user.status !== 'active') {
@@ -130,9 +144,15 @@ export class AuthService {
     return this.issueSession(user, meta);
   }
 
-  async refresh(rawToken: string | undefined, meta: SessionMeta): Promise<AuthResult> {
+  async refresh(
+    rawToken: string | undefined,
+    meta: SessionMeta,
+  ): Promise<AuthResult> {
     if (!rawToken) {
-      throw new AppException('auth.missingRefreshToken', HttpStatus.UNAUTHORIZED);
+      throw new AppException(
+        'auth.missingRefreshToken',
+        HttpStatus.UNAUTHORIZED,
+      );
     }
 
     const tokenHash = sha256(rawToken);
@@ -141,7 +161,11 @@ export class AuthService {
       include: { user: true },
     });
 
-    if (!session || session.revokedAt || session.expiresAt.getTime() <= Date.now()) {
+    if (
+      !session ||
+      session.revokedAt ||
+      session.expiresAt.getTime() <= Date.now()
+    ) {
       throw new AppException('auth.sessionExpired', HttpStatus.UNAUTHORIZED);
     }
 
@@ -198,8 +222,15 @@ export class AuthService {
     if (!user || user.emailVerifiedAt) return { sent: true };
 
     const code = await this.issueCode(user.id, 'email_verify');
-    this.logOtp(dto.email, code, 'email_verify');
-    return { sent: true, ...(this.isProduction ? {} : { devCode: code }) };
+    const delivered = await this.mail.sendVerificationCode(
+      dto.email,
+      code,
+      'email_verify',
+    );
+    return {
+      sent: true,
+      ...(!this.isProduction && !delivered ? { devCode: code } : {}),
+    };
   }
 
   async requestPasswordReset(dto: ForgotPasswordDto): Promise<CodeIssue> {
@@ -207,8 +238,15 @@ export class AuthService {
     if (!user) return { sent: true };
 
     const code = await this.issueCode(user.id, 'password_reset');
-    this.logOtp(dto.email, code, 'password_reset');
-    return { sent: true, ...(this.isProduction ? {} : { devCode: code }) };
+    const delivered = await this.mail.sendVerificationCode(
+      dto.email,
+      code,
+      'password_reset',
+    );
+    return {
+      sent: true,
+      ...(!this.isProduction && !delivered ? { devCode: code } : {}),
+    };
   }
 
   async resetPassword(dto: ResetPasswordDto): Promise<void> {
@@ -221,7 +259,10 @@ export class AuthService {
     const passwordHash = await argon2.hash(dto.newPassword);
 
     await this.prisma.$transaction([
-      this.prisma.user.update({ where: { id: user.id }, data: { passwordHash } }),
+      this.prisma.user.update({
+        where: { id: user.id },
+        data: { passwordHash },
+      }),
       this.prisma.session.updateMany({
         where: { userId: user.id, revokedAt: null },
         data: { revokedAt: new Date() },
@@ -231,7 +272,8 @@ export class AuthService {
 
   private async confirmEmail(dto: VerifyEmailDto): Promise<void> {
     const user = await this.users.findByEmail(dto.email);
-    if (!user) throw new AppException('auth.invalidCode', HttpStatus.BAD_REQUEST);
+    if (!user)
+      throw new AppException('auth.invalidCode', HttpStatus.BAD_REQUEST);
 
     await this.consumeCode(user.id, 'email_verify', dto.code!);
     await this.prisma.user.update({
@@ -240,7 +282,10 @@ export class AuthService {
     });
   }
 
-  private async issueSession(user: UserRecord, meta: SessionMeta): Promise<AuthResult> {
+  private async issueSession(
+    user: UserRecord,
+    meta: SessionMeta,
+  ): Promise<AuthResult> {
     const refreshToken = this.newRefreshToken();
     const session = await this.prisma.session.create({
       data: {
@@ -275,19 +320,30 @@ export class AuthService {
     };
   }
 
-  private async issueCode(userId: string, purpose: VerificationPurpose): Promise<string> {
+  private async issueCode(
+    userId: string,
+    purpose: VerificationPurpose,
+  ): Promise<string> {
     const latest = await this.prisma.verificationCode.findFirst({
       where: { userId, purpose },
       orderBy: { createdAt: 'desc' },
     });
 
-    if (latest && Date.now() - latest.createdAt.getTime() < OTP_RESEND_COOLDOWN_MS) {
+    if (
+      latest &&
+      Date.now() - latest.createdAt.getTime() < OTP_RESEND_COOLDOWN_MS
+    ) {
       const retryAfterSeconds = Math.ceil(
-        (OTP_RESEND_COOLDOWN_MS - (Date.now() - latest.createdAt.getTime())) / 1000,
+        (OTP_RESEND_COOLDOWN_MS - (Date.now() - latest.createdAt.getTime())) /
+          1000,
       );
-      throw new AppException('auth.codeCooldown', HttpStatus.TOO_MANY_REQUESTS, {
-        retryAfterSeconds,
-      });
+      throw new AppException(
+        'auth.codeCooldown',
+        HttpStatus.TOO_MANY_REQUESTS,
+        {
+          retryAfterSeconds,
+        },
+      );
     }
 
     const code = randomInt(0, 1_000_000).toString().padStart(6, '0');
@@ -320,10 +376,14 @@ export class AuthService {
       orderBy: { createdAt: 'desc' },
     });
 
-    if (!record) throw new AppException('auth.invalidCode', HttpStatus.BAD_REQUEST);
+    if (!record)
+      throw new AppException('auth.invalidCode', HttpStatus.BAD_REQUEST);
 
     if (record.attempts >= OTP_MAX_ATTEMPTS) {
-      throw new AppException('auth.tooManyAttempts', HttpStatus.TOO_MANY_REQUESTS);
+      throw new AppException(
+        'auth.tooManyAttempts',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
     }
 
     if (record.expiresAt.getTime() <= Date.now()) {
@@ -355,11 +415,6 @@ export class AuthService {
   private idleExpired(lastActiveAt: Date): boolean {
     const idleMs = Number(this.config.get('SESSION_IDLE_MINUTES', 30)) * 60_000;
     return lastActiveAt.getTime() + idleMs <= Date.now();
-  }
-
-  private logOtp(email: string, code: string, purpose: VerificationPurpose): void {
-    if (this.isProduction) return;
-    this.logger.warn(`[dev only] ${purpose} code for ${email}: ${code}`);
   }
 
   private isUniqueViolation(error: unknown): boolean {
