@@ -89,9 +89,12 @@ Implemented in the API:
   page.
 - Uploads: multipart image/document storage with role and purpose rules; private documents are
   kept off the public static path.
+- Commerce: cart, checkout with atomic stock reservation and idempotent retries, order history,
+  the company order queue and fulfilment, simulated payments, pre-order deposits with a 7-day
+  balance window, and cancellations that refund and return stock.
 
-Not implemented yet: cart and checkout, orders and simulated payments, reviews, messaging,
-favourites, company analytics, and the batch-sponsorship flow.
+Not implemented yet: reviews, messaging, favourites, company analytics, and the batch-sponsorship
+flow.
 
 **Frontend note:** the React app is the Figma Make prototype. It runs entirely on the in-memory
 mock store (`frontend/src/store.ts`) and does not call the API yet, so the site is fully clickable

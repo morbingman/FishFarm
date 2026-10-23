@@ -25,7 +25,7 @@ and runs the farming service itself, so there is no independent Seller. Everythi
 | --- | --- |
 | Git | `main` has the backend through M5. The teammate's rewrite lives on the `frontend` branch. |
 | `frontend/` | Rewritten React 19 + Vite + shadcn/ui app with a new farm-a-fish flow. Still a localStorage demo with no API calls. |
-| `backend/` | NestJS API: M1–M5 implemented (auth, listings, marketplace read, uploads), with tests. |
+| `backend/` | NestJS API: auth, company catalog, marketplace read, uploads, cart and orders — with unit and e2e tests. |
 
 The frontend still has **zero network calls**, so every operation it performs today is local
 state mutation. The backend replaces the mock store function-for-function when the two are wired
@@ -159,9 +159,11 @@ Server must own this — currently `sessionStorage`.
 
 ### 3.7 Entities the store does **not** model but the UI needs
 These are rendered from hardcoded/page-local data today and are the real new build:
-- **Order** — user checkout produces one (user `page: cart → checkout → payment → confirmation → tracking → delivery → review`; statuses include `pending`, `paid`, `completed`, and a `failed` payment state). Company side has `#company/orders`.
-- **Payment** — methods: `Bank Card`, `E-Wallet`, `Bank Transfer`; states `ready | failed | paid`.
-- **Cart** — currently client-only (`Fish[]`); needs persistence or server cart.
+- **Order** — built (§5). User flow: cart → checkout → confirmation → tracking → delivery →
+  review. Company side is `/v1/company/orders`.
+- **Payment** — built. Methods `bank_card | e_wallet | bank_transfer`; states `ready | failed |
+  paid`; simulated (no gateway), so orders start already paid.
+- **Cart** — built, persisted server-side at `/v1/me/cart`.
 - **Review / Rating** — user posts rating + text after delivery; the company sees reviews at `#company/reviews`; listings show `rating`.
 - **Message / Conversation** — user↔company messaging.
 - **Favorite** — user favourites list (client-only `number[]` today).
@@ -254,16 +256,16 @@ Catalog (public) — implemented as `/v1/marketplace/*`
 Favorites
 - `GET/POST/DELETE /me/favorites`
 
-Cart & checkout (User)
-- `GET/PUT/DELETE /me/cart`
-- `POST /orders` — from cart; honours the listing's `saleMode`. `in_stock` takes full payment;
-  `pre_order` takes the deposit and sets `balanceDueAt`
-- `POST /orders/{id}/pay` (payment state `ready|failed|paid`)
-- `POST /orders/{id}/pay-balance` (pre-order balance)
-- `GET  /me/orders`, `GET /orders/{id}`, `GET /orders/{id}/tracking`
-- `POST /orders/{id}/confirm-delivery`
-- `POST /orders/{id}/review` (rating + text)
-- `POST /orders/{id}/dispute` (reason, description, attachments)
+Cart & checkout (User) — implemented as `/v1/me/cart` and `/v1/orders`
+- `GET /me/cart`, `POST /me/cart/items`, `PATCH|DELETE /me/cart/items/{listingId}`, `DELETE /me/cart`
+- `POST /orders` — from cart or explicit items; honours the listing's `saleMode`. `in_stock` takes
+  full payment; `pre_order` takes the deposit and sets `balanceDueAt`. Idempotent by
+  `idempotencyKey`.
+- `POST /me/orders/{id}/pay-balance` (pre-order balance; creates the `order_balance` payment)
+- `GET /me/orders` (optional `status` filter), `GET /me/orders/{id}`
+- `POST /me/orders/{id}/cancel` (refunds payments and returns stock)
+- Not yet built: `/orders/{id}/tracking`, `/orders/{id}/confirm-delivery` (covered by the company
+  lifecycle transitions for now), review and dispute creation.
 
 Messaging
 - `GET  /me/conversations`, `GET /conversations/{id}/messages`, `POST /conversations/{id}/messages`
@@ -274,8 +276,9 @@ Company operations (Admin only)
 - `POST /company/listings` (create), `GET/PATCH/DELETE /company/listings/{id}`
 - `POST /company/listings/{id}/publish` (direct draft → approved)
 - `POST /company/listings/{id}/submit`, `/withdraw`, `/pause`, `/resume`
-- `GET  /company/orders`, `GET /company/customers`, `GET /company/reviews`
-- `POST /company/orders/{id}/mark-ready` (pre-order: triggers the balance request to the customer)
+- `GET /company/orders` — implemented as `/v1/company/orders`; also `GET /company/orders/{id}`,
+  `POST /company/orders/{id}/mark-ready | ship | deliver | complete | cancel`
+- `GET  /company/customers`, `GET /company/reviews`
 
 Admin (Admin only)
 - `GET  /admin/queue` (tab: pending|approved|changes) — optional internal review

@@ -49,6 +49,10 @@ The FishFarm frontend is a Vite app whose exported config uses port **8443** (`s
 | `GET /v1/marketplace/listings/:id` | Public listing detail by `FM-…` code or internal id |
 | `GET /v1/marketplace/store` | The company store profile with rating and catalog summary |
 | `POST /v1/uploads` | Multipart upload (`file` + `purpose`); private purposes stay off the public path |
+| `/v1/me/cart` | Cart read/add/update/remove/clear |
+| `POST /v1/orders` | Checkout from the cart or explicit items (idempotent) |
+| `/v1/me/orders` | Order history, order detail, cancel, pay pre-order balance |
+| `/v1/company/orders` | Company order queue, detail and fulfilment transitions (Admin only) |
 
 All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps are ISO 8601 UTC.
 
@@ -122,6 +126,39 @@ as an optional internal quality gate between Admins — `publish` moves a draft 
 - `GET /v1/marketplace/store` returns the company profile (about, location, contact, join date),
   aggregate rating and a catalog summary (approved listing count and distinct species).
 
+### Commerce
+
+Payment is simulated: there is no gateway, so an order is created already `paid` (or
+`deposit_paid` for a pre-order) and the `Payment` row records a `provider: "simulated"` transaction.
+
+- Cart (`/v1/me/cart`, permission `order.create`): `GET /` returns lines with listing snapshot,
+  `available` stock and `subtotal`; `POST /items` adds or increments; `PATCH /items/:listingId`
+  sets a quantity; `DELETE /items/:listingId` and `DELETE /` remove one line or clear.
+  Only `approved`, non-deleted listings can be added. Adding more than is in stock returns
+  `409 cart.quantityExceedsStock` with `{ available, requested }`. `saleMode` in the summary is
+  `in_stock`, `pre_order`, or `mixed`.
+- Checkout (`POST /v1/orders`) accepts either `items: [{ listingId, quantity }]` or nothing, in
+  which case it checks out the cart and clears it. Delivery details are required
+  (`recipientName`, `phone`, `address`); `city`, `province`, `deliveryMethod` and `shippingFee` are
+  optional. `paymentMethod` is `bank_card` | `e_wallet` | `bank_transfer`. A cart or item list may
+  not mix `in_stock` and `pre_order` listings (`400 order.mixedSaleModes`).
+- Stock is reserved inside the checkout transaction with a conditional `UPDATE … WHERE quantity >= n`,
+  so concurrent checkouts cannot oversell; a failed reservation aborts the order.
+- `idempotencyKey` (optional, 8–80 chars) makes retries safe: replaying the same key returns the
+  existing order instead of charging twice. Payments store `order:<key>:initial` and
+  `order:<code>:balance` as their idempotency keys.
+- Pre-orders charge `depositPct` (20–30%) now. `mark-ready` sets `balance_due` and opens a
+  7-day `balanceDueAt` window; `POST /v1/me/orders/{code}/pay-balance` creates the `order_balance`
+  payment and moves the order to `paid`. Overdue balances are cancelled and refunded automatically
+  when orders are read, and shipping before the balance is settled returns `409 order.balanceOutstanding`.
+- Lifecycle: `paid → ready → shipped → delivered → completed`. `POST /v1/me/orders/{code}/cancel`
+  works while the order is `paid` (not yet shipping); it refunds the recorded payments and returns
+  the reserved stock. `POST /v1/company/orders/{code}/cancel` takes a `reason` and is the Admin
+  equivalent. Invalid transitions return `409 order.invalidTransition` with `{ from, action }`.
+- Buying is User-only (`order.create`) and fulfilment is Admin-only (`order.fulfill`); a User
+  calling `/v1/company/orders` gets `403`. Order ids in URLs are the `ORD-…` codes.
+- Order placement notifies the `Admin` role and the buyer; status changes notify the buyer.
+
 ### Uploads
 
 - `POST /v1/uploads` takes multipart fields `file` and `purpose` and is available to authenticated
@@ -149,8 +186,10 @@ as an optional internal quality gate between Admins — `publish` moves a draft 
 | `minh@fishmarket.demo` | `Demo1234` | User (suspended) |
 
 Seeded data includes the single company (`fishfarm`), its main facility, seven company-owned
-listings (one pre-order example at `FM-20761`), a live grow-out batch (`BATCH-1024`) and one funded
-sponsorship with escrow tranches.
+listings (one pre-order example at `FM-20761`), five orders for the demo buyers in different
+states (completed, shipped, ready-with-balance-due, paid, cancelled), a two-line cart for
+`buyer@fishmarket.demo`, a live grow-out batch (`BATCH-1024`) and one funded sponsorship with
+escrow tranches.
 
 `pnpm db:seed` **resets demo data** and is guarded against `NODE_ENV=production` unless
 `ALLOW_DEMO_SEED=1` is set.
@@ -186,6 +225,7 @@ src/
   listings/               # company catalog CRUD, lifecycle state machine, internal review
   marketplace/            # public search, listing detail and the company store page
   uploads/                # multipart file storage, purpose/role rules, private files
+  orders/                 # cart, checkout, order lifecycle and simulated payments
   common/                 # AppException + API exception filter
   config/                 # env validation
   health/                 # GET /health

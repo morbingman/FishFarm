@@ -161,8 +161,11 @@ type SeedListing = {
   preorderPolicy?: string;
 };
 
+type SeededListing = { id: string; price: number; saleMode: 'in_stock' | 'pre_order'; depositPct: number | null };
+
 async function seedListings(admins: SeededUser[]) {
   const author = admins[0];
+  const created = new Map<string, SeededListing>();
 
   const listings: SeedListing[] = [
     {
@@ -325,8 +328,16 @@ async function seedListings(admins: SeededUser[]) {
         },
       },
     });
+    created.set(item.code, {
+      id: listing.id,
+      price: item.price,
+      saleMode: item.saleMode ?? 'in_stock',
+      depositPct: item.depositPct ?? null,
+    });
     console.log(`  listing ${listing.code} — ${item.name}`);
   }
+
+  return created;
 }
 
 async function seedNotifications(users: Map<string, SeededUser>) {
@@ -574,6 +585,167 @@ async function seedFarmVerification() {
   });
 }
 
+async function seedOrders(
+  users: Map<string, SeededUser>,
+  listings: Map<string, SeededListing>,
+) {
+  const buyer = users.get('buyer@fishmarket.demo')!;
+  const linh = users.get('linh@fishmarket.demo')!;
+
+  // Dates are relative so the demo always shows a fresh-looking history.
+  const demo = [
+    {
+      buyer,
+      code: 'ORD-10021',
+      listingCode: 'FM-19544',
+      quantity: 1,
+      shippingFee: 18,
+      status: 'completed',
+      paymentStatus: 'paid',
+      deliveryMethod: 'Domestic overnight',
+      placedAt: ago(720),
+      paidAt: ago(720),
+      readyAt: ago(700),
+      deliveredAt: ago(672),
+      completedAt: ago(660),
+    },
+    {
+      buyer,
+      code: 'ORD-10022',
+      listingCode: 'FM-18877',
+      quantity: 2,
+      shippingFee: 12,
+      status: 'shipped',
+      paymentStatus: 'paid',
+      deliveryMethod: 'Domestic overnight',
+      placedAt: ago(52),
+      paidAt: ago(52),
+      readyAt: ago(30),
+    },
+    {
+      buyer,
+      code: 'ORD-10023',
+      listingCode: 'FM-20761',
+      quantity: 1,
+      shippingFee: 0,
+      status: 'ready',
+      paymentStatus: 'balance_due',
+      deliveryMethod: 'Local pickup',
+      placedAt: ago(96),
+      paidAt: ago(96),
+      readyAt: ago(4),
+    },
+    {
+      buyer: linh,
+      code: 'ORD-10024',
+      listingCode: 'FM-19102',
+      quantity: 1,
+      shippingFee: 15,
+      status: 'paid',
+      paymentStatus: 'paid',
+      deliveryMethod: 'Domestic overnight',
+      placedAt: ago(20),
+      paidAt: ago(20),
+    },
+    {
+      buyer: linh,
+      code: 'ORD-10025',
+      listingCode: 'FM-18420',
+      quantity: 3,
+      shippingFee: 10,
+      status: 'cancelled',
+      paymentStatus: 'refunded',
+      deliveryMethod: 'Domestic overnight',
+      placedAt: ago(200),
+      paidAt: ago(200),
+      cancelledAt: ago(190),
+      refundedAt: ago(190),
+    },
+  ] as const;
+
+  for (const [index, order] of demo.entries()) {
+    const listing = listings.get(order.listingCode)!;
+    const subtotal = listing.price * order.quantity;
+    const total = subtotal + order.shippingFee;
+    const isPreOrder = listing.saleMode === 'pre_order';
+    const depositAmount =
+      isPreOrder && listing.depositPct !== null
+        ? Math.round((total * listing.depositPct) / 100)
+        : null;
+    const balanceAmount = depositAmount === null ? null : total - depositAmount;
+
+    await prisma.order.create({
+      data: {
+        code: order.code,
+        buyerId: order.buyer.id,
+        companyId: COMPANY_ID,
+        status: order.status,
+        saleMode: isPreOrder ? 'pre_order' : 'in_stock',
+        paymentStatus: order.paymentStatus,
+        subtotal,
+        shippingFee: order.shippingFee,
+        total,
+        depositAmount,
+        balanceAmount,
+        balanceDueAt:
+          isPreOrder && order.status === 'ready' ? daysFromNow(7) : null,
+        recipientName: order.buyer.name,
+        phone: '+84 90 123 4567',
+        address: '42 Nguyen Hue, District 1',
+        city: 'Ho Chi Minh City',
+        province: 'Ho Chi Minh City',
+        deliveryMethod: order.deliveryMethod,
+        placedAt: order.placedAt,
+        paidAt: order.paidAt,
+        readyAt: 'readyAt' in order ? order.readyAt : undefined,
+        deliveredAt: 'deliveredAt' in order ? order.deliveredAt : undefined,
+        completedAt: 'completedAt' in order ? order.completedAt : undefined,
+        cancelledAt: 'cancelledAt' in order ? order.cancelledAt : undefined,
+        refundedAt: 'refundedAt' in order ? order.refundedAt : undefined,
+        items: {
+          create: {
+            listingId: listing.id,
+            saleMode: isPreOrder ? 'pre_order' : 'in_stock',
+            quantity: order.quantity,
+            unitPrice: listing.price,
+            lineTotal: subtotal,
+          },
+        },
+        payments: {
+          create: {
+            purpose:
+              isPreOrder && depositAmount !== null ? 'order_deposit' : 'order_full',
+            method: index % 2 === 0 ? 'bank_card' : 'e_wallet',
+            idempotencyKey: `seed:${order.code}:initial`,
+            amount: depositAmount ?? total,
+            state: order.paymentStatus === 'refunded' ? 'refunded' : 'paid',
+            paidAt: order.paidAt,
+            refundedAt: 'refundedAt' in order ? order.refundedAt : undefined,
+          },
+        },
+      },
+    });
+    console.log(`  order ${order.code} — ${order.status}`);
+  }
+}
+
+async function seedCart(users: Map<string, SeededUser>, listings: Map<string, SeededListing>) {
+  await prisma.cartItem.createMany({
+    data: [
+      {
+        userId: users.get('buyer@fishmarket.demo')!.id,
+        listingId: listings.get('FM-19102')!.id,
+        quantity: 1,
+      },
+      {
+        userId: users.get('buyer@fishmarket.demo')!.id,
+        listingId: listings.get('FM-18877')!.id,
+        quantity: 2,
+      },
+    ],
+  });
+}
+
 async function main() {
   console.log('Resetting demo data…');
   await resetDemoData();
@@ -586,7 +758,11 @@ async function main() {
   const admins = ['admin@fishmarket.demo', 'ops@fishmarket.demo'].map((email) => users.get(email)!);
 
   console.log('Seeding listings…');
-  await seedListings(admins);
+  const listings = await seedListings(admins);
+
+  console.log('Seeding orders…');
+  await seedOrders(users, listings);
+  await seedCart(users, listings);
 
   await seedNotifications(users);
   await seedActivity(users);
@@ -598,7 +774,7 @@ async function main() {
   await prisma.sequence.createMany({
     data: [
       { name: 'listing', value: 48_300 },
-      { name: 'order', value: 10_000 },
+      { name: 'order', value: 10_025 },
       { name: 'batch', value: 1_024 },
     ],
   });
