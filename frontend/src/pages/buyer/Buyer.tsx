@@ -133,18 +133,6 @@ export function BuyerLayout() {
                 {s === "Koi" ? "Koi Fish" : `${s} Fish`}
               </UiButton>
             ))}
-            <UiButton
-              variant="plain"
-              onClick={() => {
-                clearFilters();
-                setSort("Newest");
-                setFavoritesOnly(false);
-                go("marketplace");
-              }}
-            >
-              New Arrivals
-              <span className="buy-new-dot" />
-            </UiButton>
             <span className="buy-nav-spacer" />
             <span className="buy-nav-assurance">
               <Glyph name="truck" />

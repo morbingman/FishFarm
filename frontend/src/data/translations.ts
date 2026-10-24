@@ -171,7 +171,6 @@ export const buyerVi: Record<string, string> = {
     "Tìm cá, loài, giống hoặc người bán...",
   "Search fish, species, or sellers...": "Tìm cá, loài hoặc người bán...",
   "Search marketplace": "Tìm trong chợ cá",
-  "New Arrivals": "Hàng mới về",
   "Specialist live-fish delivery": "Giao cá sống chuyên dụng",
   Koi: "Cá Koi",
   Betta: "Cá Betta",
