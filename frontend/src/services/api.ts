@@ -78,6 +78,14 @@ export const authApi = {
     saveToken(data.accessToken);
     return data;
   },
+  async google(credential: string) {
+    const data = await api<any>("/auth/google", {
+      method: "POST",
+      body: JSON.stringify({ credential }),
+    });
+    saveToken(data.accessToken);
+    return data;
+  },
   async logout() {
     try {
       await api<void>("/auth/logout", { method: "POST" });

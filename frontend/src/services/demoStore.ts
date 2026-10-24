@@ -797,6 +797,27 @@ export async function authenticate(
     };
   }
 }
+export async function authenticateWithGoogle(
+  credential: string,
+): Promise<
+  | { ok: true; user: User }
+  | { ok: false; reason: "invalid" | "suspended" | "unavailable" }
+> {
+  try {
+    const result = await authApi.google(credential);
+    return { ok: true, user: acceptApiUser(result.user) };
+  } catch (error) {
+    return {
+      ok: false,
+      reason:
+        error instanceof ApiError && error.code.includes("suspended")
+          ? "suspended"
+          : error instanceof ApiError && error.status === 503
+            ? "unavailable"
+            : "invalid",
+    };
+  }
+}
 export async function addUser(u: Omit<User, "joined" | "status" | "prefs">) {
   const result = await authApi.register({
     email: u.email,

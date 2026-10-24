@@ -2,6 +2,7 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
+import { OAuth2Client, type TokenPayload } from 'google-auth-library';
 import {
   createHash,
   randomBytes,
@@ -141,6 +142,88 @@ export class AuthService {
       throw new AppException('auth.accountSuspended', HttpStatus.FORBIDDEN);
     }
 
+    return this.issueSession(user, meta);
+  }
+
+  async googleLogin(
+    credential: string,
+    meta: SessionMeta,
+  ): Promise<AuthResult> {
+    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim();
+    if (!clientId) {
+      throw new AppException(
+        'auth.googleNotConfigured',
+        HttpStatus.SERVICE_UNAVAILABLE,
+      );
+    }
+
+    let googleProfile: TokenPayload | undefined;
+    try {
+      const ticket = await new OAuth2Client(clientId).verifyIdToken({
+        idToken: credential,
+        audience: clientId,
+      });
+      googleProfile = ticket.getPayload();
+    } catch {
+      throw new AppException('auth.googleInvalid', HttpStatus.UNAUTHORIZED);
+    }
+
+    if (!googleProfile?.email || !googleProfile.email_verified) {
+      throw new AppException('auth.googleInvalid', HttpStatus.UNAUTHORIZED);
+    }
+
+    const email = googleProfile.email.trim().toLowerCase();
+    let user = await this.users.findByEmail(email);
+    if (!user) {
+      const passwordHash = await argon2.hash(randomBytes(32).toString('hex'));
+      try {
+        user = await this.prisma.$transaction(async (tx) => {
+          const created = await tx.user.create({
+            data: {
+              email,
+              passwordHash,
+              name: (googleProfile.name ?? email.split('@')[0]).slice(0, 120),
+              role: 'Buyer',
+              emailVerifiedAt: new Date(),
+            },
+          });
+          await tx.notification.create({
+            data: {
+              recipientId: created.id,
+              type: 'system',
+              titleKey: 'notifications.welcome.title',
+              bodyKey: 'notifications.welcome.body',
+              link: '#marketplace',
+            },
+          });
+          await tx.activity.create({
+            data: {
+              actorId: created.id,
+              actorLabel: created.name,
+              role: created.role,
+              action: 'user.registered.google',
+              target: created.email,
+            },
+          });
+          return created;
+        });
+      } catch (error) {
+        if (!this.isUniqueViolation(error)) throw error;
+        user = await this.users.findByEmail(email);
+      }
+    } else if (!user.emailVerifiedAt) {
+      user = await this.prisma.user.update({
+        where: { id: user.id },
+        data: { emailVerifiedAt: new Date() },
+      });
+    }
+
+    if (!user) {
+      throw new AppException('auth.googleInvalid', HttpStatus.UNAUTHORIZED);
+    }
+    if (user.status !== 'active') {
+      throw new AppException('auth.accountSuspended', HttpStatus.FORBIDDEN);
+    }
     return this.issueSession(user, meta);
   }
 

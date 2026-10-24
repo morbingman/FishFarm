@@ -18,6 +18,7 @@ import type { CookieOptions, Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import { Public } from './decorators/public.decorator.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
+import { GoogleLoginDto } from './dto/google-login.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
 import { ResetPasswordDto } from './dto/reset-password.dto.js';
@@ -64,6 +65,20 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthPayload> {
     const result = await this.auth.login(dto, this.meta(req));
+    this.setRefreshCookie(res, result.refreshToken);
+    return result.payload;
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('google')
+  @ApiOperation({ summary: 'Sign in or create a Buyer account with Google' })
+  async googleLogin(
+    @Body() dto: GoogleLoginDto,
+    @Req() req: Request,
+    @Res({ passthrough: true }) res: Response,
+  ): Promise<AuthPayload> {
+    const result = await this.auth.googleLogin(dto.credential, this.meta(req));
     this.setRefreshCookie(res, result.refreshToken);
     return result.payload;
   }

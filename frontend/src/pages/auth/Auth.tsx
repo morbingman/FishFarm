@@ -12,6 +12,7 @@ import { Button as UiButton } from "@/components/ui/button";
 import {
   addUser,
   authenticate,
+  authenticateWithGoogle,
   currentUser,
   findUser,
   homeFor,
@@ -29,6 +30,7 @@ import "@/pages/auth/Auth.css";
 import { type Screen, screenMeta } from "@/data/authData";
 import { ApiError, authApi } from "@/services/api";
 import { Symbol, Field, Action } from "@/components/auth/AuthParts";
+import { GoogleSignInButton } from "@/components/auth/GoogleSignInButton";
 export default function Auth({
   language,
   setLanguage,
@@ -46,6 +48,7 @@ export default function Auth({
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [googleError, setGoogleError] = useState("");
   const [password, setPassword] = useState("");
   const [legal, setLegal] = useState<string | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -83,6 +86,7 @@ export default function Auth({
     setScreen(next);
     setErrors({});
     setNotice("");
+    setGoogleError("");
     setBusy(false);
     setPassword("");
   }
@@ -231,6 +235,26 @@ export default function Auth({
       }
     });
   }
+  async function googleLogin(credential: string) {
+    setBusy(true);
+    setGoogleError("");
+    const result = await authenticateWithGoogle(credential);
+    setBusy(false);
+    if (!result.ok) {
+      setGoogleError(
+        result.reason === "suspended"
+          ? "This account is suspended. Contact support to appeal."
+          : result.reason === "unavailable"
+            ? "Google Sign-In is not configured on the server yet."
+            : "Google Sign-In failed. Please try again.",
+      );
+      return;
+    }
+    setRole(result.user.role);
+    startSession(result.user.email);
+    log(result.user.name, result.user.role, "Signed in with Google");
+    redirectAfterLogin(result.user.role);
+  }
   const strength =
     Number(password.length >= 8) +
     Number(/[A-Z]/.test(password)) +
@@ -310,11 +334,7 @@ export default function Auth({
             >
               <Symbol
                 name={
-                  success
-                    ? "check"
-                    : screen === "register"
-                        ? "user"
-                        : "lock"
+                  success ? "check" : screen === "register" ? "user" : "lock"
                 }
               />
             </div>
@@ -384,6 +404,21 @@ export default function Auth({
                     )}
                   </Action>
                 </form>
+                <div className="auth-divider">
+                  <span />
+                  OR
+                  <span />
+                </div>
+                <GoogleSignInButton
+                  disabled={busy}
+                  onCredential={googleLogin}
+                  onError={setGoogleError}
+                />
+                {googleError && (
+                  <p className="auth-error auth-google-error" role="alert">
+                    {googleError}
+                  </p>
+                )}
                 <p className="auth-bottom-question">
                   Don't have an account?{" "}
                   <UiButton
