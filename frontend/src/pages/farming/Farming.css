@@ -1190,6 +1190,10 @@ a.fm-stat:hover {
   opacity: 0.4;
 }
 .fm-modal-wide {
+  z-index: 201 !important;
+  min-height: 0 !important;
+  background: #fff;
+  color: var(--text);
   max-width: 560px !important;
   max-height: calc(100dvh - 40px);
   overflow: auto;

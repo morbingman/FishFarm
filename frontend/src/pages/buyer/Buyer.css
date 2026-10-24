@@ -2713,7 +2713,7 @@
   overflow-y: auto;
 }
 .dialog-view-1 {
-  z-index: 200 !important;
+  z-index: 150 !important;
 }
 .buy-modal {
   position: fixed;
