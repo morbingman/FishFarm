@@ -2,7 +2,8 @@ import { HttpStatus, Injectable } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
 import * as argon2 from 'argon2';
-import { OAuth2Client, type TokenPayload } from 'google-auth-library';
+import { getApps, initializeApp } from 'firebase-admin/app';
+import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
 import {
   createHash,
   randomBytes,
@@ -149,26 +150,29 @@ export class AuthService {
     credential: string,
     meta: SessionMeta,
   ): Promise<AuthResult> {
-    const clientId = this.config.get<string>('GOOGLE_CLIENT_ID')?.trim();
-    if (!clientId) {
+    const projectId = this.config
+      .get<string>('FIREBASE_PROJECT_ID', 'fishfarm-6f91e')
+      .trim();
+    if (!projectId) {
       throw new AppException(
         'auth.googleNotConfigured',
         HttpStatus.SERVICE_UNAVAILABLE,
       );
     }
 
-    let googleProfile: TokenPayload | undefined;
+    let googleProfile: DecodedIdToken;
     try {
-      const ticket = await new OAuth2Client(clientId).verifyIdToken({
-        idToken: credential,
-        audience: clientId,
-      });
-      googleProfile = ticket.getPayload();
+      const app =
+        getApps()[0] ??
+        initializeApp({
+          projectId,
+        });
+      googleProfile = await getAuth(app).verifyIdToken(credential);
     } catch {
       throw new AppException('auth.googleInvalid', HttpStatus.UNAUTHORIZED);
     }
 
-    if (!googleProfile?.email || !googleProfile.email_verified) {
+    if (!googleProfile.email || !googleProfile.email_verified) {
       throw new AppException('auth.googleInvalid', HttpStatus.UNAUTHORIZED);
     }
 
