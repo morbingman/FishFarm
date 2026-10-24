@@ -337,6 +337,7 @@ export function BuyerLayout() {
                   ))}
                 </div>
                 <form
+                  className={modal === "messages" ? "buy-chat-composer" : ""}
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (message.trim()) {
@@ -348,7 +349,11 @@ export function BuyerLayout() {
                   }}
                 >
                   <UiLabel className="buy-field">
-                    <span>Your message</span>
+                    <span
+                      className={modal === "messages" ? "buy-chat-label" : ""}
+                    >
+                      Your message
+                    </span>
                     <UiTextarea
                       rows={3}
                       value={message}

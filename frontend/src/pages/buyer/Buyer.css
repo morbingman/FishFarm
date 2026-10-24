@@ -2739,12 +2739,86 @@
 }
 .dialog-view-2.buyer-app.buy-modal.buy-chat-modal {
   top: auto !important;
-  right: 24px;
-  bottom: 24px;
+  right: 20px;
+  bottom: 0;
   left: auto;
   transform: none !important;
   width: min(calc(100vw - 48px), 430px);
-  max-height: calc(100dvh - 48px);
+  height: min(650px, calc(100dvh - 92px));
+  max-height: calc(100dvh - 92px);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid #c9dce8;
+  border-bottom: 0;
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 18px 55px rgb(0 49 82 / 24%);
+}
+.buy-chat-modal > .buy-state-icon {
+  flex: 0 0 auto;
+  margin: 20px 20px 8px;
+}
+.buy-chat-modal > h2,
+.buy-chat-modal > p {
+  flex: 0 0 auto;
+  margin-right: 54px;
+  margin-left: 20px;
+}
+.buy-chat-modal > p {
+  margin-bottom: 14px;
+}
+.buy-chat-modal .buy-chat-history {
+  flex: 1 1 auto;
+  min-height: 120px;
+  margin: 0;
+  padding: 16px 18px;
+  overflow-y: auto;
+  border: 0;
+  border-top: 1px solid var(--buy-border);
+  border-radius: 0;
+  background: #f6fbfe;
+}
+.buy-chat-modal .buy-chat-composer {
+  flex: 0 0 auto;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+  padding: 14px 16px 16px;
+  border-top: 1px solid var(--buy-border);
+  background: #fff;
+}
+.buy-chat-modal .buy-chat-composer .buy-field {
+  margin: 0;
+}
+.buy-chat-modal .buy-chat-label {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.buy-chat-modal .buy-chat-composer textarea {
+  min-height: 48px;
+  height: 48px;
+  padding: 12px 14px;
+  resize: none;
+}
+.buy-chat-modal .buy-chat-composer > .buy-button {
+  width: auto;
+  min-width: 104px;
+  height: 48px;
+  margin: 0;
+  padding-inline: 16px;
+}
+.buy-chat-modal > .buy-fine-print {
+  display: none;
 }
 .buy-modal-close {
   position: absolute;
@@ -3867,12 +3941,21 @@
   }
   .dialog-view-2.buyer-app.buy-modal.buy-chat-modal {
     top: auto !important;
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
+    right: 0;
+    bottom: 0;
+    left: 0;
     width: auto;
-    max-height: calc(100dvh - 24px);
+    height: min(620px, calc(100dvh - 72px));
+    max-height: calc(100dvh - 72px);
+    padding: 0;
+    border-radius: 16px 16px 0 0;
     transform: none !important;
+  }
+  .buy-chat-modal .buy-chat-composer {
+    grid-template-columns: 1fr;
+  }
+  .buy-chat-modal .buy-chat-composer > .buy-button {
+    width: 100%;
   }
   .buy-modal h2 {
     font-size: 21px;
