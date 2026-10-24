@@ -79,8 +79,9 @@ function useBuyerState({
     setStock(listings.map(listingToFish));
   }
   useEffect(() => {
-    void refreshMarketplace()
-      .catch(() => setToast("Unable to load marketplace data."));
+    void refreshMarketplace().catch(() =>
+      setToast("Unable to load marketplace data."),
+    );
   }, []);
   const routePage = (): Page => {
     const part = window.location.hash
@@ -106,6 +107,21 @@ function useBuyerState({
     draftKey("selected"),
     emptyFish,
   );
+  useEffect(() => {
+    const apply = () => {
+      const code = new URLSearchParams(
+        window.location.hash.split("?")[1] ?? "",
+      ).get("fish");
+      const fish = stock.find((item) => item.apiId === code);
+      if (fish) {
+        setSelected(fish);
+        setGallery(0);
+      }
+    };
+    apply();
+    window.addEventListener("hashchange", apply);
+    return () => window.removeEventListener("hashchange", apply);
+  }, [stock]);
   const [favorites, setFavorites] = useSessionState<number[]>(
     draftKey("favorites"),
     [],

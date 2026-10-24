@@ -10,10 +10,8 @@ import { Input as UiInput } from "@/components/ui/input";
 import { Label as UiLabel } from "@/components/ui/label";
 import { Button as UiButton } from "@/components/ui/button";
 import {
-  addUser,
   authenticate,
   currentUser,
-  findUser,
   homeFor,
   log,
   signOut,
@@ -27,7 +25,8 @@ import { useDomTranslation } from "@/hooks/useTranslation";
 import { authVi } from "@/data/translations";
 import "@/pages/auth/Auth.css";
 import { type Screen, screenMeta } from "@/data/authData";
-import { authApi } from "@/services/api";
+import { GoogleSignIn } from "@/components/auth/GoogleSignIn";
+import { ApiError, authApi } from "@/services/api";
 import { Symbol, Field, Action } from "@/components/auth/AuthParts";
 export default function Auth({
   language,
@@ -37,12 +36,16 @@ export default function Auth({
   setLanguage: (l: Lang) => void;
 }) {
   useDomTranslation(language, authVi);
-  const [screen, setScreen] = useState<Screen>(() =>
-    currentUser() ? "dashboard" : "login",
-  );
+  const routeScreen = (): Screen => {
+    const part = window.location.hash.split("/")[1];
+    return part && Object.prototype.hasOwnProperty.call(screenMeta, part)
+      ? (part as Screen)
+      : "login";
+  };
+  const [screen, setScreen] = useState<Screen>(routeScreen);
+  const registrationPending = useRef(false);
   const [role, setRole] = useState<Role>(() => currentUser()?.role ?? "Buyer");
   const [info] = useState(() => takeFlash() ?? "");
-  const regRef = useRef<Record<string, string> | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -90,10 +93,25 @@ export default function Auth({
       previous?.focus();
     };
   }, [legal]);
+  useEffect(() => {
+    const sync = () => {
+      setScreen(routeScreen());
+      setErrors({});
+      setNotice("");
+    };
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+  useEffect(() => {
+    if (screen !== "created") return;
+    const id = setTimeout(() => go("login"), 500);
+    return () => clearTimeout(id);
+  }, [screen]);
   function go(next: Screen) {
     if (timer.current) clearTimeout(timer.current);
     if (next === "register" && role === "Admin") setRole("Buyer");
     setScreen(next);
+    window.location.hash = next === "login" ? "login" : `login/${next}`;
     setErrors({});
     setNotice("");
     setBusy(false);
@@ -174,44 +192,81 @@ export default function Auth({
         if (res.reason === "suspended")
           nextErrors.email =
             "This account is suspended. Contact support to appeal.";
-        else nextErrors.password = "Incorrect email or password.";
+        else if (res.reason === "invalid")
+          nextErrors.password = "Incorrect email or password.";
+        else
+          nextErrors.email = {
+            network:
+              language === "vi"
+                ? "Không kết nối được máy chủ. Kiểm tra BE đang chạy, địa chỉ API và cấu hình CORS."
+                : "Cannot reach the server. Check that the API is running and its URL/CORS configuration is correct.",
+            configuration:
+              language === "vi"
+                ? "Địa chỉ API chưa đúng hoặc đang trả về trang web. Kiểm tra VITE_API_URL và proxy /api → /v1."
+                : "The API URL is incorrect or returns HTML. Check VITE_API_URL and the /api to /v1 proxy.",
+            validation:
+              language === "vi"
+                ? "Thông tin đăng nhập không hợp lệ. Vui lòng kiểm tra lại."
+                : "The sign-in information is invalid. Please check it again.",
+            server:
+              language === "vi"
+                ? "Máy chủ đang gặp lỗi. Kiểm tra log BE và kết nối database; đây không phải lỗi sai mật khẩu."
+                : "The server encountered an error. Check the API logs and database connection.",
+          }[res.reason];
       } else {
         matched = res.user.role;
       }
     }
-    if (
-      screen === "register" &&
-      !Object.keys(nextErrors).length &&
-      findUser(data.email)
-    )
-      nextErrors.email =
-        "An account with this email already exists. Try signing in instead.";
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length) return;
     if (data.email) setEmail(data.email);
     if (screen === "register") {
+      if (registrationPending.current) return;
+      registrationPending.current = true;
       setBusy(true);
       try {
-        regRef.current = data;
-        await addUser({
+        await authApi.createAccount({
           email: data.email.trim().toLowerCase(),
           password: data.password,
           name: data.name.trim(),
           role: "Buyer",
           phone: data.phone,
           location: data.location,
-          store: undefined,
         });
-        const verification = await authApi.verifyEmail(data.email);
-        go("verify");
-        if (verification.devCode)
-          setNotice(`Development code: ${verification.devCode}`);
-      } catch {
-        setErrors({
-          email:
-            "This email is already registered or the server is unavailable.",
+        // Registration is complete. Email delivery must not turn success into an error.
+        go("created");
+      } catch (error) {
+        const apiError = error instanceof ApiError ? error : null;
+        console.error("[FishFarm registration]", {
+          status: apiError?.status ?? 0,
+          code: apiError?.code ?? "unknown",
         });
+        const vi = language === "vi";
+        const message =
+          apiError?.code === "auth.emailTaken"
+            ? vi
+              ? "Email này đã được đăng ký. Vui lòng đăng nhập."
+              : "This email is already registered. Please sign in."
+            : apiError?.code === "network.unreachable"
+              ? vi
+                ? "Không kết nối được máy chủ. Vui lòng thử lại."
+                : "Cannot reach the server. Please try again."
+              : apiError?.status === 404 ||
+                  apiError?.status === 405 ||
+                  apiError?.code === "api.invalidResponse"
+                ? vi
+                  ? "Chức năng đăng ký chưa sẵn sàng. Vui lòng thử lại sau."
+                  : "Registration is not available yet. Please try again later."
+                : apiError?.status === 400
+                  ? vi
+                    ? "Thông tin đăng ký không hợp lệ. Vui lòng kiểm tra lại."
+                    : "The registration details are invalid. Please check them again."
+                  : vi
+                    ? "Máy chủ chưa tạo được tài khoản. Vui lòng thử lại sau."
+                    : "The server could not create the account. Please try again later.";
+        setErrors({ email: message });
       } finally {
+        registrationPending.current = false;
         setBusy(false);
       }
       return;
@@ -275,6 +330,10 @@ export default function Auth({
   return (
     <>
       <div className="auth-app">
+        <a className="auth-home-button" href="#home" data-no-translate>
+          <span aria-hidden="true">←</span>
+          {language === "vi" ? "Về trang chủ" : "Back to Home"}
+        </a>
         <aside className="auth-visual">
           <img
             className="auth-photo"
@@ -324,6 +383,14 @@ export default function Auth({
         </aside>
 
         <section className="auth-workspace">
+          <div className="auth-page-tools" data-no-translate>
+            <button
+              type="button"
+              onClick={() => setLanguage(language === "vi" ? "en" : "vi")}
+            >
+              {language === "vi" ? "EN" : "VN"}
+            </button>
+          </div>
           <main
             className={`auth-main ${screen === "register" ? "auth-wide" : ""}`}
           >
@@ -331,15 +398,6 @@ export default function Auth({
               <span className="auth-section-tag">YOUR FISHMARKET ACCOUNT</span>
               <span className="auth-mini-line" />
             </div>
-            {screen !== "login" && screen !== "dashboard" && (
-              <UiButton
-                variant="plain"
-                className="auth-back"
-                onClick={() => go(screen === "verify" ? "register" : "login")}
-              >
-                ← Back to {screen === "verify" ? "registration" : "sign in"}
-              </UiButton>
-            )}
             <div
               className={`auth-heading-symbol ${success ? "is-success" : ""}`}
             >
@@ -377,13 +435,18 @@ export default function Auth({
                     {info}
                   </div>
                 )}
-                <form noValidate onSubmit={submit} className="auth-form">
+                <form
+                  autoComplete="off"
+                  noValidate
+                  onSubmit={submit}
+                  className="auth-form"
+                >
                   <Field
                     label="Email Address"
                     name="email"
                     type="email"
                     placeholder="you@example.com"
-                    autoComplete="email"
+                    autoComplete="off"
                     error={errors.email}
                   />
                   <Field
@@ -391,7 +454,7 @@ export default function Auth({
                     name="password"
                     type="password"
                     placeholder="Enter your password"
-                    autoComplete="current-password"
+                    autoComplete="off"
                     error={errors.password}
                   />
                   <div className="auth-options">
@@ -421,6 +484,17 @@ export default function Auth({
                     )}
                   </Action>
                 </form>
+                <div className="auth-divider">
+                  <span />
+                  {language === "vi" ? "hoặc" : "or"}
+                  <span />
+                </div>
+                <GoogleSignIn language={language} disabled={busy || !!notice} />
+                {errors.google && (
+                  <p className="auth-error" role="alert">
+                    {errors.google}
+                  </p>
+                )}
                 <p className="auth-bottom-question">
                   Don't have an account?{" "}
                   <UiButton
@@ -435,13 +509,18 @@ export default function Auth({
             )}
 
             {screen === "register" && (
-              <form noValidate onSubmit={submit} className="auth-form">
+              <form
+                autoComplete="off"
+                noValidate
+                onSubmit={submit}
+                className="auth-form"
+              >
                 <div className="auth-register-grid">
                   <Field
                     label="Full Name"
                     name="name"
                     placeholder="Your full name"
-                    autoComplete="name"
+                    autoComplete="off"
                     error={errors.name}
                   />
                   <Field
@@ -449,7 +528,7 @@ export default function Auth({
                     name="email"
                     type="email"
                     placeholder="you@example.com"
-                    autoComplete="email"
+                    autoComplete="off"
                     error={errors.email}
                   />
                   <Field
@@ -457,14 +536,14 @@ export default function Auth({
                     name="phone"
                     type="tel"
                     placeholder="+84 901 234 567"
-                    autoComplete="tel"
+                    autoComplete="off"
                     error={errors.phone}
                   />
                   <Field
                     label="Location"
                     name="location"
                     placeholder="City, country"
-                    autoComplete="address-level2"
+                    autoComplete="off"
                     error={errors.location}
                   />
                   <Field
@@ -472,7 +551,7 @@ export default function Auth({
                     name="password"
                     type="password"
                     placeholder="Create a password"
-                    autoComplete="new-password"
+                    autoComplete="off"
                     error={errors.password}
                   />
                   <Field
@@ -480,7 +559,7 @@ export default function Auth({
                     name="confirm"
                     type="password"
                     placeholder="Re-enter password"
-                    autoComplete="new-password"
+                    autoComplete="off"
                     error={errors.confirm}
                   />
                 </div>
@@ -534,7 +613,12 @@ export default function Auth({
             )}
 
             {screen === "verify" && (
-              <form noValidate onSubmit={submit} className="auth-form">
+              <form
+                autoComplete="off"
+                noValidate
+                onSubmit={submit}
+                className="auth-form"
+              >
                 <div className="auth-email-pill">
                   <Symbol name="mail" />
                   {email}
@@ -638,13 +722,18 @@ export default function Auth({
             )}
 
             {screen === "forgot" && (
-              <form noValidate onSubmit={submit} className="auth-form">
+              <form
+                autoComplete="off"
+                noValidate
+                onSubmit={submit}
+                className="auth-form"
+              >
                 <Field
                   label="Email Address"
                   name="email"
                   type="email"
                   placeholder="you@example.com"
-                  autoComplete="email"
+                  autoComplete="off"
                   error={errors.email}
                 />
                 <Action type="submit" disabled={busy}>
@@ -693,7 +782,12 @@ export default function Auth({
               </div>
             )}
             {screen === "reset" && (
-              <form noValidate onSubmit={submit} className="auth-form">
+              <form
+                autoComplete="off"
+                noValidate
+                onSubmit={submit}
+                className="auth-form"
+              >
                 <Field
                   label="Reset Code"
                   name="code"
@@ -706,7 +800,7 @@ export default function Auth({
                   name="password"
                   type="password"
                   placeholder="Create a strong password"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   error={errors.password}
                   onValue={setPassword}
                 />
@@ -733,7 +827,7 @@ export default function Auth({
                   name="confirm"
                   type="password"
                   placeholder="Re-enter your new password"
-                  autoComplete="new-password"
+                  autoComplete="off"
                   error={errors.confirm}
                 />
                 <Action type="submit" disabled={busy}>
@@ -748,12 +842,12 @@ export default function Auth({
                   <Symbol name="shield" />
                   <strong>
                     {screen === "created"
-                      ? `${role} account ready`
+                      ? "Account created successfully"
                       : "A fresh start. A secure account."}
                   </strong>
                   <p>
                     {screen === "created"
-                      ? `${email} is now verified.`
+                      ? "Returning to sign in…"
                       : "Your password reset is complete."}
                   </p>
                 </div>

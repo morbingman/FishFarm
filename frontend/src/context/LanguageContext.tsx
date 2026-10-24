@@ -1,6 +1,7 @@
 import { createContext, useContext } from "react";
 export type Language = "en" | "vi";
 export const vi: Record<string, string> = {
+  "Loading fish…": "Đang tải cá…",
   "Farm a Fish": "Đặt nuôi cá",
   "Start your fish farming journey": "Bắt đầu hành trình nuôi cá",
   "Raise Your Fish With Us": "Đặt nuôi cá tại trang trại",

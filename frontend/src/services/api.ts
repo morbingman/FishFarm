@@ -1,7 +1,9 @@
 const API_URL =
-  (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ??
-  "/api";
+  (import.meta.env.VITE_API_URL as string | undefined)
+    ?.trim()
+    .replace(/\/+$/, "") || "/api";
 let accessToken = sessionStorage.getItem("fishfarm-access-token");
+let refreshPending: Promise<boolean> | null = null;
 
 export class ApiError extends Error {
   constructor(
@@ -19,18 +21,51 @@ function saveToken(token: string | null) {
   else sessionStorage.removeItem("fishfarm-access-token");
 }
 
-async function refresh() {
-  const response = await fetch(`${API_URL}/auth/refresh`, {
-    method: "POST",
-    credentials: "include",
-  });
-  if (!response.ok) {
-    saveToken(null);
-    return false;
+async function request(
+  path: string,
+  init: RequestInit = {},
+  credentials: RequestCredentials = "include",
+) {
+  try {
+    return await fetch(`${API_URL}${path}`, {
+      ...init,
+      credentials,
+      signal: init.signal ?? AbortSignal.timeout(15_000),
+    });
+  } catch {
+    throw new ApiError(0, "network.unreachable");
   }
-  const data = await response.json();
-  saveToken(data.accessToken);
-  return true;
+}
+
+async function responseData(response: Response) {
+  if (response.status === 204) return undefined;
+  try {
+    return await response.json();
+  } catch {
+    throw new ApiError(response.status, "api.invalidResponse");
+  }
+}
+
+async function refresh(): Promise<boolean> {
+  if (!refreshPending) {
+    refreshPending = (async () => {
+      const response = await request("/auth/refresh", { method: "POST" });
+      if (!response.ok) {
+        if (response.status === 401 || response.status === 403) saveToken(null);
+        if (response.status >= 500)
+          throw new ApiError(response.status, "error.internal");
+        return false;
+      }
+      const data = await responseData(response);
+      if (typeof data?.accessToken !== "string")
+        throw new ApiError(response.status, "api.invalidResponse");
+      saveToken(data.accessToken);
+      return true;
+    })().finally(() => {
+      refreshPending = null;
+    });
+  }
+  return refreshPending;
 }
 
 export async function api<T>(
@@ -42,73 +77,110 @@ export async function api<T>(
   if (init.body && !(init.body instanceof FormData))
     headers.set("Content-Type", "application/json");
   if (accessToken) headers.set("Authorization", `Bearer ${accessToken}`);
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers,
-    credentials: "include",
-  });
+  const response = await request(path, { ...init, headers });
   if (response.status === 401 && retry && (await refresh()))
     return api<T>(path, init, false);
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({}));
+  const data = await responseData(response);
+  if (!response.ok)
     throw new ApiError(
       response.status,
-      error.code ?? `http.${response.status}`,
-      error.details,
+      data?.code ?? `http.${response.status}`,
+      data?.details,
     );
-  }
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
+  return data as T;
+}
+
+// Catalogue requests never depend on a login session or trigger token refresh.
+async function publicApi<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await request(
+    path,
+    { method: "GET", cache: "no-store", signal },
+    "omit",
+  );
+  const data = await responseData(response);
+  if (!response.ok)
+    throw new ApiError(
+      response.status,
+      data?.code ?? `http.${response.status}`,
+      data?.details,
+    );
+  return data as T;
 }
 
 export const authApi = {
   async login(email: string, password: string) {
-    const data = await api<any>("/auth/login", {
-      method: "POST",
-      body: JSON.stringify({ email, password }),
-    });
+    const data = await api<any>(
+      "/auth/login",
+      { method: "POST", body: JSON.stringify({ email, password }) },
+      false,
+    );
+    if (typeof data?.accessToken !== "string" || !data.user)
+      throw new ApiError(200, "api.invalidResponse");
     saveToken(data.accessToken);
     return data;
   },
+  async createAccount(body: unknown) {
+    const data = await api<{ created: true; email: string }>(
+      "/auth/register-account",
+      { method: "POST", body: JSON.stringify(body) },
+      false,
+    );
+    if (data?.created !== true || typeof data.email !== "string")
+      throw new ApiError(200, "api.invalidResponse");
+    return data;
+  },
   async register(body: unknown) {
-    const data = await api<any>("/auth/register", {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
+    const data = await api<any>(
+      "/auth/register",
+      { method: "POST", body: JSON.stringify(body) },
+      false,
+    );
     saveToken(data.accessToken);
     return data;
   },
   async logout() {
     try {
-      await api<void>("/auth/logout", { method: "POST" });
+      await api<void>("/auth/logout", { method: "POST" }, false);
     } finally {
       saveToken(null);
     }
   },
   verifyEmail(email: string, code?: string) {
-    return api<any>("/auth/verify-email", {
-      method: "POST",
-      body: JSON.stringify({ email, code }),
-    });
+    return api<any>(
+      "/auth/verify-email",
+      { method: "POST", body: JSON.stringify({ email, code }) },
+      false,
+    );
   },
   forgotPassword(email: string) {
-    return api<any>("/auth/forgot-password", {
-      method: "POST",
-      body: JSON.stringify({ email }),
-    });
+    return api<any>(
+      "/auth/forgot-password",
+      { method: "POST", body: JSON.stringify({ email }) },
+      false,
+    );
   },
   resetPassword(email: string, code: string, password: string) {
-    return api<void>("/auth/reset-password", {
-      method: "POST",
-      body: JSON.stringify({ email, code, password }),
-    });
+    return api<void>(
+      "/auth/reset-password",
+      {
+        method: "POST",
+        body: JSON.stringify({ email, code, newPassword: password }),
+      },
+      false,
+    );
   },
 };
 
 export const domainApi = {
-  home: () => api<import("@/data/homeData").HomeData>("/marketplace/home"),
-  listings: (params = "") =>
-    api<any>(`/marketplace/listings${params ? `?${params}` : ""}`),
+  home: (signal?: AbortSignal) =>
+    publicApi<import("@/data/homeData").HomeData>("/marketplace/home", signal),
+  listings: (params = "", signal?: AbortSignal) =>
+    publicApi<any>(
+      `/marketplace/listings${params ? `?${params}` : ""}`,
+      signal,
+    ),
+  listing: (code: string, signal?: AbortSignal) =>
+    publicApi<any>(`/marketplace/listings/${encodeURIComponent(code)}`, signal),
   favorites: () => api<any[]>("/me/favorites"),
   addFavorite: (id: string) => api(`/me/favorites/${id}`, { method: "POST" }),
   removeFavorite: (id: string) =>

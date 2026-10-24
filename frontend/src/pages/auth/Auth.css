@@ -1110,3 +1110,167 @@
   color: var(--color-market-navy);
   font-family: ui-monospace, monospace;
 }
+
+/* A single input surface; the inner native input has no separate card/ring. */
+html body .auth-app .auth-input-wrap > input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  outline: none;
+  background: transparent;
+  box-shadow: none;
+  --tw-ring-shadow: 0 0 #0000;
+  --tw-shadow: 0 0 #0000;
+}
+html body .auth-app .auth-input-wrap > input:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+html body .auth-app .auth-input-wrap > input:-webkit-autofill {
+  -webkit-box-shadow: 0 0 0 1000px white inset;
+  -webkit-text-fill-color: #003152;
+}
+.auth-input-wrap > .auth-icon {
+  flex-shrink: 0;
+}
+.auth-page-tools {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 32px;
+  color: #003152;
+  font-size: 13px;
+}
+.auth-page-tools > button {
+  padding: 6px 12px;
+  border: 1px solid #d4e9f3;
+  border-radius: 8px;
+  font-weight: 700;
+}
+.auth-workspace {
+  position: relative;
+}
+.auth-page-tools {
+  position: absolute;
+  inset: 0 0 auto;
+}
+.auth-google-area {
+  margin-top: 18px;
+  text-align: center;
+}
+.auth-google-fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  height: 46px;
+  width: 100%;
+  border: 1px solid #d4e9f3;
+  border-radius: 9px;
+  background: white;
+  color: #003152;
+  font-weight: 600;
+}
+.auth-google-fallback svg {
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+}
+.auth-google-host {
+  display: flex;
+  justify-content: center;
+  min-height: 44px;
+}
+.auth-google-area[data-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.55;
+}
+.auth-google-message {
+  margin-top: 10px;
+  font-size: 12px;
+  color: #46667b;
+  line-height: 1.6;
+}
+@media (max-width: 600px) {
+  .auth-page-tools {
+    padding: 18px 24px;
+  }
+  .auth-workspace {
+    padding-top: 54px;
+  }
+}
+/* Standalone auth fills the viewport now that the site header is absent. */
+html body .auth-app {
+  min-height: 100dvh;
+}
+html body .auth-app .auth-visual {
+  min-height: 100dvh;
+}
+html body .auth-app .auth-brand {
+  display: inline-flex;
+}
+html body .auth-app .auth-main h1:focus {
+  outline: none;
+}
+.auth-google-fallback {
+  font-family: inherit;
+  font-size: 14px;
+}
+
+/* Move the primary back-home action onto the left visual panel. */
+html body .auth-app {
+  position: relative;
+}
+.auth-home-button {
+  position: absolute;
+  z-index: 5;
+  top: 30px;
+  left: calc(44% - 190px);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  min-height: 44px;
+  width: 158px;
+  padding: 10px 16px;
+  border: 1px solid #ffffffb3;
+  border-radius: 12px;
+  background: #addef1;
+  color: #003152;
+  text-decoration: none;
+  font-size: 13px;
+  font-weight: 800;
+  box-shadow: 0 8px 26px #001d3259;
+}
+.auth-home-button:hover {
+  background: #d5effa;
+  box-shadow: 0 10px 30px #001d326b;
+}
+.auth-home-button > span {
+  font-size: 20px;
+  line-height: 1;
+}
+.auth-page-tools {
+  justify-content: flex-end;
+}
+@media (min-width: 769px) and (max-width: 1200px) {
+  .auth-home-button {
+    top: 106px;
+    left: 28px;
+  }
+}
+@media (max-width: 768px) {
+  .auth-home-button {
+    top: 18px;
+    left: 20px;
+    width: auto;
+    min-height: 40px;
+    padding: 8px 13px;
+  }
+  .auth-workspace {
+    padding-top: 64px;
+  }
+}

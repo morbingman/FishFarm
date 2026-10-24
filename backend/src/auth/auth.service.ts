@@ -12,6 +12,7 @@ import { AppException } from '../common/exceptions/app.exception.js';
 import type { VerificationPurpose } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { MailService } from '../mail/mail.service.js';
+import { GoogleTokenVerifier } from './google-token-verifier.js';
 import { UsersService, type UserRecord } from '../users/users.service.js';
 import type { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import type { LoginDto } from './dto/login.dto.js';
@@ -23,7 +24,8 @@ import type { AuthResult, SessionMeta } from './types.js';
 const OTP_TTL_MS = 5 * 60_000;
 const OTP_RESEND_COOLDOWN_MS = 45_000;
 const OTP_MAX_ATTEMPTS = 5;
-const ACCESS_COOKIE_PATH = '/v1/auth';
+// The browser may reach this API through /api or directly through /v1.
+const ACCESS_COOKIE_PATH = '/';
 
 export interface CodeIssue {
   sent: true;
@@ -38,6 +40,7 @@ export class AuthService {
     private readonly config: ConfigService,
     private readonly users: UsersService,
     private readonly mail: MailService,
+    private readonly google: GoogleTokenVerifier,
   ) {}
 
   get refreshCookiePath(): string {
@@ -61,6 +64,10 @@ export class AuthService {
   }
 
   async register(dto: RegisterDto, meta: SessionMeta): Promise<AuthResult> {
+    return this.issueSession(await this.createAccount(dto), meta);
+  }
+
+  async createAccount(dto: RegisterDto): Promise<UserRecord> {
     if (dto.store) {
       throw new AppException(
         'profile.storeRequiresSeller',
@@ -111,13 +118,13 @@ export class AuthService {
         return created;
       });
     } catch (error) {
-      if (this.isUniqueViolation(error)) {
+      if (this.isUniqueViolation(error) && await this.users.findByEmail(dto.email)) {
         throw new AppException('auth.emailTaken', HttpStatus.CONFLICT);
       }
       throw error;
     }
 
-    return this.issueSession(user, meta);
+    return user;
   }
 
   async login(dto: LoginDto, meta: SessionMeta): Promise<AuthResult> {
@@ -141,6 +148,40 @@ export class AuthService {
       throw new AppException('auth.accountSuspended', HttpStatus.FORBIDDEN);
     }
 
+    return this.issueSession(user, meta);
+  }
+
+  async googleLogin(credential: string, meta: SessionMeta): Promise<AuthResult> {
+    const identity = await this.google.verify(credential);
+    let linked;
+    try {
+      linked = await this.prisma.googleIdentity.findUnique({ where: { subject: identity.subject }, include: { user: true } });
+    } catch {
+      throw new AppException('auth.googleNotReady', HttpStatus.SERVICE_UNAVAILABLE);
+    }
+    let user: UserRecord;
+    if (linked) user = linked.user;
+    else {
+      if (await this.users.findByEmail(identity.email)) {
+        // Never silently attach Google to an existing password account.
+        throw new AppException('auth.googleAccountNotLinked', HttpStatus.CONFLICT);
+      }
+      const passwordHash = await argon2.hash(randomBytes(48).toString('hex'));
+      try {
+        user = await this.prisma.user.create({ data: {
+          email: identity.email, name: identity.name, passwordHash, role: 'Buyer',
+          status: 'active', emailVerifiedAt: new Date(),
+          googleIdentity: { create: { subject: identity.subject } },
+          notifications: { create: { type: 'system', titleKey: 'notifications.welcome.title', bodyKey: 'notifications.welcome.body', link: '#home' } },
+        } });
+      } catch (error) {
+        if (!this.isUniqueViolation(error)) throw error;
+        const existing = await this.prisma.googleIdentity.findUnique({ where: { subject: identity.subject }, include: { user: true } });
+        if (!existing) throw new AppException('auth.googleAccountNotLinked', HttpStatus.CONFLICT);
+        user = existing.user;
+      }
+    }
+    if (user.status !== 'active') throw new AppException('auth.accountSuspended', HttpStatus.FORBIDDEN);
     return this.issueSession(user, meta);
   }
 

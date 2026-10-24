@@ -14,8 +14,10 @@ function refreshCookieValue(response: Response): string {
   const header = response.headers['set-cookie'] as unknown as
     string[] | string | undefined;
   const cookies = Array.isArray(header) ? header : header ? [header] : [];
-  const cookie = cookies.find((value) =>
-    value.startsWith(`${REFRESH_COOKIE}=`),
+  const cookie = cookies.find(
+    (value) =>
+      value.startsWith(`${REFRESH_COOKIE}=`) &&
+      !value.startsWith(`${REFRESH_COOKIE}=;`),
   );
   if (!cookie) throw new Error('refresh cookie was not set');
   return cookie.split(';', 1)[0];

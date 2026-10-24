@@ -1,0 +1,196 @@
+{
+  "User": [
+    "id",
+    "email",
+    "role",
+    "status",
+    "joinedAt",
+    "prefs",
+    "createdAt",
+    "updatedAt"
+  ],
+  "Session": [
+    "id",
+    "refreshTokenHash",
+    "lastActiveAt",
+    "createdAt"
+  ],
+  "VerificationCode": [
+    "id",
+    "attempts",
+    "createdAt"
+  ],
+  "Sequence": [
+    "name",
+    "value"
+  ],
+  "Listing": [
+    "id",
+    "code",
+    "status",
+    "createdAt",
+    "updatedAt",
+    "views",
+    "deletedAt"
+  ],
+  "ListingDraft": [
+    "id",
+    "listingId",
+    "breed",
+    "description",
+    "price",
+    "quantity",
+    "negotiable",
+    "shipping",
+    "saleMode",
+    "depositPct",
+    "createdAt",
+    "updatedAt"
+  ],
+  "ListingImage": [
+    "id",
+    "position",
+    "isMain",
+    "createdAt"
+  ],
+  "ListingHistory": [
+    "id",
+    "at"
+  ],
+  "Notification": [
+    "id",
+    "recipientRole",
+    "createdAt"
+  ],
+  "Activity": [
+    "id",
+    "createdAt"
+  ],
+  "Favorite": [
+    "id",
+    "createdAt"
+  ],
+  "Conversation": [
+    "id",
+    "lastMessageAt",
+    "createdAt"
+  ],
+  "Message": [
+    "id",
+    "createdAt"
+  ],
+  "Upload": [
+    "id",
+    "purpose",
+    "createdAt"
+  ],
+  "CartItem": [
+    "id",
+    "quantity",
+    "createdAt",
+    "updatedAt"
+  ],
+  "Order": [
+    "id",
+    "code",
+    "status",
+    "saleMode",
+    "paymentStatus",
+    "shippingFee",
+    "placedAt",
+    "createdAt",
+    "updatedAt"
+  ],
+  "OrderItem": [
+    "id"
+  ],
+  "Payment": [
+    "id",
+    "provider",
+    "idempotencyKey",
+    "state",
+    "createdAt"
+  ],
+  "Review": [
+    "id",
+    "orderId",
+    "createdAt"
+  ],
+  "Dispute": [
+    "id",
+    "orderId",
+    "status",
+    "createdAt"
+  ],
+  "DisputeAttachment": [
+    "id",
+    "createdAt"
+  ],
+  "GrowOutBatch": [
+    "id",
+    "code",
+    "status",
+    "shareUnit",
+    "expectedHarvestWeightG",
+    "packagePricePerShare",
+    "contingencyPct",
+    "farmVerified",
+    "createdAt",
+    "updatedAt"
+  ],
+  "BatchImage": [
+    "id",
+    "position",
+    "isMain",
+    "createdAt"
+  ],
+  "BatchCostItem": [
+    "id",
+    "amount"
+  ],
+  "BatchUpdate": [
+    "id",
+    "createdAt"
+  ],
+  "BatchUpdatePhoto": [
+    "id"
+  ],
+  "Sponsorship": [
+    "id",
+    "deliveryFee",
+    "status",
+    "termsSnapshot",
+    "createdAt",
+    "updatedAt"
+  ],
+  "EscrowRelease": [
+    "id",
+    "state",
+    "createdAt"
+  ],
+  "Harvest": [
+    "id",
+    "batchId",
+    "mortalityRateBps",
+    "status",
+    "createdAt",
+    "updatedAt"
+  ],
+  "Adjustment": [
+    "id",
+    "status",
+    "createdAt"
+  ],
+  "FarmVerification": [
+    "id",
+    "sellerId",
+    "level",
+    "status",
+    "createdAt",
+    "updatedAt"
+  ],
+  "VerificationDocument": [
+    "id",
+    "uploadedAt"
+  ]
+}

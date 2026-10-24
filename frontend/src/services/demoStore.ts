@@ -647,7 +647,7 @@ function acceptApiUser(remote: any): User {
     email: remote.email,
     password: "",
     name: remote.name,
-    role: remote.role === "Buyer" ? "Buyer" : "Admin",
+    role: remote.role === "Admin" ? "Admin" : "Buyer",
     status: remote.status,
     phone: remote.phone ?? "",
     location: remote.location ?? "",
@@ -781,7 +781,13 @@ export async function authenticate(
     }
   | {
       ok: false;
-      reason: "invalid" | "suspended";
+      reason:
+        | "invalid"
+        | "suspended"
+        | "network"
+        | "server"
+        | "configuration"
+        | "validation";
     }
 > {
   try {
@@ -791,9 +797,21 @@ export async function authenticate(
     return {
       ok: false,
       reason:
-        error instanceof ApiError && error.code.includes("suspended")
-          ? "suspended"
-          : "invalid",
+        error instanceof ApiError
+          ? error.code === "network.unreachable"
+            ? "network"
+            : error.status >= 500
+              ? "server"
+              : error.code === "api.invalidResponse" || error.status === 404
+                ? "configuration"
+                : error.code === "auth.accountSuspended"
+                  ? "suspended"
+                  : error.code === "auth.invalidCredentials"
+                    ? "invalid"
+                    : error.status === 400
+                      ? "validation"
+                      : "server"
+          : "server",
     };
   }
 }

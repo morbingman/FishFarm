@@ -1,0 +1,145 @@
+.public-market {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 44px 24px 80px;
+  min-height: 65vh;
+  color: #003152;
+}
+.public-market-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+.public-market-heading a {
+  font-size: 13px;
+  color: #356783;
+}
+.public-market-heading h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 800;
+  margin: 12px 0;
+  letter-spacing: -0.035em;
+}
+.public-market-heading p {
+  color: #46667b;
+  line-height: 1.7;
+}
+.public-market-search {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 18px;
+  border: 1px solid #d4e9f3;
+  background: #f6fbfe;
+  border-radius: 16px;
+  margin-bottom: 24px;
+}
+.public-market-search label {
+  font-weight: 700;
+  font-size: 13px;
+}
+.public-market-search input {
+  min-width: 0;
+  flex: 1;
+  border: 1px solid #c3dfed;
+  background: white;
+  padding: 11px 14px;
+  border-radius: 10px;
+}
+.public-market-total {
+  font-size: 13px;
+  margin-bottom: 18px;
+  color: #46667b;
+}
+.public-market-pages {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 20px;
+  margin-top: 32px;
+}
+.public-market-pages button {
+  padding: 9px 18px;
+  border: 1px solid #c3dfed;
+  border-radius: 9px;
+}
+.public-market-pages button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.public-fish-detail {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 36px;
+  padding: 28px;
+  border: 1px solid #d4e9f3;
+  border-radius: 24px;
+  box-shadow: 0 12px 40px #0031520a;
+}
+.public-fish-image {
+  aspect-ratio: 1;
+  border-radius: 18px;
+  overflow: hidden;
+  background: #edf8fd;
+}
+.public-fish-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.public-fish-copy {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.public-fish-copy h2 {
+  font-size: 30px;
+  line-height: 1.2;
+  font-weight: 800;
+  margin: 12px 0 22px;
+}
+.public-fish-price {
+  display: block;
+  font-size: 28px;
+  margin-bottom: 20px;
+}
+.public-fish-copy dl > div {
+  display: grid;
+  grid-template-columns: 100px minmax(0, 1fr);
+  gap: 16px;
+  padding: 9px 0;
+  border-bottom: 1px solid #eaf6fc;
+  font-size: 14px;
+}
+.public-fish-copy dt {
+  color: #46667b;
+}
+.public-fish-description {
+  white-space: pre-wrap;
+  line-height: 1.8;
+  margin: 20px 0;
+}
+@media (max-width: 700px) {
+  .public-fish-detail {
+    grid-template-columns: minmax(0, 1fr);
+    padding: 18px;
+    gap: 24px;
+  }
+  .public-market-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 480px) {
+  .public-market-search label {
+    width: 100%;
+  }
+  .public-market-search input {
+    flex-basis: 100%;
+  }
+  .public-market {
+    padding: 30px 20px 60px;
+  }
+}

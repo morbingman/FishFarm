@@ -10,7 +10,7 @@ export class PrismaService
 {
   constructor(config: ConfigService) {
     const connectionString = config.getOrThrow<string>('DATABASE_URL');
-    super({ adapter: new PrismaPg({ connectionString }) });
+    super({ adapter: new PrismaPg({ connectionString, connectionTimeoutMillis: 10_000 }) });
   }
 
   async onModuleInit(): Promise<void> {

@@ -35,14 +35,37 @@ export function AppContent() {
   const { t } = useTranslation();
 
   useEffect(() => {
-    void domainApi
-      .home()
-      .then((data) => {
-        setHome(data);
-        setHomeError(false);
-      })
-      .catch(() => setHomeError(true))
-      .finally(() => setHomeLoading(false));
+    let controller: AbortController | undefined;
+    const load = () => {
+      controller?.abort();
+      controller = new AbortController();
+      const signal = controller.signal;
+      void domainApi
+        .home(signal)
+        .then((data) => {
+          if (!signal.aborted) {
+            setHome(data);
+            setHomeError(false);
+          }
+        })
+        .catch(() => {
+          if (!signal.aborted) setHomeError(true);
+        })
+        .finally(() => {
+          if (!signal.aborted) setHomeLoading(false);
+        });
+    };
+    load();
+    const visible = () => {
+      if (!document.hidden) load();
+    };
+    window.addEventListener("focus", visible);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      controller?.abort();
+      window.removeEventListener("focus", visible);
+      document.removeEventListener("visibilitychange", visible);
+    };
   }, []);
 
   const benefits = [
@@ -71,11 +94,7 @@ export function AppContent() {
   return (
     <div className="home-view-1">
       <main>
-        <Hero
-          activeListings={home.stats.activeListings}
-          verifiedSellers={home.stats.verifiedSellers}
-          image="/hero-koi.jpg"
-        />
+        <Hero />
 
         <section id="categories" className="home-view-2">
           <div className="home-view-3">
@@ -125,6 +144,7 @@ export function AppContent() {
                 </Button>
               }
             />
+            {homeLoading && <p role="status">{t("Loading fish…")}</p>}
             <div className="home-view-9">
               {home.featured.map((item) => (
                 <ListingCard key={item.id} item={item} />

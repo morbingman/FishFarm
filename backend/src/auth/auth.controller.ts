@@ -17,6 +17,7 @@ import {
 import type { CookieOptions, Request, Response } from 'express';
 import { AuthService } from './auth.service.js';
 import { Public } from './decorators/public.decorator.js';
+import { GoogleLoginDto } from './dto/google-login.dto.js';
 import { ForgotPasswordDto } from './dto/forgot-password.dto.js';
 import { LoginDto } from './dto/login.dto.js';
 import { RegisterDto } from './dto/register.dto.js';
@@ -46,6 +47,22 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ): Promise<AuthPayload> {
     const result = await this.auth.register(dto, this.meta(req));
+    this.setRefreshCookie(res, result.refreshToken);
+    return result.payload;
+  }
+
+  @Public()
+  @Post('register-account')
+  async registerAccount(@Body() dto: RegisterDto): Promise<{ created: true; email: string }> {
+    const user = await this.auth.createAccount(dto);
+    return { created: true, email: user.email };
+  }
+
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @Post('google')
+  async googleLogin(@Body() dto: GoogleLoginDto, @Req() req: Request, @Res({ passthrough: true }) res: Response): Promise<AuthPayload> {
+    const result = await this.auth.googleLogin(dto.credential, this.meta(req));
     this.setRefreshCookie(res, result.refreshToken);
     return result.payload;
   }
@@ -149,10 +166,23 @@ export class AuthController {
   }
 
   private setRefreshCookie(res: Response, token: string): void {
+    this.clearLegacyRefreshCookies(res);
     res.cookie(REFRESH_COOKIE, token, this.cookieOptions());
   }
 
+  private clearLegacyRefreshCookies(res: Response): void {
+    for (const path of ['/v1/auth', '/api/auth']) {
+      res.clearCookie(REFRESH_COOKIE, {
+        httpOnly: true,
+        secure: this.auth.isProduction,
+        sameSite: this.auth.isProduction ? 'none' : 'lax',
+        path,
+      });
+    }
+  }
+
   private clearRefreshCookie(res: Response): void {
+    this.clearLegacyRefreshCookies(res);
     res.clearCookie(REFRESH_COOKIE, {
       httpOnly: true,
       secure: this.auth.isProduction,

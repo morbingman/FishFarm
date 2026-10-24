@@ -138,7 +138,13 @@ export function Field({
           name={name}
           type={password && visible ? "text" : type}
           placeholder={placeholder}
-          autoComplete={autoComplete}
+          autoComplete={autoComplete ?? "off"}
+          data-lpignore="true"
+          data-1p-ignore="true"
+          data-bwignore="true"
+          autoCorrect="off"
+          autoCapitalize={type === "email" || password ? "none" : undefined}
+          spellCheck={type === "email" || password ? false : undefined}
           defaultValue={defaultValue}
           onChange={(e) => onValue?.(e.target.value)}
           aria-invalid={!!error}

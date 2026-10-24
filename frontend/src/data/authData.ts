@@ -19,8 +19,8 @@ export const screenMeta: Record<Screen, [string, string]> = {
     "We've sent a verification code to your email.",
   ],
   created: [
-    "You're All Set",
-    "Your account is verified. A world of better trading awaits.",
+    "Account Created Successfully",
+    "Your account is ready. Returning to sign in…",
   ],
   forgot: [
     "Forgot Your Password?",

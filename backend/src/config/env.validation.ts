@@ -7,11 +7,25 @@ const REQUIRED = ['DATABASE_URL', 'JWT_ACCESS_SECRET'] as const;
  * Returns a normalized env object so ConfigService.get<number>('PORT') is actually a number.
  */
 export function validateEnv(config: RawEnv): RawEnv {
+  config = { ...config };
+  for (const key of [...REQUIRED, 'DIRECT_URL'] as const) {
+    if (typeof config[key] === 'string') config[key] = config[key].trim();
+  }
   const missing = REQUIRED.filter((key) => !config[key]);
   if (missing.length > 0) {
     throw new Error(
-      `Missing required environment variables: ${missing.join(', ')}`,
+      `Missing required environment variables: ${missing.join(', ')}. Put .env in backend/ or set ENV_FILE to your file path.`,
     );
+  }
+
+  for (const key of ['DATABASE_URL', 'DIRECT_URL'] as const) {
+    if (!config[key]) continue;
+    let valid = false;
+    try {
+      const url = new URL(String(config[key]));
+      valid = ['postgres:', 'postgresql:'].includes(url.protocol) && !!url.hostname && url.pathname.length > 1;
+    } catch { /* Never include the database URL/password in an error. */ }
+    if (!valid) throw new Error(`${key} must be a valid PostgreSQL connection URL with a database name.`);
   }
 
   const port = Number(config.PORT ?? 4000);

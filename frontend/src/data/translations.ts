@@ -1,4 +1,10 @@
 export const authVi: Record<string, string> = {
+  "Account Created Successfully": "Tạo tài khoản thành công",
+  "Account created successfully": "Tạo tài khoản thành công",
+  "Your account is ready. Returning to sign in…":
+    "Tài khoản đã sẵn sàng. Đang quay lại trang đăng nhập…",
+  "Returning to sign in…": "Đang quay lại trang đăng nhập…",
+
   "Back to marketplace": "← Về chợ cá",
   "← Back to marketplace": "← Về chợ cá",
   "Secure account access": "Truy cập tài khoản an toàn",

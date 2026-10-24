@@ -1,16 +1,11 @@
 import { LogoMark } from "@/components/layout/LogoMark";
 import type { HomeCategory, HomeListing, HomeSeller } from "@/data/homeData";
-import type { ReactNode, FormEvent } from "react";
+import type { ReactNode } from "react";
 import "./HomeParts.css";
-import {
-  NativeSelect,
-  NativeSelectOption,
-} from "@/components/ui/native-select";
-import { Input as UiInput } from "@/components/ui/input";
-import { Label as UiLabel } from "@/components/ui/label";
 import { Button as UiButton } from "@/components/ui/button";
 import { SiteHeader } from "@/components/layout/SiteHeader";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { useUser } from "@/services/demoStore";
 import { useTranslation } from "@/context/LanguageContext";
 import { photos } from "@/data/homeData";
 import { domainApi } from "@/services/api";
@@ -260,139 +255,87 @@ export function Header() {
   const { language, setLanguage } = useTranslation();
   return <SiteHeader language={language} setLanguage={setLanguage} />;
 }
-export function SearchPanel() {
-  const [searched, setSearched] = useState(false);
+// Direct media URL for the same Cloudinary asset, without embedded player UI.
+const HOME_VIDEO =
+  "https://res.cloudinary.com/dwnlbx7wm/video/upload/videoForHome_tvybfy.mp4";
+
+export function Hero() {
   const { t } = useTranslation();
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    setSearched(true);
-    document.querySelector("#featured")?.scrollIntoView({
-      behavior: "smooth",
-    });
-  };
+  const backgroundVideo = useRef<HTMLVideoElement>(null);
+  useEffect(() => {
+    const video = backgroundVideo.current;
+    if (!video) return;
+    video.muted = true;
+    video.defaultMuted = true;
+    const syncPlayback = () => {
+      if (document.hidden) video.pause();
+      else
+        void video.play().catch(() => {
+          /* Keep the poster if autoplay is blocked. */
+        });
+    };
+    syncPlayback();
+    document.addEventListener("visibilitychange", syncPlayback);
+    return () => {
+      document.removeEventListener("visibilitychange", syncPlayback);
+      video.pause();
+    };
+  }, []);
   return (
-    <form onSubmit={submit} className="home-parts-view-12">
-      <div className="home-parts-view-13">
-        <UiLabel className="home-parts-view-14">
-          <Icon name="search" className="home-parts-view-15" />
-          <span className="home-parts-view-16">Search marketplace</span>
-          <UiInput
-            className="home-parts-view-17"
-            placeholder={t("Search fish, species, breed, or seller...")}
-          />
-        </UiLabel>
-        {["Species", "Location", "Price Range"].map((label) => (
-          <UiLabel key={label} className="home-parts-view-18">
-            <span className="home-parts-view-16">{label}</span>
-            <NativeSelect className="home-parts-view-19" defaultValue="">
-              <NativeSelectOption value="" disabled>
-                {t(label)}
-              </NativeSelectOption>
-              <NativeSelectOption>{t(`All ${label}`)}</NativeSelectOption>
-            </NativeSelect>
-            <Icon name="chevron" className="home-parts-view-20" />
-          </UiLabel>
-        ))}
-        <Button type="submit" className="home-parts-view-21">
-          <Icon name="search" className="home-parts-view-22" />
-          {t(searched ? "Results" : "Search")}
-        </Button>
+    <section id="top" className="market-hero home-video-hero">
+      <div className="home-video-background" aria-hidden="true">
+        <video
+          ref={backgroundVideo}
+          src={HOME_VIDEO}
+          poster="/hero-koi.jpg"
+          autoPlay
+          muted
+          loop
+          playsInline
+          controls={false}
+          disablePictureInPicture
+          disableRemotePlayback
+          preload="auto"
+          tabIndex={-1}
+          onContextMenu={(event) => event.preventDefault()}
+        />
       </div>
-    </form>
-  );
-}
-export function Hero({
-  activeListings,
-  verifiedSellers,
-  image,
-}: {
-  activeListings: number;
-  verifiedSellers: number;
-  image: string | null;
-}) {
-  const { t } = useTranslation();
-  return (
-    <section id="top" className="market-hero home-parts-view-23">
-      <div className="home-parts-view-24">
-        <div className="home-parts-view-25">
-          <div className="hero-copy home-parts-view-26">
-            <span className="home-parts-view-27">
-              <span className="home-parts-view-28" />{" "}
-              {t("The trusted marketplace for aquatic trade")}
-            </span>
-            <h1 className="home-parts-view-29">
-              {t("Buy. Sell.")}
-              <br />
-              <span className="home-parts-view-30">{t("Trade. Fish.")}</span>
-            </h1>
-            <p className="home-parts-view-31">
-              {t(
-                "Discover quality fish from trusted breeders, farms, and sellers. Compare prices, verify sellers, and trade with confidence.",
-              )}
-            </p>
-            <div className="home-parts-view-32">
-              <Button
-                onClick={() => {
-                  window.location.hash = "marketplace";
-                }}
-              >
-                {t("Explore Marketplace")}{" "}
-                <Icon name="arrow" className="home-parts-view-22" />
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => {
-                  window.location.hash = "farming";
-                }}
-              >
-                {t("Farm a Fish")}
-              </Button>
-            </div>
-            <div className="pt-6">
-              {[
-                `${activeListings.toLocaleString()} ${t("Fish Listed")}`,
-                `${verifiedSellers.toLocaleString()} ${t("Verified Sellers")}`,
-                "Secure Transactions",
-              ].map((item) => (
-                <span key={item} className="home-parts-view-34">
-                  <span className="home-parts-view-35">
-                    <Icon name="check" className="home-parts-view-36" />
-                  </span>
-                  {t(item)}
-                </span>
-              ))}
-            </div>
-          </div>
-        </div>
-        <div className="home-parts-view-37">
-          {image && (
-            <img
-              src={image}
-              alt={t("Koi fish")}
-              className="home-parts-view-38"
-              fetchPriority="high"
-            />
-          )}
-          <div className="home-parts-view-39" />
-          <div className="home-parts-view-40">
-            <div className="home-parts-view-41">
-              <span className="home-parts-view-42">
-                <Icon name="shield" />
-              </span>
-              <div>
-                <p className="home-parts-view-43">{t("Buyer Protection")}</p>
-                <p className="home-parts-view-44">
-                  {t("Included on eligible trades")}
-                </p>
-              </div>
-            </div>
+      <div className="home-video-overlay" aria-hidden="true" />
+      <div className="home-video-layout">
+        <div className="hero-copy home-video-copy">
+          <span className="home-parts-view-27">
+            {t("The trusted marketplace for aquatic trade")}
+          </span>
+          <h1>
+            {t("Buy. Sell.")}
+            <br />
+            {t("Trade. Fish.")}
+          </h1>
+          <p>
+            {t(
+              "Discover quality fish from trusted breeders, farms, and sellers. Compare prices, verify sellers, and trade with confidence.",
+            )}
+          </p>
+          <div className="home-video-actions">
+            <Button
+              variant="light"
+              onClick={() => {
+                window.location.hash = "marketplace";
+              }}
+            >
+              {t("Explore Marketplace")}
+            </Button>
+            <Button
+              variant="secondary"
+              onClick={() => {
+                window.location.hash = "farming";
+              }}
+            >
+              {t("Farm a Fish")}
+            </Button>
           </div>
         </div>
       </div>
-      <div className="home-parts-view-45">
-        <SearchPanel />
-      </div>
-      <div className="home-parts-view-46" />
     </section>
   );
 }
@@ -419,6 +362,7 @@ export function CategoryCard({ item }: { item: HomeCategory }) {
   );
 }
 export function ListingCard({ item }: { item: HomeListing }) {
+  const user = useUser();
   const [favorite, setFavorite] = useState(false);
   const { language, t } = useTranslation();
   const detail = [item.size ? `${item.size} cm` : null, item.origin]
@@ -439,6 +383,10 @@ export function ListingCard({ item }: { item: HomeListing }) {
         <UiButton
           variant="plain"
           onClick={() => {
+            if (!user) {
+              window.location.hash = "login";
+              return;
+            }
             const request = favorite
               ? domainApi.removeFavorite(item.id)
               : domainApi.addFavorite(item.id);
@@ -463,19 +411,25 @@ export function ListingCard({ item }: { item: HomeListing }) {
       </div>
       <div className="home-parts-view-57">
         <VerifiedBadge />
-        <p className="home-parts-view-58">{item.species}</p>
-        <h3 className="home-parts-view-59">{item.name}</h3>
+        <p title={item.species} className="home-parts-view-58">
+          {item.species}
+        </p>
+        <h3 title={item.name} className="home-parts-view-59">
+          {item.name}
+        </h3>
         <div className="home-parts-view-60">
-          <span>{detail}</span>
-          <span className="home-parts-view-61" />
-          <span className="home-parts-view-62">
+          <span title={detail}>{detail || "—"}</span>
+
+          <span title={item.location ?? ""} className="home-parts-view-62">
             <Icon name="location" className="home-parts-view-5" />
-            {item.location}
+            <span>{item.location || "—"}</span>
           </span>
         </div>
-        <div className="pt-4">
+        <div className="listing-card-summary">
           <div>
-            <p className="home-parts-view-64">{item.seller}</p>
+            <p title={item.seller} className="home-parts-view-64">
+              {item.seller}
+            </p>
             <Rating value={item.rating.toFixed(1)} />
           </div>
           <div className="home-parts-view-65">
@@ -484,10 +438,10 @@ export function ListingCard({ item }: { item: HomeListing }) {
           </div>
         </div>
         <Button
-          variant="secondary"
+          variant="primary"
           className="home-parts-view-68"
           onClick={() => {
-            window.location.hash = "marketplace";
+            window.location.hash = `marketplace/detail?fish=${encodeURIComponent(item.id)}`;
           }}
         >
           {t("View Details")}{" "}
@@ -626,15 +580,54 @@ export function HowItWorks() {
 }
 export function Promo() {
   const { t } = useTranslation();
+  const slides = [
+    photos.farm,
+    "/home/fish-01.jpg",
+    "/home/fish-02.jpg",
+    "/home/fish-03.jpg",
+  ];
+  const [activeSlide, setActiveSlide] = useState(0);
+  useEffect(() => {
+    const motion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    let timer: ReturnType<typeof setInterval> | undefined;
+    const sync = () => {
+      if (timer) clearInterval(timer);
+      if (!motion.matches && !document.hidden)
+        timer = setInterval(
+          () => setActiveSlide((current) => (current + 1) % 4),
+          7000,
+        );
+    };
+    sync();
+    document.addEventListener("visibilitychange", sync);
+    motion.addEventListener("change", sync);
+    return () => {
+      if (timer) clearInterval(timer);
+      document.removeEventListener("visibilitychange", sync);
+      motion.removeEventListener("change", sync);
+    };
+  }, []);
   return (
     <section className="home-parts-view-96">
       <div className="home-parts-view-97">
-        <img
-          src={photos.farm}
-          alt="Professional fish farm seller at work"
-          className="home-parts-view-98"
-        />
-        <div className="home-parts-view-99" />
+        <div className="promo-slides" aria-hidden="true">
+          {slides.map((src, index) => (
+            <img
+              key={src}
+              src={src}
+              alt=""
+              loading="lazy"
+              className={`home-parts-view-98 promo-slide${activeSlide === index ? " is-active" : ""}`}
+              onError={(event) => {
+                if (index === 0 && !event.currentTarget.dataset.fallback) {
+                  event.currentTarget.dataset.fallback = "true";
+                  event.currentTarget.src = "/home/fish-03.jpg";
+                }
+              }}
+            />
+          ))}
+        </div>
+        <div className="home-parts-view-99 promo-overlay" />
         <div className="home-parts-view-100">
           <p className="home-parts-view-101">
             {t("Start your fish farming journey")}

@@ -611,9 +611,21 @@ export function NotifItem({
       <span className={`pt-notif-ic ${n.type}`}>
         <Icon name={NIC[n.type]} size={16} />
       </span>
-      <div>
-        <b>{n.title}</b>
-        <span>{n.body}</span>
+      <div className="pt-notif-copy">
+        <b>
+          {n.title === "notifications.welcome.title"
+            ? vi
+              ? "Chào mừng bạn đến FishFarm"
+              : "Welcome to FishFarm"
+            : n.title}
+        </b>
+        <span>
+          {n.body === "notifications.welcome.body"
+            ? vi
+              ? "Tài khoản của bạn đã sẵn sàng. Khám phá chợ cá và bắt đầu hành trình nuôi cá."
+              : "Your account is ready. Explore the marketplace and start your fish farming journey."
+            : n.body}
+        </span>
         <small>{timeAgo(n.at, vi)}</small>
       </div>
     </UiButton>

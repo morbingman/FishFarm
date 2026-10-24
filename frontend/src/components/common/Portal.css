@@ -119,7 +119,7 @@
   font-size: 13px;
   color: var(--navy);
 }
-.pt-notif span {
+.pt-notif-copy > span {
   display: block;
   font-size: 12px;
   color: var(--muted);
@@ -764,4 +764,35 @@
   position: relative;
   inset: auto;
   padding: 0;
+}
+
+/* One fixed icon slot shared by every role and notification surface. */
+.pt-notif {
+  align-items: flex-start;
+  white-space: normal;
+}
+.pt-notif > .pt-notif-ic {
+  display: grid;
+  place-items: center;
+  flex: 0 0 34px;
+  width: 34px;
+  height: 34px;
+  margin: 0;
+  line-height: 1;
+  color: #003152;
+}
+.pt-notif > .pt-notif-ic svg {
+  display: block;
+  flex: none;
+  width: 17px;
+  height: 17px;
+  margin: 0;
+}
+.pt-notif-copy {
+  min-width: 0;
+  flex: 1;
+}
+.pt-notif-copy > b,
+.pt-notif-copy > span {
+  overflow-wrap: anywhere;
 }

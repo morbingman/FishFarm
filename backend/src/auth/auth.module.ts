@@ -5,7 +5,9 @@ import { JwtModule } from '@nestjs/jwt';
 import { MailModule } from '../mail/mail.module.js';
 import { UsersModule } from '../users/users.module.js';
 import { AuthController } from './auth.controller.js';
+import { GoogleTokenVerifier } from './google-token-verifier.js';
 import { AuthService } from './auth.service.js';
+import { AdminBootstrapService } from './admin-bootstrap.service.js';
 import { JwtAuthGuard } from './guards/jwt-auth.guard.js';
 import { PermissionsGuard } from './guards/permissions.guard.js';
 
@@ -28,6 +30,8 @@ import { PermissionsGuard } from './guards/permissions.guard.js';
   controllers: [AuthController],
   providers: [
     AuthService,
+    GoogleTokenVerifier,
+    AdminBootstrapService,
     // Default-deny: every route needs a valid access token unless marked @Public().
     { provide: APP_GUARD, useClass: JwtAuthGuard },
     { provide: APP_GUARD, useClass: PermissionsGuard },

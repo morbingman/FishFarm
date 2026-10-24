@@ -17,8 +17,8 @@ this file covers how to run the service.
 cd backend
 pnpm install                 # also runs `prisma generate`
 cp .env.example .env         # fill Supabase, JWT, email and Cloudinary values
-pnpm db:migrate:deploy       # apply committed migrations to Supabase
-pnpm db:seed                 # demo users, listings, one sponsorship batch
+pnpm db:check                # read-only connection and application table check
+# Default Admin is created automatically when the API starts.
 pnpm start:dev               # http://localhost:4000
 ```
 
@@ -55,7 +55,7 @@ All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps
 ### Auth (M2)
 
 - `POST /v1/auth/login` returns a short-lived access token in the body. The refresh token is set in
-  the httpOnly cookie `fishfarm_refresh` (path `/v1/auth`), rotated on every `/refresh`.
+  the httpOnly cookie `fishfarm_refresh` (path `/`), rotated on every `/refresh`.
 - Access tokens stay in frontend memory. Every protected request must send
   `Authorization: Bearer <token>`; the global `JwtAuthGuard` is default-deny, with `@Public()`
   opt-outs. Sessions are server-side (hashed refresh token) and slide on activity; after
@@ -131,3 +131,14 @@ src/
 - The schema includes both products: marketplace entities (§3) and batch sponsorship (§11).
   Implemented so far: M1 scaffolding and M2 auth/users; listings start at M3.
 - `pnpm test:e2e` boots the real app against the local database and cleans up the users it creates.
+
+## Environment diagnostics
+
+The API, Prisma CLI and admin/seed scripts use `backend/.env`. To select another
+file, set `ENV_FILE` to an absolute path or a path relative to `backend/`.
+Server-provided environment variables take precedence over the file.
+
+Run `npm run db:check` to test configuration, database connectivity and existing
+application table/column names without changing data. Migration history is not
+required. This setup uses an existing database and does not run migrations or seed. Local frontend proxy target can be changed using `API_PROXY_TARGET`
+in `frontend/.env.local`; production frontend builds use `VITE_API_URL` instead.

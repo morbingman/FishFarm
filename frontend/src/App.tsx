@@ -23,6 +23,9 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { type Language, LanguageContext } from "@/context/LanguageContext";
 import { AppContent } from "@/pages/home/Home";
 export const Auth = lazy(() => import("@/pages/auth/Auth"));
+const PublicMarketplace = lazy(
+  () => import("@/pages/marketplace/PublicMarketplace"),
+);
 export const Buyer = lazy(() => import("@/pages/buyer/Buyer"));
 export const Admin = lazy(() => import("@/pages/admin/Admin"));
 export const Account = lazy(() => import("@/pages/account/Account"));
@@ -32,6 +35,7 @@ export type View =
   | "home"
   | "auth"
   | "buyer"
+  | "publicMarketplace"
   | "admin"
   | "account"
   | "expired"
@@ -99,6 +103,10 @@ export default function App() {
         user?.role === "Admin" ? "#admin/listings" : "#home",
       );
   }, [adminRedirect, requestedTop, user?.role]);
+  const marketPage = hash.replace(/^#/, "").split("?")[0];
+  const publicMarket =
+    top === "marketplace" &&
+    ["marketplace", "marketplace/detail"].includes(marketPage);
   let view: View = "home";
   let denied: string | null = null;
   if (sessionExpired()) view = "expired";
@@ -106,6 +114,7 @@ export default function App() {
   else if (top === "expired") view = "expired";
   else if (top === "" || top === "home") view = "home";
   else if (!TOP.has(top)) view = "notfound";
+  else if (!user && publicMarket) view = "publicMarketplace";
   else if (!user) view = "auth";
   else if (top === "marketplace") view = "buyer";
   else if (top === "account") view = "account";
@@ -119,6 +128,7 @@ export default function App() {
   const gated =
     !user &&
     TOP.has(top) &&
+    !publicMarket &&
     ["marketplace", "seller", "admin", "account", "farming"].includes(top);
   useEffect(() => {
     if (gated) {
@@ -171,6 +181,7 @@ export default function App() {
         home={user ? "#" + homeFor(user.role) : "#home"}
       />
     );
+  else if (view === "publicMarketplace") page = <PublicMarketplace />;
   else if (!user) page = null;
   else if (view === "admin")
     page = <Admin user={user} language={language} setLanguage={setLanguage} />;
@@ -191,17 +202,27 @@ export default function App() {
         setLanguage,
       }}
     >
-      <WorkspaceFrame user={user} language={language} setLanguage={setLanguage}>
-        <Suspense
-          fallback={
-            <div className="app-view-1" role="status">
-              Loading FISHMARKET...
-            </div>
-          }
-        >
+      {view === "auth" ? (
+        <Suspense fallback={<div className="app-view-1">Loading…</div>}>
           {page}
         </Suspense>
-      </WorkspaceFrame>
+      ) : (
+        <WorkspaceFrame
+          user={user}
+          language={language}
+          setLanguage={setLanguage}
+        >
+          <Suspense
+            fallback={
+              <div className="app-view-1" role="status">
+                Loading FISHMARKET...
+              </div>
+            }
+          >
+            {page}
+          </Suspense>
+        </WorkspaceFrame>
+      )}
       {flashMsg && (
         <div className="sl-toast" role="status">
           {flashMsg}

@@ -1,7 +1,10 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
+import { envFilePath } from '../src/config/env-file.js';
+config({ path: envFilePath, quiet: true });
 import * as argon2 from 'argon2';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
+import { ensureDefaultAdmin } from '../src/auth/default-admin.js';
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
@@ -26,8 +29,13 @@ async function hash(password: string) {
 }
 
 async function resetDemoData() {
-  if (process.env.NODE_ENV === 'production' && process.env.ALLOW_DEMO_SEED !== '1') {
-    throw new Error('Refusing to reset demo data in production. Set ALLOW_DEMO_SEED=1 to override.');
+  if (
+    process.env.NODE_ENV === 'production' &&
+    process.env.ALLOW_DEMO_SEED !== '1'
+  ) {
+    throw new Error(
+      'Refusing to reset demo data in production. Set ALLOW_DEMO_SEED=1 to override.',
+    );
   }
 
   // Children first — mirrors the FK graph.
@@ -78,7 +86,12 @@ type SeedUser = {
 
 async function seedUsers() {
   const users: SeedUser[] = [
-    { email: 'buyer@fishmarket.demo', password: 'Buyer123', name: 'Alex Nguyen', role: 'Buyer' },
+    {
+      email: 'buyer@fishmarket.demo',
+      password: 'Buyer123',
+      name: 'Alex Nguyen',
+      role: 'Buyer',
+    },
     {
       email: 'seller@fishmarket.demo',
       password: 'Seller123',
@@ -86,7 +99,12 @@ async function seedUsers() {
       role: 'Admin',
       store: 'Golden Koi Farm',
     },
-    { email: 'admin@fishmarket.demo', password: 'Admin123', name: 'Marketplace Admin', role: 'Admin' },
+    {
+      email: 'admin@fishmarket.demo',
+      password: 'Admin123',
+      name: 'Marketplace Admin',
+      role: 'Admin',
+    },
     {
       email: 'lagoon@fishmarket.demo',
       password: 'Demo1234',
@@ -101,7 +119,12 @@ async function seedUsers() {
       role: 'Admin',
       store: 'Mekong Aroworld',
     },
-    { email: 'linh@fishmarket.demo', password: 'Demo1234', name: 'Linh Tran', role: 'Buyer' },
+    {
+      email: 'linh@fishmarket.demo',
+      password: 'Demo1234',
+      name: 'Linh Tran',
+      role: 'Buyer',
+    },
     {
       email: 'minh@fishmarket.demo',
       password: 'Demo1234',
@@ -259,7 +282,9 @@ async function seedListings(users: Map<string, { id: string; name: string }>) {
 
   for (const item of listings) {
     const owner = users.get(item.owner)!;
-    const seller = await prisma.user.findUniqueOrThrow({ where: { email: item.owner } });
+    const seller = await prisma.user.findUniqueOrThrow({
+      where: { email: item.owner },
+    });
     const createdAt = ago(item.hoursAgo + 5);
     const updatedAt = ago(item.hoursAgo);
     const submittedAt = ago(item.hoursAgo + 1);
@@ -307,8 +332,18 @@ async function seedListings(users: Map<string, { id: string; name: string }>) {
         },
         history: {
           create: [
-            { at: createdAt, actorId: owner.id, actorLabel: owner.name, action: 'Created draft' },
-            { at: submittedAt, actorId: owner.id, actorLabel: owner.name, action: 'Submitted for review' },
+            {
+              at: createdAt,
+              actorId: owner.id,
+              actorLabel: owner.name,
+              action: 'Created draft',
+            },
+            {
+              at: submittedAt,
+              actorId: owner.id,
+              actorLabel: owner.name,
+              action: 'Submitted for review',
+            },
             ...(item.status === 'approved'
               ? [
                   {
@@ -326,7 +361,9 @@ async function seedListings(users: Map<string, { id: string; name: string }>) {
   }
 }
 
-async function seedNotifications(users: Map<string, { id: string; name: string }>) {
+async function seedNotifications(
+  users: Map<string, { id: string; name: string }>,
+) {
   await prisma.notification.createMany({
     data: [
       {
@@ -335,7 +372,10 @@ async function seedNotifications(users: Map<string, { id: string; name: string }
         titleKey: 'notifications.admin.pendingQueue.title',
         titleParams: { count: 2 },
         bodyKey: 'notifications.admin.pendingQueue.body',
-        bodyParams: { names: 'Betta Halfmoon Blue, Arowana Silver 28 cm', hours: 20 },
+        bodyParams: {
+          names: 'Betta Halfmoon Blue, Arowana Silver 28 cm',
+          hours: 20,
+        },
         link: '#admin/queue?tab=pending',
         createdAt: ago(1),
       },
@@ -433,11 +473,36 @@ async function seedBatch(users: Map<string, { id: string; name: string }>) {
             allocation: 'batch_total',
             note: 'Farm-owned and reusable across batches.',
           },
-          { category: 'feed', label: 'Premium koi feed', amount: 1_250_000, allocation: 'per_share' },
-          { category: 'labour', label: 'Daily care and monitoring', amount: 380_000, allocation: 'per_share' },
-          { category: 'health', label: 'Quarantine and vet checks', amount: 130_000, allocation: 'per_share' },
-          { category: 'transport', label: 'Farm to delivery hub', amount: 140_000, allocation: 'per_share' },
-          { category: 'platform_fee', label: 'Platform fee', amount: 100_000, allocation: 'per_share' },
+          {
+            category: 'feed',
+            label: 'Premium koi feed',
+            amount: 1_250_000,
+            allocation: 'per_share',
+          },
+          {
+            category: 'labour',
+            label: 'Daily care and monitoring',
+            amount: 380_000,
+            allocation: 'per_share',
+          },
+          {
+            category: 'health',
+            label: 'Quarantine and vet checks',
+            amount: 130_000,
+            allocation: 'per_share',
+          },
+          {
+            category: 'transport',
+            label: 'Farm to delivery hub',
+            amount: 140_000,
+            allocation: 'per_share',
+          },
+          {
+            category: 'platform_fee',
+            label: 'Platform fee',
+            amount: 100_000,
+            allocation: 'per_share',
+          },
           {
             category: 'contingency',
             label: '10% contingency buffer',
@@ -505,7 +570,9 @@ async function seedBatch(users: Map<string, { id: string; name: string }>) {
   console.log(`  sponsorship ${sponsorship.id} — ${sponsorship.shares} shares`);
 }
 
-async function seedFarmVerification(users: Map<string, { id: string; name: string }>) {
+async function seedFarmVerification(
+  users: Map<string, { id: string; name: string }>,
+) {
   await prisma.farmVerification.create({
     data: {
       sellerId: users.get('seller@fishmarket.demo')!.id,
@@ -520,13 +587,34 @@ async function seedFarmVerification(users: Map<string, { id: string; name: strin
       reviewedBy: 'Marketplace Admin',
       documents: {
         create: [
-          { type: 'business_registration', url: 'https://storage.fishfarm.local/demo/golden-koi/business.pdf' },
-          { type: 'owner_identity', url: 'https://storage.fishfarm.local/demo/golden-koi/identity.pdf' },
-          { type: 'land_use_rights', url: 'https://storage.fishfarm.local/demo/golden-koi/lease.pdf' },
-          { type: 'environmental_permit', url: 'https://storage.fishfarm.local/demo/golden-koi/water-permit.pdf' },
-          { type: 'veterinary_records', url: 'https://storage.fishfarm.local/demo/golden-koi/quarantine.pdf' },
-          { type: 'site_photos', url: 'https://storage.fishfarm.local/demo/golden-koi/site.zip' },
-          { type: 'bank_account', url: 'https://storage.fishfarm.local/demo/golden-koi/bank.pdf' },
+          {
+            type: 'business_registration',
+            url: 'https://storage.fishfarm.local/demo/golden-koi/business.pdf',
+          },
+          {
+            type: 'owner_identity',
+            url: 'https://storage.fishfarm.local/demo/golden-koi/identity.pdf',
+          },
+          {
+            type: 'land_use_rights',
+            url: 'https://storage.fishfarm.local/demo/golden-koi/lease.pdf',
+          },
+          {
+            type: 'environmental_permit',
+            url: 'https://storage.fishfarm.local/demo/golden-koi/water-permit.pdf',
+          },
+          {
+            type: 'veterinary_records',
+            url: 'https://storage.fishfarm.local/demo/golden-koi/quarantine.pdf',
+          },
+          {
+            type: 'site_photos',
+            url: 'https://storage.fishfarm.local/demo/golden-koi/site.zip',
+          },
+          {
+            type: 'bank_account',
+            url: 'https://storage.fishfarm.local/demo/golden-koi/bank.pdf',
+          },
         ],
       },
     },
@@ -558,6 +646,10 @@ async function main() {
     ],
   });
 
+  await ensureDefaultAdmin(prisma, {
+    email: process.env.DEFAULT_ADMIN_EMAIL,
+    password: process.env.DEFAULT_ADMIN_PASSWORD,
+  });
   console.log('Seed complete.');
   console.log('Demo accounts:');
   console.log('  buyer@fishmarket.demo / Buyer123');
