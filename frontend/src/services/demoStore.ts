@@ -1185,7 +1185,7 @@ export function refreshAccountLocks() {
 }
 export function manageAccount(
   email: string,
-  action: BlockKind | "unblock" | "delete",
+  action: BlockKind | "unblock",
   reason: string,
 ) {
   const admin = currentUser();
@@ -1198,7 +1198,6 @@ export function manageAccount(
   )
     throw new Error("Protected account or access denied");
   if (!reason.trim()) throw new Error("Please enter a reason");
-  const deleted = action === "delete";
   const until =
     action === "24h"
       ? new Date(Date.now() + 86400000).toISOString()
@@ -1211,23 +1210,21 @@ export function manageAccount(
     blockKind: ["24h", "7d", "permanent"].includes(action)
       ? (action as BlockKind)
       : undefined,
-    ...(deleted ? { deletedAt: nowISO() } : {}),
   });
   log(
     admin.name,
     "Admin",
-    `${deleted ? "Deleted" : action === "unblock" ? "Unblocked" : "Blocked (" + action + ")"} account: ${reason.trim()}`,
+    `${action === "unblock" ? "Unblocked" : "Blocked (" + action + ")"} account: ${reason.trim()}`,
     target.name,
     "#admin/users",
   );
-  if (!deleted)
-    notify(
-      email,
-      "system",
-      action === "unblock" ? "Account reactivated" : "Account blocked",
-      reason.trim(),
-      "#login",
-    );
+  notify(
+    email,
+    "system",
+    action === "unblock" ? "Account reactivated" : "Account blocked",
+    reason.trim(),
+    "#login",
+  );
   void api(`/admin/users/${encodeURIComponent(email)}/status`, {
     method: "PATCH",
     body: JSON.stringify({
