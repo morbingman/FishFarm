@@ -245,6 +245,7 @@ export function BuyerLayout() {
       {modal && (
         <Dialog
           open={!!modal}
+          modal={modal !== "messages"}
           onOpenChange={(open) => {
             if (!open) setModal(null);
           }}
@@ -261,8 +262,12 @@ export function BuyerLayout() {
             }
             className={
               "buyer-app " +
-              `buy-modal ${modal === "zoom" ? "buy-zoom-modal" : ""}`
+              `buy-modal ${modal === "zoom" ? "buy-zoom-modal" : ""} ${modal === "messages" ? "buy-chat-modal" : ""}`
             }
+            showOverlay={modal !== "messages"}
+            onInteractOutside={(event) => {
+              if (modal === "messages") event.preventDefault();
+            }}
             aria-describedby={undefined}
           >
             <DialogTitle className="buyer-view-1">FISHMARKET</DialogTitle>

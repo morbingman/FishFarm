@@ -2737,6 +2737,15 @@
   max-height: calc(100dvh - 32px);
   padding: 24px;
 }
+.dialog-view-2.buyer-app.buy-modal.buy-chat-modal {
+  top: auto !important;
+  right: 24px;
+  bottom: 24px;
+  left: auto;
+  transform: none !important;
+  width: min(calc(100vw - 48px), 430px);
+  max-height: calc(100dvh - 48px);
+}
 .buy-modal-close {
   position: absolute;
   top: 15px;
@@ -3855,6 +3864,15 @@
     top: 55% !important;
     max-height: calc(100dvh - 20px);
     padding: 20px;
+  }
+  .dialog-view-2.buyer-app.buy-modal.buy-chat-modal {
+    top: auto !important;
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+    max-height: calc(100dvh - 24px);
+    transform: none !important;
   }
   .buy-modal h2 {
     font-size: 21px;
