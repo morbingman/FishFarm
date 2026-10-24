@@ -27,7 +27,7 @@ import { useDomTranslation } from "@/hooks/useTranslation";
 import { authVi } from "@/data/translations";
 import "@/pages/auth/Auth.css";
 import { type Screen, screenMeta } from "@/data/authData";
-import { authApi } from "@/services/api";
+import { ApiError, authApi } from "@/services/api";
 import { Symbol, Field, Action } from "@/components/auth/AuthParts";
 export default function Auth({
   language,
@@ -202,14 +202,27 @@ export default function Auth({
           location: data.location,
           store: undefined,
         });
+      } catch (error) {
+        const message =
+          error instanceof ApiError && error.status === 409
+            ? "An account with this email already exists. Try signing in instead."
+            : error instanceof ApiError && error.status === 400
+              ? "The registration information was rejected. Check each field and try again."
+              : "Unable to reach the registration server. Please try again shortly.";
+        setErrors({ email: message });
+        setBusy(false);
+        return;
+      }
+
+      try {
         const verification = await authApi.verifyEmail(data.email);
         go("verify");
         if (verification.devCode)
           setNotice(`Development code: ${verification.devCode}`);
       } catch {
+        go("verify");
         setErrors({
-          email:
-            "This email is already registered or the server is unavailable.",
+          otp: "Your account was created, but the verification email could not be sent. Check the email service configuration, then select Resend Code.",
         });
       } finally {
         setBusy(false);
