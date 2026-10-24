@@ -42,17 +42,12 @@ export default function Auth({
   );
   const [role, setRole] = useState<Role>(() => currentUser()?.role ?? "Buyer");
   const [info] = useState(() => takeFlash() ?? "");
-  const regRef = useRef<Record<string, string> | null>(null);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [password, setPassword] = useState("");
-  const [otp, setOtp] = useState<string[]>(Array(6).fill(""));
-  const [seconds, setSeconds] = useState(45);
-  const [expiry, setExpiry] = useState(Date.now() + 5 * 60_000);
   const [legal, setLegal] = useState<string | null>(null);
-  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const heading = useRef<HTMLHeadingElement>(null);
   const modal = useRef<HTMLDivElement>(null);
@@ -62,14 +57,6 @@ export default function Auth({
     },
     [],
   );
-  useEffect(() => {
-    if (screen !== "verify") return;
-    const interval = setInterval(
-      () => setSeconds((s) => Math.max(0, s - 1)),
-      1000,
-    );
-    return () => clearInterval(interval);
-  }, [screen]);
   useEffect(() => {
     heading.current?.focus();
   }, [screen]);
@@ -98,11 +85,6 @@ export default function Auth({
     setNotice("");
     setBusy(false);
     setPassword("");
-    if (next === "verify") {
-      setOtp(Array(6).fill(""));
-      setSeconds(45);
-      setExpiry(Date.now() + 5 * 60_000);
-    }
   }
   function redirectAfterLogin(r: Role) {
     const back = takeReturnTo();
@@ -133,7 +115,6 @@ export default function Auth({
     >;
     const nextErrors: Record<string, string> = {};
     if (
-      screen !== "verify" &&
       screen !== "reset" &&
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(data.email || "")
     )
@@ -158,12 +139,6 @@ export default function Auth({
         nextErrors.phone = "Enter a valid phone number.";
       if (!data.terms)
         nextErrors.terms = "Please agree to the terms to continue.";
-    }
-    if (screen === "verify") {
-      if (Date.now() > expiry)
-        nextErrors.otp = "This code has expired. Request a new one.";
-      else if (!/^\d{6}$/.test(otp.join("")))
-        nextErrors.otp = "Enter the 6-digit code sent to your email.";
     }
     let matched: Role | null = null;
     if (screen === "login" && !Object.keys(nextErrors).length) {
@@ -192,7 +167,6 @@ export default function Auth({
     if (screen === "register") {
       setBusy(true);
       try {
-        regRef.current = data;
         await addUser({
           email: data.email.trim().toLowerCase(),
           password: data.password,
@@ -202,6 +176,8 @@ export default function Auth({
           location: data.location,
           store: undefined,
         });
+        setRole("Buyer");
+        go("created");
       } catch (error) {
         const message =
           error instanceof ApiError && error.status === 409
@@ -212,30 +188,6 @@ export default function Auth({
         setErrors({ email: message });
         setBusy(false);
         return;
-      }
-
-      try {
-        const verification = await authApi.verifyEmail(data.email);
-        go("verify");
-        if (verification.devCode)
-          setNotice(`Development code: ${verification.devCode}`);
-      } catch {
-        go("verify");
-        setErrors({
-          otp: "Your account was created, but the verification email could not be sent. Check the email service configuration, then select Resend Code.",
-        });
-      } finally {
-        setBusy(false);
-      }
-      return;
-    }
-    if (screen === "verify") {
-      setBusy(true);
-      try {
-        await authApi.verifyEmail(email, otp.join(""));
-        go("created");
-      } catch {
-        setErrors({ otp: "That code is invalid or expired." });
       } finally {
         setBusy(false);
       }
@@ -348,9 +300,9 @@ export default function Auth({
               <UiButton
                 variant="plain"
                 className="auth-back"
-                onClick={() => go(screen === "verify" ? "register" : "login")}
+                onClick={() => go("login")}
               >
-                ← Back to {screen === "verify" ? "registration" : "sign in"}
+                ← Back to sign in
               </UiButton>
             )}
             <div
@@ -360,9 +312,7 @@ export default function Auth({
                 name={
                   success
                     ? "check"
-                    : screen === "verify"
-                      ? "mail"
-                      : screen === "register"
+                    : screen === "register"
                         ? "user"
                         : "lock"
                 }
@@ -546,110 +496,6 @@ export default function Auth({
               </form>
             )}
 
-            {screen === "verify" && (
-              <form noValidate onSubmit={submit} className="auth-form">
-                <div className="auth-email-pill">
-                  <Symbol name="mail" />
-                  {email}
-                </div>
-                <fieldset className="auth-otp-fieldset">
-                  <legend>Enter your 6-digit code</legend>
-                  <div className="auth-otp">
-                    {otp.map((digit, index) => (
-                      <UiInput
-                        key={index}
-                        ref={(el) => {
-                          otpRefs.current[index] = el;
-                        }}
-                        aria-label={`Digit ${index + 1}`}
-                        aria-invalid={!!errors.otp}
-                        inputMode="numeric"
-                        autoComplete={index === 0 ? "one-time-code" : "off"}
-                        maxLength={1}
-                        value={digit}
-                        onChange={(e) => {
-                          const v = e.target.value.replace(/\D/g, "").slice(-1);
-                          setOtp((old) =>
-                            old.map((x, i) => (i === index ? v : x)),
-                          );
-                          if (v) otpRefs.current[index + 1]?.focus();
-                        }}
-                        onKeyDown={(e) => {
-                          if (e.key === "Backspace" && !digit)
-                            otpRefs.current[index - 1]?.focus();
-                          if (e.key === "ArrowLeft")
-                            otpRefs.current[index - 1]?.focus();
-                          if (e.key === "ArrowRight")
-                            otpRefs.current[index + 1]?.focus();
-                        }}
-                        onPaste={(e) => {
-                          e.preventDefault();
-                          const digits = e.clipboardData
-                            .getData("text")
-                            .replace(/\D/g, "")
-                            .slice(0, 6);
-                          setOtp(
-                            Array.from(
-                              {
-                                length: 6,
-                              },
-                              (_, i) => digits[i] || "",
-                            ),
-                          );
-                          otpRefs.current[Math.min(digits.length, 5)]?.focus();
-                        }}
-                      />
-                    ))}
-                  </div>
-                </fieldset>
-                {errors.otp && (
-                  <p className="auth-error" role="alert">
-                    {errors.otp}
-                  </p>
-                )}
-                <Action
-                  type="submit"
-                  disabled={busy || otp.join("").length !== 6}
-                >
-                  {busy ? "Verifying…" : "Verify Account"}
-                  <Symbol name="arrow" />
-                </Action>
-                <p className="auth-resend">
-                  Didn't receive a code?{" "}
-                  <UiButton
-                    variant="plain"
-                    type="button"
-                    className="auth-text-button"
-                    disabled={seconds > 0}
-                    onClick={async () => {
-                      setBusy(true);
-                      setSeconds(45);
-                      setExpiry(Date.now() + 5 * 60_000);
-                      setErrors({});
-                      setOtp(Array(6).fill(""));
-                      try {
-                        const verification = await authApi.verifyEmail(email);
-                        setNotice(
-                          verification.devCode
-                            ? `Development code: ${verification.devCode}`
-                            : "A new verification code was sent to your email.",
-                        );
-                      } catch {
-                        setErrors({
-                          otp: "Unable to send a new code. Please try again.",
-                        });
-                        setSeconds(0);
-                      } finally {
-                        setBusy(false);
-                      }
-                    }}
-                  >
-                    Resend Code{seconds > 0 ? ` (${seconds}s)` : ""}
-                  </UiButton>
-                </p>
-              </form>
-            )}
-
             {screen === "forgot" && (
               <form noValidate onSubmit={submit} className="auth-form">
                 <Field
@@ -766,7 +612,7 @@ export default function Auth({
                   </strong>
                   <p>
                     {screen === "created"
-                      ? `${email} is now verified.`
+                      ? `${email} can now sign in.`
                       : "Your password reset is complete."}
                   </p>
                 </div>
@@ -841,8 +687,8 @@ export default function Auth({
               <h2>{legal}</h2>
               <p>
                 {legal === "Need a hand?"
-                  ? "Contact the FISHMARKET support team if you need help signing in, verifying your email, or resetting your password."
-                  : "Your account information is used to provide marketplace, order, and support services. Never share your password or verification code with anyone."}
+                  ? "Contact the FISHMARKET support team if you need help signing in or resetting your password."
+                  : "Your account information is used to provide marketplace, order, and support services. Never share your password or password reset code with anyone."}
               </p>
               <Action onClick={() => setLegal(null)}>Got it</Action>
             </div>

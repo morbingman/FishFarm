@@ -80,24 +80,9 @@ export const authVi: Record<string, string> = {
   "Please agree to the terms to continue.":
     "Vui lòng đồng ý với điều khoản để tiếp tục.",
   "Creating your account…": "Đang tạo tài khoản…",
-  "Verify Your Account": "Xác minh tài khoản",
-  "Verify Account": "Xác minh tài khoản",
-  Verification: "Xác minh",
-  "Verifying…": "Đang xác minh…",
-  "We've sent a verification code to your email.":
-    "Chúng tôi đã gửi mã xác minh đến email của bạn.",
-  "Enter your 6-digit code": "Nhập mã gồm 6 chữ số",
-  "· Valid for 5 minutes.": "· Có hiệu lực trong 5 phút.",
-  "Prototype code:": "Mã bản mẫu:",
-  "Preview expired code": "Xem trước mã hết hạn",
-  "That code isn't correct. Please try again.":
-    "Mã không đúng. Vui lòng thử lại.",
-  "This code has expired. Request a new one.":
-    "Mã đã hết hạn. Hãy yêu cầu mã mới.",
-  "A fresh demo code is ready: 123456.": "Mã demo mới đã sẵn sàng: 123456.",
   "You're All Set": "Mọi thứ đã sẵn sàng",
-  "Your account is verified. A world of better trading awaits.":
-    "Tài khoản đã được xác minh. Một thế giới giao dịch tốt hơn đang chờ bạn.",
+  "Your account is ready. A world of better trading awaits.":
+    "Tài khoản đã sẵn sàng. Một thế giới giao dịch tốt hơn đang chờ bạn.",
   "Forgot Your Password?": "Quên mật khẩu?",
   "It happens. Enter your email and we'll send you a reset link.":
     "Chuyện này hay xảy ra. Nhập email, chúng tôi sẽ gửi liên kết đặt lại.",

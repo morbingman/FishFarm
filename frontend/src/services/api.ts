@@ -85,12 +85,6 @@ export const authApi = {
       saveToken(null);
     }
   },
-  verifyEmail(email: string, code?: string) {
-    return api<any>("/auth/verify-email", {
-      method: "POST",
-      body: JSON.stringify({ email, code }),
-    });
-  },
   forgotPassword(email: string) {
     return api<any>("/auth/forgot-password", {
       method: "POST",
