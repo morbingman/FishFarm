@@ -39,7 +39,6 @@ describe('Company listing lifecycle (e2e)', () => {
   let secondAdminEmail: string;
   let userEmail: string;
   const createdCodes: string[] = [];
-  const startedAt = new Date();
 
   beforeAll(async () => {
     app = await createTestApp();
@@ -79,7 +78,12 @@ describe('Company listing lifecycle (e2e)', () => {
     const ids = users.map((user) => user.id);
 
     await prisma.activity.deleteMany({ where: { actorId: { in: ids } } });
-    await prisma.notification.deleteMany({ where: { recipientId: { in: ids } } });
+    await prisma.notification.deleteMany({
+      where: { OR: [
+        { recipientId: { in: ids } },
+        { link: { in: createdCodes.map((code) => `#admin/review/${code}`) } },
+      ] },
+    });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
     await app.close();
   });
@@ -396,13 +400,21 @@ describe('Company listing lifecycle (e2e)', () => {
     );
     expect(entry).toMatchObject({ role: 'Admin' });
 
-    const adminNotification = await prisma.notification.findFirst({
+    const admins = await prisma.user.findMany({
+      where: { email: { in: [adminEmail, secondAdminEmail] } },
+      select: { id: true },
+    });
+    const notifications = await prisma.notification.findMany({
       where: {
-        recipientRole: 'Admin',
+        recipientId: { in: admins.map((admin) => admin.id) },
         titleKey: 'notifications.admin.listingSubmitted.title',
-        createdAt: { gte: startedAt },
+        link: `#admin/review/${listing.id}`,
       },
     });
-    expect(adminNotification).toBeTruthy();
+    expect(notifications).toHaveLength(2);
+    expect(notifications.every((notification) => notification.recipientRole === null)).toBe(true);
+    await prisma.notification.update({ where: { id: notifications[0].id }, data: { readAt: new Date() } });
+    const other = await prisma.notification.findUniqueOrThrow({ where: { id: notifications[1].id } });
+    expect(other.readAt).toBeNull();
   });
 });

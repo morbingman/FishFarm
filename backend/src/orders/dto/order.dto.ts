@@ -3,6 +3,8 @@ import { Type } from 'class-transformer';
 import {
   ArrayMaxSize,
   IsArray,
+  IsISO8601,
+  MinLength,
   IsIn,
   IsInt,
   IsOptional,
@@ -108,6 +110,27 @@ export class CreateOrderDto {
   @IsString()
   @Matches(/^[A-Za-z0-9._:-]{8,80}$/, { message: 'validation.idempotencyKey' })
   idempotencyKey?: string;
+}
+
+export class ShipOrderDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(80)
+  trackingCarrier?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MinLength(1)
+  @MaxLength(100)
+  trackingNumber?: string;
+
+  @ApiPropertyOptional({ format: 'date-time' })
+  @IsOptional()
+  @IsISO8601({ strict: true })
+  estimatedDeliveryAt?: string;
 }
 
 export class ListOrdersDto {

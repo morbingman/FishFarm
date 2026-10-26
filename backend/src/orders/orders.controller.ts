@@ -41,12 +41,27 @@ export class OrdersController {
     return this.orders.getMine(user.id, id);
   }
 
+  @Get('me/orders/:id/tracking')
+  @RequirePermissions('order.view')
+  @ApiOperation({ summary: 'Shipment details and recorded lifecycle events for my order' })
+  tracking(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.orders.trackingMine(user.id, id);
+  }
+
+  @Post('me/orders/:id/confirm-delivery')
+  @HttpCode(HttpStatus.OK)
+  @RequirePermissions('order.view')
+  @ApiOperation({ summary: 'Confirm receipt and complete a delivered order' })
+  confirmDelivery(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
+    return this.orders.confirmDelivery(user, id);
+  }
+
   @Post('me/orders/:id/cancel')
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('order.view')
   @ApiOperation({ summary: 'Cancel an order before it ships; paid amounts are refunded' })
   cancel(@CurrentUser() user: AuthenticatedUser, @Param('id') id: string) {
-    return this.orders.cancelMine(user.id, id);
+    return this.orders.cancelMine(user, id);
   }
 
   @Post('me/orders/:id/pay-balance')

@@ -26,7 +26,7 @@ export class UploadsController {
   constructor(private readonly uploads: UploadsService) {}
 
   @Post()
-  @ApiOperation({ summary: 'Upload an image or document and get its public URL' })
+  @ApiOperation({ summary: 'Upload public catalog media or private resource evidence' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {

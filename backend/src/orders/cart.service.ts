@@ -89,8 +89,11 @@ export class CartService {
    * Cart rows are re-validated at checkout as well as at add time, because price,
    * stock and listing status can change in between.
    */
-  async checkoutLines(userId: string): Promise<CartLine[]> {
-    const lines = await this.lines(userId);
+  async checkoutLines(
+    userId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<CartLine[]> {
+    const lines = await this.lines(userId, db);
     if (lines.length === 0) throw new AppException('cart.empty', HttpStatus.BAD_REQUEST);
     return lines;
   }
@@ -107,8 +110,11 @@ export class CartService {
     };
   }
 
-  private async lines(userId: string): Promise<CartLine[]> {
-    const items = await this.prisma.cartItem.findMany({
+  private async lines(
+    userId: string,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
+  ): Promise<CartLine[]> {
+    const items = await db.cartItem.findMany({
       where: { userId },
       include: CART_INCLUDE,
       orderBy: { createdAt: 'asc' },

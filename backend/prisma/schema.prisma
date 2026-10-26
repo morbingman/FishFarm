@@ -41,23 +41,23 @@ model User {
   createdAt       DateTime   @default(now())
   updatedAt       DateTime   @updatedAt
 
-  sessions              Session[]
-  listings              Listing[]          @relation("ListingCreator")
-  listingHistory        ListingHistory[]
-  notifications         Notification[]
-  activities            Activity[]
-  favorites             Favorite[]
-  cartItems             CartItem[]
-  ordersAsBuyer         Order[]            @relation("OrderBuyer")
-  reviewsWritten        Review[]           @relation("ReviewBuyer")
-  conversationsAsBuyer  Conversation[]     @relation("ConversationBuyer")
-  messages              Message[]
-  disputes              Dispute[]
-  uploads               Upload[]
-  sponsorships          Sponsorship[]
-  batches               GrowOutBatch[]     @relation("BatchCreator")
-  batchUpdates          BatchUpdate[]      @relation("BatchUpdateAuthor")
-  verificationCodes     VerificationCode[]
+  sessions             Session[]
+  listings             Listing[]          @relation("ListingCreator")
+  listingHistory       ListingHistory[]
+  notifications        Notification[]
+  activities           Activity[]
+  favorites            Favorite[]
+  cartItems            CartItem[]
+  ordersAsBuyer        Order[]            @relation("OrderBuyer")
+  reviewsWritten       Review[]           @relation("ReviewBuyer")
+  conversationsAsBuyer Conversation[]     @relation("ConversationBuyer")
+  messages             Message[]
+  disputes             Dispute[]
+  uploads              Upload[]
+  sponsorships         Sponsorship[]
+  batches              GrowOutBatch[]     @relation("BatchCreator")
+  batchUpdates         BatchUpdate[]      @relation("BatchUpdateAuthor")
+  verificationCodes    VerificationCode[]
 
   @@index([role, status])
 }
@@ -358,8 +358,11 @@ model Upload {
   url       String
   mimeType  String
   sizeBytes Int
-  purpose   String // listing_image | dispute_attachment | batch_update | farm_document
+  purpose   String // listing_image | batch_image | dispute_attachment | batch_update | farm_document
   createdAt DateTime @default(now())
+
+  disputeAttachment    DisputeAttachment?
+  verificationDocument VerificationDocument?
 
   @@index([ownerId, createdAt])
 }
@@ -423,16 +426,20 @@ model Order {
   balanceDueAt  DateTime?
 
   // Delivery snapshot.
-  recipientName  String
-  phone          String
-  address        String
-  city           String?
-  province       String?
-  deliveryMethod String?
+  recipientName       String
+  phone               String
+  address             String
+  city                String?
+  province            String?
+  deliveryMethod      String?
+  trackingCarrier     String?
+  trackingNumber      String?
+  estimatedDeliveryAt DateTime?
 
   placedAt    DateTime  @default(now())
   paidAt      DateTime?
   readyAt     DateTime?
+  shippedAt   DateTime?
   deliveredAt DateTime?
   completedAt DateTime?
   cancelledAt DateTime?
@@ -555,6 +562,8 @@ model DisputeAttachment {
   id        String   @id @default(cuid())
   disputeId String
   dispute   Dispute  @relation(fields: [disputeId], references: [id], onDelete: Cascade)
+  uploadId  String?  @unique
+  upload    Upload?  @relation(fields: [uploadId], references: [id], onDelete: Restrict)
   url       String
   createdAt DateTime @default(now())
 }
@@ -608,11 +617,11 @@ model GrowOutBatch {
   code String @unique // "BATCH-1024"
 
   companyId   String
-  company     Company @relation(fields: [companyId], references: [id], onDelete: Restrict)
+  company     Company   @relation(fields: [companyId], references: [id], onDelete: Restrict)
   facilityId  String?
   facility    Facility? @relation(fields: [facilityId], references: [id], onDelete: SetNull)
   createdById String?
-  createdBy   User?    @relation("BatchCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?     @relation("BatchCreator", fields: [createdById], references: [id], onDelete: SetNull)
 
   title       String
   species     String
@@ -629,7 +638,8 @@ model GrowOutBatch {
   stockCount             Int
   shareUnitType          ShareUnitType
   shareUnit              String // "5 kg" or "4 fish"
-  expectedHarvestWeightG Int? // required when shareUnitType = weight
+  shareQuantity          Int? // grams or fish per share; required for newly published batches
+  expectedHarvestWeightG Int? // total expected batch biomass, required for weight shares
   totalShares            Int
   sharesAvailable        Int
 
@@ -883,6 +893,8 @@ model VerificationDocument {
   verificationId String
   verification   FarmVerification @relation(fields: [verificationId], references: [id], onDelete: Cascade)
   type           String
+  uploadId       String?          @unique
+  upload         Upload?          @relation(fields: [uploadId], references: [id], onDelete: Restrict)
   url            String
   uploadedAt     DateTime         @default(now())
 

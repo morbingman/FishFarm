@@ -143,9 +143,10 @@ id  to        # recipient email OR role broadcast ("Admin")
 type: success|error|system|status|approval|reminder
 title body link   at   read: bool
 ```
-Filtering rule already expressed in `notifsFor()`: a user sees notifications addressed to their
-email **or** to their role. Respect `prefs` when creating (`notify()` skips muted categories).
-Cap: 200 most recent per the demo.
+Filtering rule in the demo `notifsFor()` accepts email or role. Backend notifications now fan out
+as one `recipientId` row per active Admin instead of a shared role row, so read state is independent.
+Direct recipient takes precedence over role; `notify()` skips muted status/system/reminder categories.
+Cap: 200 most recent per the demo. Notification read/delete API routes below remain proposed.
 
 ### 3.5 Activity (platform audit log, admin-visible)
 ```
@@ -259,13 +260,24 @@ Favorites
 Cart & checkout (User) — implemented as `/v1/me/cart` and `/v1/orders`
 - `GET /me/cart`, `POST /me/cart/items`, `PATCH|DELETE /me/cart/items/{listingId}`, `DELETE /me/cart`
 - `POST /orders` — from cart or explicit items; honours the listing's `saleMode`. `in_stock` takes
-  full payment; `pre_order` takes the deposit and sets `balanceDueAt`. Idempotent by
-  `idempotencyKey`.
+  full payment; `pre_order` takes the deposit. Mark-ready opens the seven-day `balanceDueAt` window.
+  Idempotent by `idempotencyKey` scoped to the buyer; concurrent retries reserve and charge once.
+  New keys are `order:<buyerId>:<clientKey>:initial`.
 - `POST /me/orders/{id}/pay-balance` (pre-order balance; creates the `order_balance` payment)
 - `GET /me/orders` (optional `status` filter), `GET /me/orders/{id}`
 - `POST /me/orders/{id}/cancel` (refunds payments and returns stock)
-- Not yet built: `/orders/{id}/tracking`, `/orders/{id}/confirm-delivery` (covered by the company
-  lifecycle transitions for now), review and dispute creation.
+- `GET /me/orders/{id}/tracking` — persisted shipment fields and recorded lifecycle events only.
+- `POST /me/orders/{id}/confirm-delivery` — idempotent delivered → completed; active disputes block completion.
+- `POST /me/orders/{id}/dispute`, `GET /me/disputes`, `GET /me/disputes/{id}` — implemented,
+  owner-scoped, one dispute per order. `not_received` is eligible after shipment; other reasons
+  require delivery/completion. Description 15–2000 trimmed characters; max three owned, unused
+  `dispute_attachment` uploads. Images/PDF and the configured default 10 MB limit apply.
+- Private evidence: `GET /me/disputes/{id}/attachments/{attachmentId}/content`; authorized Admin
+  equivalent under `/admin/disputes`. Legacy unlinked URLs return 404; no public static access.
+- Admin disputes: `GET /admin/disputes`, `GET /admin/disputes/{id}`,
+  `POST /admin/disputes/{id}/start-review | resolve | reject`. Final resolution is nonblank and
+  records `resolvedAt`; resolution does not automatically refund money.
+- Reviews remain unimplemented.
 
 Messaging
 - `GET  /me/conversations`, `GET /conversations/{id}/messages`, `POST /conversations/{id}/messages`
@@ -460,7 +472,8 @@ stockingDate expectedHarvestDate
 stockCount          # animals stocked
 shareUnitType       # weight | count
 shareUnit           # what ONE share delivers at harvest, e.g. "5 kg" or "4 fish"
-expectedHarvestWeightG  # required when shareUnitType = weight
+shareQuantity       # grams or fish delivered per share; required for new batches
+expectedHarvestWeightG  # total expected batch biomass, required for weight shares
 totalShares sharesAvailable
 packagePricePerShare # FULL care cost for one share, VND integer đồng
 costBreakdown: [{ category, label, amount, allocation, note }]
@@ -590,7 +603,18 @@ Rules:
 - **No cash returns.** Settlement is always fish/product or a refund of money paid — never a profit
   above the amount paid.
 
-### 11.6 API surface (proposed)
+### 11.6 API surface
+
+Implemented on 2026-10-23: public batch list/detail/updates; shared company batch draft CRUD,
+partial draft edits, publish/submit/updates; Admin pending queue/approve/reject/cancel; company
+facility create/list/detail and compliance submission; Admin inspection and both authorized private
+compliance-document routes. Draft deletion requires no sponsorship/update/harvest; cancellation
+requires draft/pending/open and no sponsorship until refund support exists. Opening and public
+visibility require current approved compliance with controlled documents. Public views omit private
+URLs, reviewer data and internal notes.
+
+Sponsorship reservation/payment, tranche releases, harvest, delivery and settlement routes in the
+following proposal remain unimplemented. No frontend integration is part of this checkpoint.
 
 Public / User
 - `GET  /batches` — filters: `species, region, status=open, harvestBefore, priceMax`; pagination
@@ -656,7 +680,12 @@ harvest published, ready for delivery, refund issued, batch cancelled.
   (ornamental fish).
 - `shareUnit` is the promised delivery per share (`5 kg` or `4 fish`); `expectedHarvestWeightG` is
   required for weight-based batches.
-- `totalShares` is derived from stock and validated on publish (no overselling).
+- `totalShares` is `floor(stockCount / shareQuantity)` for count shares or
+  `floor(expectedHarvestWeightG / shareQuantity)` for weight shares. `shareQuantity` is fish or
+  grams per share. The backend derives `shareUnit` and validates consistency on publish.
+- Demo batch source uses 40 × 5 kg with 200,000 g total biomass. Existing seed compliance contains
+  legacy URL-only documents, not controlled uploads; its open-state batch is intentionally hidden
+  by the public API until controlled compliance is submitted and approved.
 
 **Shortfall**
 - Default: **pro-rata refund** of the undelivered portion, computed as
@@ -693,9 +722,9 @@ Every batch's `costBreakdown` uses these categories so sponsors can compare pack
 
 Rules:
 - Reconciliation on publish:
-  `sum(amortised batch_total lines) + sum(per_share lines) == packagePricePerShare * totalShares`.
-- Costs may only be edited while the batch is `draft`; after `open`, cost changes require the
-  batch to return to `pending_review`.
+  `sum(batch_total amounts) + totalShares * sum(per_share amounts) == packagePricePerShare * totalShares`.
+- Costs may only be edited while the batch is `draft`. Returning a published batch to review for
+  financial edits is not implemented in the current management API.
 - `costBreakdown` is shown to sponsors in full; no hidden fees.
 
 ### 11.11 Facility compliance

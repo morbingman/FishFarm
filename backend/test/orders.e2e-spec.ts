@@ -54,7 +54,7 @@ describe('Cart and orders (e2e)', () => {
     preOrderCode = await createListing({
       name: 'E2E Pre-order Koi',
       price: 2_000_000,
-      quantity: 2,
+      quantity: 20,
       saleMode: 'pre_order',
       depositPct: 25,
       expectedReadyDate: new Date(Date.now() + 30 * DAY),
@@ -73,7 +73,13 @@ describe('Cart and orders (e2e)', () => {
       await prisma.order.deleteMany({ where: { code: { in: createdCodes } } });
     }
     await prisma.cartItem.deleteMany({ where: { userId: { in: ids } } });
-    await prisma.notification.deleteMany({ where: { recipientId: { in: ids } } });
+    await prisma.notification.deleteMany({
+      where: { OR: [
+        { recipientId: { in: ids } },
+        { link: { in: createdCodes.map((code) => `#company/orders/${code}`) } },
+      ] },
+    });
+    await prisma.activity.deleteMany({ where: { actorId: { in: ids } } });
     await prisma.listing.deleteMany({ where: { code: { in: createdListingCodes } } });
     await prisma.user.deleteMany({ where: { id: { in: ids } } });
     await app.close();
@@ -356,6 +362,94 @@ describe('Cart and orders (e2e)', () => {
     expect(cancelledAgain.body.code).toBe('order.invalidTransition');
   });
 
+  it('records shipment data and lets the buyer confirm delivery idempotently', async () => {
+    const order = await placeOrder(buyerToken, {
+      items: [{ listingId: inStockCode, quantity: 1 }],
+    });
+    await request(app.getHttpServer())
+      .post(`/v1/company/orders/${order.id}/mark-ready`)
+      .set(auth(adminToken))
+      .expect(200);
+    const estimate = new Date(Date.now() + 2 * DAY).toISOString();
+    await request(app.getHttpServer())
+      .post(`/v1/company/orders/${order.id}/ship`)
+      .set(auth(adminToken))
+      .send({ trackingCarrier: '  Viettel Post  ', trackingNumber: ' VTP-123 ', estimatedDeliveryAt: estimate })
+      .expect(200);
+
+    const tracking = await request(app.getHttpServer())
+      .get(`/v1/me/orders/${order.id}/tracking`)
+      .set(auth(buyerToken))
+      .expect(200);
+    expect(tracking.body).toMatchObject({
+      id: order.id,
+      status: 'shipped',
+      carrier: 'Viettel Post',
+      trackingNumber: 'VTP-123',
+      estimatedDeliveryAt: estimate,
+    });
+    expect(tracking.body.events.map((event: { status: string }) => event.status)).toEqual([
+      'placed', 'paid', 'ready', 'shipped',
+    ]);
+    await request(app.getHttpServer())
+      .get(`/v1/me/orders/${order.id}/tracking`)
+      .set(auth(otherBuyerToken))
+      .expect(404);
+
+    await request(app.getHttpServer())
+      .post(`/v1/company/orders/${order.id}/deliver`)
+      .set(auth(adminToken))
+      .expect(200);
+    const confirmed = await request(app.getHttpServer())
+      .post(`/v1/me/orders/${order.id}/confirm-delivery`)
+      .set(auth(buyerToken))
+      .expect(200);
+    expect(confirmed.body.status).toBe('completed');
+    const replay = await request(app.getHttpServer())
+      .post(`/v1/me/orders/${order.id}/confirm-delivery`)
+      .set(auth(buyerToken))
+      .expect(200);
+    expect(replay.body.completedAt).toBe(confirmed.body.completedAt);
+  });
+
+  it('scopes idempotency keys by buyer and serializes repeated checkout', async () => {
+    const key = `shared-idem-${Date.now()}`;
+    const body = {
+      recipientName: 'E2E Buyer', phone: '+84 90 000 0000', address: 'HQ',
+      paymentMethod: 'bank_card', items: [{ listingId: inStockCode, quantity: 1 }],
+      idempotencyKey: key,
+    };
+    const [first, retry] = await Promise.all([
+      request(app.getHttpServer()).post('/v1/orders').set(auth(buyerToken)).send(body),
+      request(app.getHttpServer()).post('/v1/orders').set(auth(buyerToken)).send(body),
+    ]);
+    expect(first.status).toBe(201);
+    expect(retry.status).toBe(201);
+    expect(first.body.id).toBe(retry.body.id);
+    createdCodes.push(first.body.id);
+    expect(await prisma.activity.count({ where: { action: 'Placed order', target: first.body.id as string } })).toBe(1);
+
+    const other = await request(app.getHttpServer())
+      .post('/v1/orders')
+      .set(auth(otherBuyerToken))
+      .send(body)
+      .expect(201);
+    expect(other.body.id).not.toBe(first.body.id);
+    createdCodes.push(other.body.id);
+  });
+
+  it('restores stock only once under concurrent cancellation', async () => {
+    const before = await prisma.listingDraft.findFirstOrThrow({ where: { listing: { code: inStockCode } } });
+    const order = await placeOrder(buyerToken, { items: [{ listingId: inStockCode, quantity: 3 }] });
+    const responses = await Promise.all([
+      request(app.getHttpServer()).post(`/v1/me/orders/${order.id}/cancel`).set(auth(buyerToken)),
+      request(app.getHttpServer()).post(`/v1/me/orders/${order.id}/cancel`).set(auth(buyerToken)),
+    ]);
+    expect(responses.map((response) => response.status).sort((a, b) => a - b)).toEqual([200, 409]);
+    const after = await prisma.listingDraft.findFirstOrThrow({ where: { listing: { code: inStockCode } } });
+    expect(after.quantity).toBe(before.quantity);
+  });
+
   // ---------------------------------------------------------------------------
   // Pre-order orders
   // ---------------------------------------------------------------------------
@@ -391,11 +485,18 @@ describe('Cart and orders (e2e)', () => {
     expect(shippedEarly.status).toBe(409);
     expect(shippedEarly.body.code).toBe('order.balanceOutstanding');
 
-    const paid = await request(app.getHttpServer())
-      .post(`/v1/me/orders/${order.id}/pay-balance`)
-      .set(auth(buyerToken))
-      .send({ paymentMethod: 'bank_transfer' })
-      .expect(200);
+    const paidResponses = await Promise.all([
+      request(app.getHttpServer())
+        .post(`/v1/me/orders/${order.id}/pay-balance`)
+        .set(auth(buyerToken))
+        .send({ paymentMethod: 'bank_transfer' }),
+      request(app.getHttpServer())
+        .post(`/v1/me/orders/${order.id}/pay-balance`)
+        .set(auth(buyerToken))
+        .send({ paymentMethod: 'bank_transfer' }),
+    ]);
+    expect(paidResponses.map((response) => response.status)).toEqual([200, 200]);
+    const paid = paidResponses[0];
     expect(paid.body).toMatchObject({ paymentStatus: 'paid', balanceDueAt: null });
     expect(paid.body.payments).toHaveLength(2);
 
@@ -404,6 +505,28 @@ describe('Cart and orders (e2e)', () => {
       .set(auth(adminToken))
       .expect(200);
     expect(shipped.body.status).toBe('shipped');
+  });
+
+  it('refunds an expired pre-order instead of accepting the balance', async () => {
+    const order = await placeOrder(buyerToken, {
+      items: [{ listingId: preOrderCode, quantity: 1 }],
+    });
+    await request(app.getHttpServer())
+      .post(`/v1/company/orders/${order.id}/mark-ready`)
+      .set(auth(adminToken))
+      .expect(200);
+    await prisma.order.update({
+      where: { code: order.id },
+      data: { balanceDueAt: new Date(Date.now() - DAY) },
+    });
+    const expired = await request(app.getHttpServer())
+      .post(`/v1/me/orders/${order.id}/pay-balance`)
+      .set(auth(buyerToken))
+      .send({ paymentMethod: 'bank_card' })
+      .expect(200);
+    expect(expired.body).toMatchObject({ status: 'refunded', paymentStatus: 'refunded' });
+    expect(expired.body.payments).toHaveLength(1);
+    expect(expired.body.payments[0].state).toBe('refunded');
   });
 
   it('rejects a balance payment on a non-pre-order', async () => {

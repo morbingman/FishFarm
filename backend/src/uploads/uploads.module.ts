@@ -12,6 +12,7 @@ import {
   resolveUploadDir,
 } from './upload.config.js';
 import { UploadsController } from './uploads.controller.js';
+import { PrivateFilesService } from './private-files.service.js';
 import { UploadsService } from './uploads.service.js';
 
 @Module({
@@ -51,6 +52,7 @@ import { UploadsService } from './uploads.service.js';
     }),
   ],
   controllers: [UploadsController],
-  providers: [UploadsService],
+  providers: [UploadsService, PrivateFilesService],
+  exports: [PrivateFilesService],
 })
 export class UploadsModule {}

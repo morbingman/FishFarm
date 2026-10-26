@@ -1,6 +1,7 @@
 import { HttpStatus, Injectable } from '@nestjs/common';
 import type { AuthenticatedUser } from '../auth/types.js';
 import { AppException } from '../common/exceptions/app.exception.js';
+import { notify } from '../common/notifications.js';
 import { CompanyService } from '../company/company.service.js';
 import { Prisma } from '../generated/prisma/client.js';
 import {
@@ -8,10 +9,8 @@ import {
   ListingStatus,
   NotificationType,
   SaleMode,
-  type UserRole,
 } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import { normalizePrefs } from '../users/users.service.js';
 import { UPLOAD_URL_PREFIX } from '../uploads/upload.config.js';
 import type { AdminQueueTab, CompanyListingFilter } from './dto/list-listings.dto.js';
 import type {
@@ -30,16 +29,6 @@ const LISTING_INCLUDE = {
 
 type ListingRecord = Prisma.ListingGetPayload<{ include: typeof LISTING_INCLUDE }>;
 
-type NotificationInput = {
-  userId?: string;
-  role?: UserRole;
-  type: NotificationType;
-  titleKey: string;
-  titleParams?: Record<string, string | number | boolean>;
-  bodyKey: string;
-  bodyParams?: Record<string, string | number | boolean>;
-  link?: string;
-};
 
 /**
  * Catalog management for the company's Admins.
@@ -295,7 +284,7 @@ export class ListingsService {
         include: LISTING_INCLUDE,
       });
 
-      await this.notify(tx, {
+      await notify(tx, {
         role: 'Admin',
         type: NotificationType.status,
         titleKey: resubmit
@@ -843,36 +832,6 @@ export class ListingsService {
         ...(entry.note ? { note: entry.note } : {}),
       })),
     };
-  }
-
-  private async notify(tx: Prisma.TransactionClient, input: NotificationInput): Promise<void> {
-    if (input.userId) {
-      const user = await tx.user.findUnique({
-        where: { id: input.userId },
-        select: { prefs: true },
-      });
-      const prefs = normalizePrefs(user?.prefs);
-      if (
-        (input.type === NotificationType.system && !prefs.system) ||
-        (input.type === NotificationType.reminder && !prefs.reminders) ||
-        (input.type === NotificationType.status && !prefs.status)
-      ) {
-        return;
-      }
-    }
-
-    await tx.notification.create({
-      data: {
-        ...(input.userId ? { recipientId: input.userId } : {}),
-        ...(input.role ? { recipientRole: input.role } : {}),
-        type: input.type,
-        titleKey: input.titleKey,
-        titleParams: input.titleParams as Prisma.InputJsonValue | undefined,
-        bodyKey: input.bodyKey,
-        bodyParams: input.bodyParams as Prisma.InputJsonValue | undefined,
-        link: input.link,
-      },
-    });
   }
 
   private async log(

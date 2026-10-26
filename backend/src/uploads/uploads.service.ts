@@ -17,6 +17,7 @@ export const UPLOAD_PURPOSES = [
   'listing_image',
   'dispute_attachment',
   'batch_update',
+  'batch_image',
   'farm_document',
 ] as const;
 
@@ -29,6 +30,7 @@ const PURPOSE_ACCESS: Record<UploadPurpose, { roles: UserRole[]; mime: Set<strin
   listing_image: { roles: ['Admin'], mime: IMAGE_MIME },
   dispute_attachment: { roles: ['User'], mime: DOCUMENT_MIME },
   batch_update: { roles: ['Admin'], mime: IMAGE_MIME },
+  batch_image: { roles: ['Admin'], mime: IMAGE_MIME },
   farm_document: { roles: ['Admin'], mime: DOCUMENT_MIME },
 };
 

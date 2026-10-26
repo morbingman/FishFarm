@@ -4,7 +4,7 @@ import { IsOptional, IsString, MaxLength, MinLength } from 'class-validator';
 import { CurrentUser } from '../auth/decorators/current-user.decorator.js';
 import { RequirePermissions } from '../auth/decorators/require-permissions.decorator.js';
 import type { AuthenticatedUser } from '../auth/types.js';
-import { ListOrdersDto } from './dto/order.dto.js';
+import { ListOrdersDto, ShipOrderDto } from './dto/order.dto.js';
 import { OrdersService } from './orders.service.js';
 
 export class CancelOrderDto {
@@ -57,8 +57,12 @@ export class CompanyOrdersController {
   @HttpCode(HttpStatus.OK)
   @RequirePermissions('order.fulfill')
   @ApiOperation({ summary: 'Mark a ready order as shipped' })
-  ship(@CurrentUser() admin: AuthenticatedUser, @Param('id') id: string) {
-    return this.orders.ship(admin, id);
+  ship(
+    @CurrentUser() admin: AuthenticatedUser,
+    @Param('id') id: string,
+    @Body() dto: ShipOrderDto,
+  ) {
+    return this.orders.ship(admin, id, dto);
   }
 
   @Post(':id/deliver')

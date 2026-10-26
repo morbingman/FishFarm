@@ -3,8 +3,11 @@ import { ConfigModule } from '@nestjs/config';
 import { AppController } from './app.controller.js';
 import { AppService } from './app.service.js';
 import { AuthModule } from './auth/auth.module.js';
+import { BatchesModule } from './batches/batches.module.js';
 import { CompanyModule } from './company/company.module.js';
 import { validateEnv } from './config/env.validation.js';
+import { DisputesModule } from './disputes/disputes.module.js';
+import { FacilitiesModule } from './facilities/facilities.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ListingsModule } from './listings/listings.module.js';
 import { MarketplaceModule } from './marketplace/marketplace.module.js';
@@ -23,6 +26,9 @@ import { UsersModule } from './users/users.module.js';
     ListingsModule,
     MarketplaceModule,
     OrdersModule,
+    DisputesModule,
+    FacilitiesModule,
+    BatchesModule,
     UploadsModule,
     HealthModule,
   ],

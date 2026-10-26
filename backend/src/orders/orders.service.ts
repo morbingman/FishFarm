@@ -2,6 +2,7 @@ import { HttpStatus, Injectable, Logger } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { AuthenticatedUser } from '../auth/types.js';
 import { AppException } from '../common/exceptions/app.exception.js';
+import { logActivity, type ActivityActor } from '../common/activity.js';
 import { notify } from '../common/notifications.js';
 import { CompanyService } from '../company/company.service.js';
 import type { Prisma } from '../generated/prisma/client.js';
@@ -16,7 +17,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service.js';
 import type { CartLine } from './cart.service.js';
 import { CartService } from './cart.service.js';
-import type { CreateOrderDto, OrderFilter } from './dto/order.dto.js';
+import type { CreateOrderDto, OrderFilter, ShipOrderDto } from './dto/order.dto.js';
 
 /** Balance is due this many days after the company marks a pre-order ready. */
 export const BALANCE_WINDOW_DAYS = 7;
@@ -53,36 +54,44 @@ export class OrdersService {
   // -------------------------------------------------------------------------
 
   async create(buyer: AuthenticatedUser, dto: CreateOrderDto) {
-    if (dto.idempotencyKey) {
-      const replay = await this.prisma.payment.findUnique({
-        where: { idempotencyKey: `order:${dto.idempotencyKey}:initial` },
-        include: { order: { include: ORDER_INCLUDE } },
-      });
-      if (replay?.order) return this.toView(replay.order);
-    }
-
-    const lines = dto.items?.length
-      ? await this.linesFromInput(dto.items)
-      : await this.cart.checkoutLines(buyer.id);
-
-    const saleModes = [...new Set(lines.map((line) => line.saleMode))];
-    if (saleModes.length > 1) {
-      throw new AppException('order.mixedSaleModes', HttpStatus.BAD_REQUEST);
-    }
-    const saleMode = saleModes[0] === SaleMode.pre_order ? SaleMode.pre_order : SaleMode.in_stock;
-
-    const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
-    const shippingFee = dto.shippingFee ?? 0;
-    const total = subtotal + shippingFee;
-    const depositAmount =
-      saleMode === SaleMode.pre_order
-        ? Math.round((total * this.depositPct(lines)) / 100)
-        : null;
-    const balanceAmount = depositAmount === null ? null : total - depositAmount;
-
     const company = await this.company.current();
+    const key = dto.idempotencyKey
+      ? `order:${buyer.id}:${dto.idempotencyKey}:initial`
+      : `order:${randomUUID()}:initial`;
     const order = await this.prisma.$transaction(async (tx) => {
-      // Reserve stock first; a failed reservation aborts the whole transaction.
+      await tx.$queryRaw<Array<{ locked: number }>>`
+        SELECT 1::int AS "locked"
+        FROM pg_advisory_xact_lock(hashtextextended(${`checkout:${buyer.id}`}, 0))
+      `;
+      if (dto.idempotencyKey) {
+        const replay = await tx.payment.findUnique({
+          where: { idempotencyKey: key },
+          include: { order: { include: ORDER_INCLUDE } },
+        });
+        if (replay?.order?.buyerId === buyer.id) return replay.order;
+        const legacy = await tx.payment.findUnique({
+          where: { idempotencyKey: `order:${dto.idempotencyKey}:initial` },
+          include: { order: { include: ORDER_INCLUDE } },
+        });
+        if (legacy?.order?.buyerId === buyer.id) return legacy.order;
+      }
+      const lines = dto.items?.length
+        ? await this.linesFromInput(dto.items, tx)
+        : await this.cart.checkoutLines(buyer.id, tx);
+      const saleModes = [...new Set(lines.map((line) => line.saleMode))];
+      if (saleModes.length > 1) {
+        throw new AppException('order.mixedSaleModes', HttpStatus.BAD_REQUEST);
+      }
+      const saleMode = saleModes[0] === SaleMode.pre_order ? SaleMode.pre_order : SaleMode.in_stock;
+      const subtotal = lines.reduce((sum, line) => sum + line.lineTotal, 0);
+      const shippingFee = dto.shippingFee ?? 0;
+      const total = subtotal + shippingFee;
+      if (!Number.isSafeInteger(total) || total > 2_147_483_647) {
+        throw new AppException('order.invalidTotal', HttpStatus.BAD_REQUEST);
+      }
+      const depositAmount = saleMode === SaleMode.pre_order
+        ? Math.round((total * this.depositPct(lines)) / 100) : null;
+      const balanceAmount = depositAmount === null ? null : total - depositAmount;
       for (const line of lines) {
         await this.reserveStock(tx, line);
       }
@@ -122,9 +131,7 @@ export class OrdersService {
               purpose:
                 depositAmount === null ? PaymentPurpose.order_full : PaymentPurpose.order_deposit,
               method: dto.paymentMethod,
-              idempotencyKey: dto.idempotencyKey
-                ? `order:${dto.idempotencyKey}:initial`
-                : `order:${randomUUID()}:initial`,
+              idempotencyKey: key,
               amount: depositAmount ?? total,
               state: PaymentState.paid,
               paidAt: new Date(),
@@ -157,6 +164,7 @@ export class OrdersService {
         link: `#marketplace/orders/${created.code}`,
       });
 
+      await logActivity(tx, buyer, 'Placed order', created.code, `#company/orders/${created.code}`);
       return created;
     });
 
@@ -191,67 +199,95 @@ export class OrdersService {
     return this.toView(order);
   }
 
-  async cancelMine(userId: string, id: string) {
-    const order = await this.findOrder(id);
-    if (order.buyerId !== userId) {
-      throw new AppException('order.notFound', HttpStatus.NOT_FOUND);
-    }
-    return this.toView(await this.cancel(userId, order, 'Cancelled by customer'));
-  }
-
-  /** Pays the outstanding balance on a pre-order that the company marked ready. */
-  async payBalance(user: AuthenticatedUser, id: string, method: CreateOrderDto['paymentMethod']) {
+  async cancelMine(user: AuthenticatedUser, id: string) {
     const order = await this.findOrder(id);
     if (order.buyerId !== user.id) {
       throw new AppException('order.notFound', HttpStatus.NOT_FOUND);
     }
-    if (order.saleMode !== SaleMode.pre_order) {
+    return this.toView(await this.cancel(user, order.id, 'Cancelled by customer'));
+  }
+
+  async trackingMine(userId: string, id: string) {
+    const order = await this.findOrder(id);
+    if (order.buyerId !== userId) throw new AppException('order.notFound', HttpStatus.NOT_FOUND);
+    return this.trackingView(order);
+  }
+
+  async confirmDelivery(user: AuthenticatedUser, id: string) {
+    const order = await this.findOrder(id);
+    if (order.buyerId !== user.id) throw new AppException('order.notFound', HttpStatus.NOT_FOUND);
+    if (order.status === OrderStatus.completed) return this.toView(order);
+    if (order.status !== OrderStatus.delivered) {
+      throw this.invalidTransition(order.status, 'confirm-delivery');
+    }
+    return this.toView(await this.completeLocked(user, order.id));
+  }
+
+  /** Pays the outstanding balance on a pre-order that the company marked ready. */
+  async payBalance(user: AuthenticatedUser, id: string, method: CreateOrderDto['paymentMethod']) {
+    const beforeExpiry = await this.findOrder(id);
+    if (beforeExpiry.buyerId !== user.id) throw new AppException('order.notFound', HttpStatus.NOT_FOUND);
+    if (beforeExpiry.saleMode !== SaleMode.pre_order) {
       throw new AppException('order.notPreOrder', HttpStatus.CONFLICT);
     }
-    if (order.paymentStatus === OrderPaymentStatus.paid) {
-      throw new AppException('order.balanceAlreadyPaid', HttpStatus.CONFLICT);
-    }
+    await this.expireUnpaidBalances(id);
+    const found = await this.findOrder(id);
+    if (found.status === OrderStatus.refunded) return this.toView(found);
 
     const updated = await this.prisma.$transaction(async (tx) => {
-      await tx.payment.create({
-        data: {
+      const order = await this.lockOrder(tx, found.id);
+      if (order.buyerId !== user.id) throw new AppException('order.notFound', HttpStatus.NOT_FOUND);
+      if (order.paymentStatus === OrderPaymentStatus.paid) {
+        return this.findOrderTx(tx, order.id);
+      }
+      const now = new Date();
+      if (
+        order.status !== OrderStatus.ready ||
+        order.paymentStatus !== OrderPaymentStatus.balance_due ||
+        !order.balanceDueAt
+      ) {
+        throw new AppException('order.balanceNotDue', HttpStatus.CONFLICT);
+      }
+      if (order.balanceDueAt <= now) {
+        return this.cancelLocked(tx, user, order.id, 'Balance not paid within the deadline');
+      }
+
+      await tx.payment.upsert({
+        where: { idempotencyKey: `order:${order.code}:balance` },
+        create: {
           orderId: order.id,
           purpose: PaymentPurpose.order_balance,
           method,
           idempotencyKey: `order:${order.code}:balance`,
           amount: order.balanceAmount ?? 0,
           state: PaymentState.paid,
-          paidAt: new Date(),
+          paidAt: now,
         },
+        update: {},
       });
-
-      const next = await tx.order.update({
-        where: { id: order.id },
-        data: {
-          paymentStatus: OrderPaymentStatus.paid,
-          balanceDueAt: null,
+      const claimed = await tx.order.updateMany({
+        where: {
+          id: order.id,
+          status: OrderStatus.ready,
+          paymentStatus: OrderPaymentStatus.balance_due,
+          balanceDueAt: { gt: now },
         },
-        include: ORDER_INCLUDE,
+        data: { paymentStatus: OrderPaymentStatus.paid, balanceDueAt: null },
       });
+      if (claimed.count !== 1) throw new AppException('order.balanceNotDue', HttpStatus.CONFLICT);
 
       await notify(tx, {
-        userId: order.buyerId,
-        type: NotificationType.success,
-        titleKey: 'notifications.buyer.balancePaid.title',
-        titleParams: { code: order.code },
-        bodyKey: 'notifications.buyer.balancePaid.body',
-        link: `#marketplace/orders/${order.code}`,
+        userId: order.buyerId, type: NotificationType.success,
+        titleKey: 'notifications.buyer.balancePaid.title', titleParams: { code: order.code },
+        bodyKey: 'notifications.buyer.balancePaid.body', link: `#marketplace/orders/${order.code}`,
       });
       await notify(tx, {
-        role: 'Admin',
-        type: NotificationType.status,
-        titleKey: 'notifications.admin.balancePaid.title',
-        titleParams: { code: order.code },
-        bodyKey: 'notifications.admin.balancePaid.body',
-        link: `#company/orders/${order.code}`,
+        role: 'Admin', type: NotificationType.status,
+        titleKey: 'notifications.admin.balancePaid.title', titleParams: { code: order.code },
+        bodyKey: 'notifications.admin.balancePaid.body', link: `#company/orders/${order.code}`,
       });
-
-      return next;
+      await logActivity(tx, user, 'Paid order balance', order.code, `#marketplace/orders/${order.code}`);
+      return this.findOrderTx(tx, order.id);
     });
 
     return this.toView(updated);
@@ -283,29 +319,27 @@ export class OrdersService {
   }
 
   async markReady(admin: AuthenticatedUser, id: string) {
-    const order = await this.findOrder(id);
-    if (order.status !== OrderStatus.paid) {
-      throw this.invalidTransition(order.status, 'mark-ready');
-    }
-
-    const preOrder = order.saleMode === SaleMode.pre_order;
-    const balanceDueAt = preOrder
-      ? new Date(Date.now() + BALANCE_WINDOW_DAYS * 86_400_000)
-      : null;
-
+    const found = await this.findOrder(id);
     const updated = await this.prisma.$transaction(async (tx) => {
-      const next = await tx.order.update({
+      const order = await this.lockOrder(tx, found.id);
+      if (order.status !== OrderStatus.paid) {
+        throw this.invalidTransition(order.status, 'mark-ready');
+      }
+      const preOrder = order.saleMode === SaleMode.pre_order;
+      const now = new Date();
+      const balanceDueAt = preOrder
+        ? new Date(now.getTime() + BALANCE_WINDOW_DAYS * 86_400_000)
+        : null;
+      await tx.order.update({
         where: { id: order.id },
         data: {
           status: OrderStatus.ready,
-          readyAt: new Date(),
+          readyAt: now,
           ...(preOrder
             ? { paymentStatus: OrderPaymentStatus.balance_due, balanceDueAt }
             : {}),
         },
-        include: ORDER_INCLUDE,
       });
-
       await notify(tx, {
         userId: order.buyerId,
         type: NotificationType.status,
@@ -319,73 +353,105 @@ export class OrdersService {
         bodyParams: { days: BALANCE_WINDOW_DAYS, balance: order.balanceAmount ?? 0 },
         link: `#marketplace/orders/${order.code}`,
       });
-
-      return next;
+      await logActivity(tx, admin, 'Marked order ready', order.code, `#company/orders/${order.code}`);
+      return this.findOrderTx(tx, order.id);
     });
-
     return this.toView(updated);
   }
 
-  async ship(admin: AuthenticatedUser, id: string) {
-    const order = await this.findOrder(id);
-    if (order.status !== OrderStatus.ready) {
-      throw this.invalidTransition(order.status, 'ship');
-    }
-    if (
-      order.saleMode === SaleMode.pre_order &&
-      order.paymentStatus !== OrderPaymentStatus.paid
-    ) {
-      throw new AppException('order.balanceOutstanding', HttpStatus.CONFLICT);
-    }
-
-    return this.toView(
-      await this.prisma.order.update({
+  async ship(admin: AuthenticatedUser, id: string, dto: ShipOrderDto = {}) {
+    const found = await this.findOrder(id);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await this.lockOrder(tx, found.id);
+      if (order.status !== OrderStatus.ready) {
+        throw this.invalidTransition(order.status, 'ship');
+      }
+      if (order.saleMode === SaleMode.pre_order && order.paymentStatus !== OrderPaymentStatus.paid) {
+        throw new AppException('order.balanceOutstanding', HttpStatus.CONFLICT);
+      }
+      const trackingCarrier = this.optionalTrimmed(dto.trackingCarrier);
+      const trackingNumber = this.optionalTrimmed(dto.trackingNumber);
+      const now = new Date();
+      await tx.order.update({
         where: { id: order.id },
-        data: { status: OrderStatus.shipped },
-        include: ORDER_INCLUDE,
-      }),
-    );
+        data: {
+          status: OrderStatus.shipped,
+          shippedAt: now,
+          trackingCarrier,
+          trackingNumber,
+          estimatedDeliveryAt: dto.estimatedDeliveryAt
+            ? new Date(dto.estimatedDeliveryAt)
+            : null,
+        },
+      });
+      await notify(tx, {
+        userId: order.buyerId,
+        type: NotificationType.status,
+        titleKey: 'notifications.buyer.orderShipped.title',
+        titleParams: { code: order.code },
+        bodyKey: 'notifications.buyer.orderShipped.body',
+        link: `#marketplace/orders/${order.code}`,
+      });
+      await logActivity(tx, admin, 'Shipped order', order.code, `#company/orders/${order.code}`);
+      return this.findOrderTx(tx, order.id);
+    });
+    return this.toView(updated);
   }
 
   async deliver(admin: AuthenticatedUser, id: string) {
-    const order = await this.findOrder(id);
-    if (order.status !== OrderStatus.shipped) {
-      throw this.invalidTransition(order.status, 'deliver');
-    }
-
-    return this.toView(
-      await this.prisma.order.update({
+    const found = await this.findOrder(id);
+    const updated = await this.prisma.$transaction(async (tx) => {
+      const order = await this.lockOrder(tx, found.id);
+      if (order.status !== OrderStatus.shipped) {
+        throw this.invalidTransition(order.status, 'deliver');
+      }
+      await tx.order.update({
         where: { id: order.id },
         data: { status: OrderStatus.delivered, deliveredAt: new Date() },
-        include: ORDER_INCLUDE,
-      }),
-    );
+      });
+      await notify(tx, {
+        userId: order.buyerId,
+        type: NotificationType.status,
+        titleKey: 'notifications.buyer.orderDelivered.title',
+        titleParams: { code: order.code },
+        bodyKey: 'notifications.buyer.orderDelivered.body',
+        link: `#marketplace/orders/${order.code}`,
+      });
+      await logActivity(tx, admin, 'Marked order delivered', order.code, `#company/orders/${order.code}`);
+      return this.findOrderTx(tx, order.id);
+    });
+    return this.toView(updated);
   }
 
   async complete(admin: AuthenticatedUser, id: string) {
-    const order = await this.findOrder(id);
-    if (order.status !== OrderStatus.delivered) {
-      throw this.invalidTransition(order.status, 'complete');
-    }
-
-    return this.toView(
-      await this.prisma.order.update({
-        where: { id: order.id },
-        data: { status: OrderStatus.completed, completedAt: new Date() },
-        include: ORDER_INCLUDE,
-      }),
-    );
+    const found = await this.findOrder(id);
+    return this.toView(await this.completeLocked(admin, found.id));
   }
 
   async cancelCompany(admin: AuthenticatedUser, id: string, reason: string) {
-    return this.toView(await this.cancel(admin.id, await this.findOrder(id), reason));
+    const found = await this.findOrder(id);
+    return this.toView(await this.cancel(admin, found.id, reason));
   }
 
   // -------------------------------------------------------------------------
   // Internals
   // -------------------------------------------------------------------------
 
-  private async cancel(actorId: string, order: OrderRecord, reason: string) {
+  private async cancel(actor: ActivityActor, orderId: string, reason: string) {
+    const updated = await this.prisma.$transaction((tx) =>
+      this.cancelLocked(tx, actor, orderId, reason),
+    );
+    this.logger.log(`Order ${updated.code} cancelled by ${actor?.id ?? 'system'}: ${reason}`);
+    return updated;
+  }
+
+  private async cancelLocked(
+    tx: Prisma.TransactionClient,
+    actor: ActivityActor,
+    orderId: string,
+    reason: string,
+  ): Promise<OrderRecord> {
+    const order = await this.lockOrder(tx, orderId);
     const cancellable: OrderStatus[] = [
       OrderStatus.pending_payment,
       OrderStatus.paid,
@@ -394,61 +460,93 @@ export class OrdersService {
     if (!cancellable.includes(order.status)) {
       throw this.invalidTransition(order.status, 'cancel');
     }
-
     const refunded = order.paymentStatus !== OrderPaymentStatus.unpaid;
+    const now = new Date();
+    const claimed = await tx.order.updateMany({
+      where: { id: order.id, status: order.status },
+      data: {
+        status: refunded ? OrderStatus.refunded : OrderStatus.cancelled,
+        paymentStatus: refunded ? OrderPaymentStatus.refunded : OrderPaymentStatus.unpaid,
+        cancelledAt: now,
+        refundedAt: refunded ? now : null,
+        balanceDueAt: null,
+      },
+    });
+    if (claimed.count !== 1) throw this.invalidTransition(order.status, 'cancel');
+    for (const item of order.items) {
+      await tx.listingDraft.updateMany({
+        where: { listingId: item.listingId },
+        data: { quantity: { increment: item.quantity } },
+      });
+    }
+    await tx.payment.updateMany({
+      where: { orderId: order.id, state: PaymentState.paid },
+      data: { state: PaymentState.refunded, refundedAt: now },
+    });
+    await notify(tx, {
+      userId: order.buyerId,
+      type: NotificationType.status,
+      titleKey: refunded
+        ? 'notifications.buyer.orderRefunded.title'
+        : 'notifications.buyer.orderCancelled.title',
+      titleParams: { code: order.code },
+      bodyKey: refunded
+        ? 'notifications.buyer.orderRefunded.body'
+        : 'notifications.buyer.orderCancelled.body',
+      bodyParams: { reason },
+      link: `#marketplace/orders/${order.code}`,
+    });
+    await logActivity(
+      tx,
+      actor,
+      refunded ? 'Refunded order' : 'Cancelled order',
+      order.code,
+      `#company/orders/${order.code}`,
+    );
+    return this.findOrderTx(tx, order.id);
+  }
 
-    const updated = await this.prisma.$transaction(async (tx) => {
-      for (const item of order.items) {
-        await tx.listingDraft.updateMany({
-          where: { listingId: item.listingId },
-          data: { quantity: { increment: item.quantity } },
-        });
+  private async completeLocked(actor: ActivityActor, orderId: string): Promise<OrderRecord> {
+    return this.prisma.$transaction(async (tx) => {
+      const order = await this.lockOrder(tx, orderId);
+      if (order.status === OrderStatus.completed) return this.findOrderTx(tx, order.id);
+      if (order.status !== OrderStatus.delivered) {
+        throw this.invalidTransition(order.status, 'complete');
       }
-
-      await tx.payment.updateMany({
-        where: { orderId: order.id, state: PaymentState.paid },
-        data: { state: PaymentState.refunded, refundedAt: new Date() },
+      const blockingDispute = await tx.dispute.findFirst({
+        where: { orderId: order.id, status: { in: ['open', 'reviewing'] } },
+        select: { id: true },
       });
-
-      const next = await tx.order.update({
+      if (blockingDispute) {
+        throw new AppException('order.openDispute', HttpStatus.CONFLICT);
+      }
+      await tx.order.update({
         where: { id: order.id },
-        data: {
-          status: refunded ? OrderStatus.refunded : OrderStatus.cancelled,
-          paymentStatus: refunded ? OrderPaymentStatus.refunded : OrderPaymentStatus.unpaid,
-          cancelledAt: new Date(),
-          refundedAt: refunded ? new Date() : null,
-        },
-        include: ORDER_INCLUDE,
+        data: { status: OrderStatus.completed, completedAt: new Date() },
       });
-
       await notify(tx, {
         userId: order.buyerId,
-        type: NotificationType.status,
-        titleKey: refunded
-          ? 'notifications.buyer.orderRefunded.title'
-          : 'notifications.buyer.orderCancelled.title',
+        type: NotificationType.success,
+        titleKey: 'notifications.buyer.orderCompleted.title',
         titleParams: { code: order.code },
-        bodyKey: refunded
-          ? 'notifications.buyer.orderRefunded.body'
-          : 'notifications.buyer.orderCancelled.body',
-        bodyParams: { reason },
+        bodyKey: 'notifications.buyer.orderCompleted.body',
         link: `#marketplace/orders/${order.code}`,
       });
-
-      return next;
+      await logActivity(tx, actor, 'Completed order', order.code, `#company/orders/${order.code}`);
+      return this.findOrderTx(tx, order.id);
     });
-
-    this.logger.log(`Order ${order.code} cancelled by ${actorId}: ${reason}`);
-    return updated;
   }
 
   /**
    * Pre-orders whose balance window elapsed are cancelled and refunded, matching
    * the requirement that a missed balance never forfeits the deposit.
    */
-  private async expireUnpaidBalances(): Promise<void> {
+  private async expireUnpaidBalances(orderReference?: string): Promise<void> {
     const overdue = await this.prisma.order.findMany({
       where: {
+        ...(orderReference
+          ? { OR: [{ id: orderReference }, { code: orderReference }] }
+          : {}),
         saleMode: SaleMode.pre_order,
         status: OrderStatus.ready,
         paymentStatus: OrderPaymentStatus.balance_due,
@@ -458,16 +556,20 @@ export class OrdersService {
     });
 
     for (const order of overdue) {
-      await this.cancel(order.buyerId, order, 'Balance not paid within the deadline');
+      await this.cancel(null, order.id, 'Balance not paid within the deadline').catch((error) => {
+        if (error instanceof AppException && error.code === 'order.invalidTransition') return;
+        throw error;
+      });
     }
   }
 
   private async linesFromInput(
     items: Array<{ listingId: string; quantity: number }>,
+    db: Prisma.TransactionClient | PrismaService = this.prisma,
   ): Promise<CartLine[]> {
     const lines: CartLine[] = [];
     for (const item of items) {
-      const listing = await this.prisma.listing.findFirst({
+      const listing = await db.listing.findFirst({
         where: {
           OR: [{ id: item.listingId }, { code: item.listingId }],
           status: 'approved',
@@ -541,6 +643,50 @@ export class OrdersService {
     return order;
   }
 
+  private async findOrderTx(tx: Prisma.TransactionClient, id: string): Promise<OrderRecord> {
+    const order = await tx.order.findUnique({ where: { id }, include: ORDER_INCLUDE });
+    if (!order) throw new AppException('order.notFound', HttpStatus.NOT_FOUND);
+    return order;
+  }
+
+  private async lockOrder(tx: Prisma.TransactionClient, id: string): Promise<OrderRecord> {
+    const rows = await tx.$queryRaw<Array<{ id: string }>>`
+      SELECT "id" FROM "Order" WHERE "id" = ${id} FOR UPDATE
+    `;
+    if (!rows[0]) throw new AppException('order.notFound', HttpStatus.NOT_FOUND);
+    return this.findOrderTx(tx, id);
+  }
+
+  private optionalTrimmed(value?: string): string | null {
+    if (value === undefined) return null;
+    const trimmed = value.trim();
+    if (!trimmed) throw new AppException('validation.nonBlank', HttpStatus.BAD_REQUEST);
+    return trimmed;
+  }
+
+  private trackingView(order: OrderRecord) {
+    const events = [
+      ['placed', order.placedAt],
+      ['paid', order.paidAt],
+      ['ready', order.readyAt],
+      ['shipped', order.shippedAt],
+      ['delivered', order.deliveredAt],
+      ['completed', order.completedAt],
+      ['cancelled', order.cancelledAt],
+      ['refunded', order.refundedAt],
+    ]
+      .filter((event): event is [string, Date] => event[1] instanceof Date)
+      .map(([status, at]) => ({ status, at }));
+    return {
+      id: order.code,
+      status: order.status,
+      carrier: order.trackingCarrier,
+      trackingNumber: order.trackingNumber,
+      estimatedDeliveryAt: order.estimatedDeliveryAt,
+      events,
+    };
+  }
+
   private async nextOrderCode(tx: Prisma.TransactionClient): Promise<string> {
     const rows = await tx.$queryRaw<Array<{ value: bigint }>>`
       INSERT INTO "Sequence" ("name", "value") VALUES ('order', 10023)
@@ -605,6 +751,10 @@ export class OrdersService {
       placedAt: order.placedAt,
       paidAt: order.paidAt,
       readyAt: order.readyAt,
+      shippedAt: order.shippedAt,
+      trackingCarrier: order.trackingCarrier,
+      trackingNumber: order.trackingNumber,
+      estimatedDeliveryAt: order.estimatedDeliveryAt,
       deliveredAt: order.deliveredAt,
       completedAt: order.completedAt,
       cancelledAt: order.cancelledAt,

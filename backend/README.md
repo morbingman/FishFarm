@@ -51,8 +51,14 @@ The FishFarm frontend is a Vite app whose exported config uses port **8443** (`s
 | `POST /v1/uploads` | Multipart upload (`file` + `purpose`); private purposes stay off the public path |
 | `/v1/me/cart` | Cart read/add/update/remove/clear |
 | `POST /v1/orders` | Checkout from the cart or explicit items (idempotent) |
-| `/v1/me/orders` | Order history, order detail, cancel, pay pre-order balance |
-| `/v1/company/orders` | Company order queue, detail and fulfilment transitions (Admin only) |
+| `/v1/me/orders` | Owner-scoped order history, detail, tracking, cancel, balance payment and delivery confirmation |
+| `/v1/company/orders` | Company order queue, shipment data and fulfilment transitions (Admin only) |
+| `/v1/me/orders/:id/dispute`, `/v1/me/disputes` | Customer dispute creation, history, detail and private evidence access |
+| `/v1/admin/disputes` | Dispute queue, review, resolution/rejection and private evidence access |
+| `GET /v1/batches`, `GET /v1/batches/:id`, `GET /v1/batches/:id/updates` | Public compliant open batches and growth updates |
+| `/v1/company/batches` | Shared company drafts, partial edits, publish/submit and growth updates |
+| `/v1/admin/batches` | Pending batch queue and approve/reject/cancel |
+| `/v1/company/facilities`, `/v1/admin/facilities/:id` | Facility records, compliance submission, inspection and private documents |
 
 All feature routes sit behind the `/v1` prefix. Money is integer VND; timestamps are ISO 8601 UTC.
 
@@ -105,8 +111,8 @@ as an optional internal quality gate between Admins — `publish` moves a draft 
   includes completeness checks. Decisions require a fixed reason plus ≥ 10 characters of feedback;
   takedown is limited to approved/paused listings and records `Policy violation`.
 - Every transition appends a `ListingHistory` row and an `Activity` entry attributed to the acting
-  Admin. Submitting for internal review also broadcasts a notification to the `Admin` role.
-  Pre-order listings must have `depositPct` 20–30 and an `expectedReadyDate`.
+  Admin. Submitting for internal review creates an independent notification for each active Admin,
+  honoring their preferences. Pre-order listings must have `depositPct` 20–30 and an `expectedReadyDate`.
 
 ### Marketplace
 
@@ -144,9 +150,10 @@ Payment is simulated: there is no gateway, so an order is created already `paid`
   not mix `in_stock` and `pre_order` listings (`400 order.mixedSaleModes`).
 - Stock is reserved inside the checkout transaction with a conditional `UPDATE … WHERE quantity >= n`,
   so concurrent checkouts cannot oversell; a failed reservation aborts the order.
-- `idempotencyKey` (optional, 8–80 chars) makes retries safe: replaying the same key returns the
-  existing order instead of charging twice. Payments store `order:<key>:initial` and
-  `order:<code>:balance` as their idempotency keys.
+- `idempotencyKey` (optional, 8–80 chars) is buyer-scoped. Concurrent retries return the existing
+  order instead of reserving stock, charging, notifying or logging twice. New initial payment keys
+  are `order:<buyerId>:<key>:initial`; safe same-owner legacy keys remain replayable.
+  Balance keys remain `order:<code>:balance`.
 - Pre-orders charge `depositPct` (20–30%) now. `mark-ready` sets `balance_due` and opens a
   7-day `balanceDueAt` window; `POST /v1/me/orders/{code}/pay-balance` creates the `order_balance`
   payment and moves the order to `paid`. Overdue balances are cancelled and refunded automatically
@@ -157,16 +164,68 @@ Payment is simulated: there is no gateway, so an order is created already `paid`
   equivalent. Invalid transitions return `409 order.invalidTransition` with `{ from, action }`.
 - Buying is User-only (`order.create`) and fulfilment is Admin-only (`order.fulfill`); a User
   calling `/v1/company/orders` gets `403`. Order ids in URLs are the `ORD-…` codes.
-- Order placement notifies the `Admin` role and the buyer; status changes notify the buyer.
+- Order placement and lifecycle mutations are audited transactionally. Operational notifications
+  fan out to active Admins as independent recipient rows, honoring each recipient's preferences.
+- `POST /v1/company/orders/{id}/ship` accepts optional `trackingCarrier`, `trackingNumber` and
+  `estimatedDeliveryAt`. `GET /v1/me/orders/{id}/tracking` returns persisted shipment information
+  and recorded lifecycle events only. Another customer's order returns `404`.
+- `POST /v1/me/orders/{id}/confirm-delivery` completes a delivered order. Repeating confirmation
+  returns the same completed order. Both customer confirmation and company completion are blocked
+  while a dispute is `open` or `reviewing`.
+- Balance payment requires a ready pre-order with an unexpired deadline. Concurrent retries charge
+  once; late payment instead returns the cancelled/refunded order. Cancellation restores stock once.
+
+### Disputes
+
+- `POST /v1/me/orders/{id}/dispute` accepts `reason`, a trimmed 15–2000-character `description`,
+  and up to three unique `uploadIds`. Reasons: `fish_unwell`, `not_as_described`,
+  `damaged_packaging`, `not_received`, `other`. `not_received` is eligible after shipment;
+  other reasons require delivery or completion. There is one dispute per order.
+- Evidence must be unused, owned by the buyer, and uploaded for `dispute_attachment`. The existing
+  images/PDF policy and configured upload limit apply. Responses omit private URLs.
+- Customer history/detail: `GET /v1/me/disputes` and `GET /v1/me/disputes/{id}`. Admins use
+  `/v1/admin/disputes` and `POST /{id}/start-review | resolve | reject`. Final decisions require a
+  nonblank `resolution`, set `resolvedAt`, and do not automatically issue a refund.
+- Evidence streams through `GET /v1/me/disputes/{id}/attachments/{attachmentId}/content` or the
+  equivalent `/v1/admin/disputes/...` endpoint, with authorization and `nosniff`. Another buyer gets
+  `404`. Legacy URL-only attachments are not downloadable through these endpoints.
+
+### Batches and facilities
+
+- Every Admin operates the same facilities and batches. Facility create/list/detail is under
+  `/v1/company/facilities`. Compliance is submitted through `POST /{id}/verification` with a
+  `level` and `documents: [{ type, uploadId }]`; submission resets the file to `pending`.
+- Compliance documents must be unused `farm_document` uploads belonging to any Admin. Replacement
+  and inspection are serialized. `POST /v1/admin/facilities/{id}/inspect` accepts
+  `approved | rejected | revoked`; approval requires non-`none` level, future `validUntil`, and
+  controlled documents. Downloads use `/verification/documents/{documentId}/content` under either
+  authorized facility route. Private URLs and legacy unlinked files are not exposed.
+- `POST /v1/company/batches` creates a draft. `PATCH /{id}` is draft-only and partial; omitted
+  fields and arrays remain intact. `totalShares` is derived as `floor(stockCount / shareQuantity)`
+  for count shares or `floor(expectedHarvestWeightG / shareQuantity)` for weight shares.
+  `shareQuantity` is fish or grams per share; expected weight is total batch biomass.
+- Direct `POST /{id}/publish` opens a draft; optional `/submit` sends it to the Admin queue.
+  `/v1/admin/batches/{id}/approve` opens pending batches, `/reject` returns them to draft.
+  Opening requires images, consistent shares, current approved facility compliance, controlled
+  documents and exact cost reconciliation:
+  `sum(batch_total) + totalShares * sum(per_share) == packagePricePerShare * totalShares`.
+- Draft deletion requires no sponsorships, updates or harvest. Cancellation is allowed only from
+  draft/pending/open with no sponsorships, until the sponsorship refund workflow exists.
+- Public batch list supports `q`, `species`, `region`, `harvestBefore`, `priceMax`, `page`, `limit`.
+  Only open batches with available shares and current controlled compliance appear. Expiry or
+  revocation immediately hides them. Public views omit private documents and internal review data.
+  Growth updates use `POST /v1/company/batches/{id}/updates` and the public updates endpoint.
+- Sponsorship reservation/payment, tranche releases, harvest and settlement APIs remain unimplemented.
+  Batch sponsorship is prepaid fish/product commerce, never investment or profit-return commerce.
 
 ### Uploads
 
 - `POST /v1/uploads` takes multipart fields `file` and `purpose` and is available to authenticated
-  users. Purposes are `listing_image` and `batch_update` (Admin, images only), `farm_document`
-  (Admin, images or PDF) and `dispute_attachment` (User, images or PDF).
+  users. Purposes are `listing_image`, `batch_image` and `batch_update` (Admin, images only),
+  `farm_document` (Admin, images or PDF) and `dispute_attachment` (User, images or PDF).
 - Files are stored on local disk under `UPLOAD_DIR` (default `backend/uploads`, gitignored) with
   random UUID names. The endpoint returns `{ id, url, mimeType, sizeBytes, purpose, isPrivate }`.
-- `listing_image` and `batch_update` files are served publicly from `/uploads/<file>`.
+- `listing_image`, `batch_image` and `batch_update` files are served publicly from `/uploads/<file>`.
   `farm_document` and `dispute_attachment` files are moved to `uploads/private` and that path
   returns `404` before the static middleware, so private evidence is never publicly reachable.
 - Default limit is `UPLOAD_MAX_BYTES` (10 MB); oversized files return `413 uploads.fileTooLarge` and
@@ -188,8 +247,10 @@ Payment is simulated: there is no gateway, so an order is created already `paid`
 Seeded data includes the single company (`fishfarm`), its main facility, seven company-owned
 listings (one pre-order example at `FM-20761`), five orders for the demo buyers in different
 states (completed, shipped, ready-with-balance-due, paid, cancelled), a two-line cart for
-`buyer@fishmarket.demo`, a live grow-out batch (`BATCH-1024`) and one funded sponsorship with
-escrow tranches.
+`buyer@fishmarket.demo`, an open-state grow-out batch (`BATCH-1024`) and one funded sponsorship with
+escrow tranches. Seed compliance uses legacy URL-only documents, not controlled private uploads;
+therefore that batch is hidden by the public API until real controlled compliance is submitted and
+approved. Its share model is 40 × 5 kg from 200,000 g expected total biomass.
 
 `pnpm db:seed` **resets demo data** and is guarded against `NODE_ENV=production` unless
 `ALLOW_DEMO_SEED=1` is set.
@@ -225,7 +286,10 @@ src/
   listings/               # company catalog CRUD, lifecycle state machine, internal review
   marketplace/            # public search, listing detail and the company store page
   uploads/                # multipart file storage, purpose/role rules, private files
-  orders/                 # cart, checkout, order lifecycle and simulated payments
+  orders/                 # cart, checkout, order lifecycle, tracking and simulated payments
+  disputes/               # owner-scoped disputes, Admin decisions and private evidence
+  batches/                # company batch management, public browsing and growth updates
+  facilities/             # controlled compliance, inspection and private documents
   common/                 # AppException + API exception filter
   config/                 # env validation
   health/                 # GET /health
@@ -239,7 +303,7 @@ src/
   required. Do not downgrade the CLI below 7.
 - The generated client is ignored by Git and rebuilt by `postinstall` and `prisma:generate`.
 - The schema includes both products: marketplace entities (§3) and batch sponsorship (§11).
-  Auth/users, listings, the public marketplace and uploads are implemented; cart, checkout and
-  orders are next.
-- `pnpm test:e2e` boots the real app against the local database and cleans up the users and listings
-  it creates.
+  Auth/users, listings, marketplace, uploads, cart/orders/tracking/disputes and batch/facility
+  management are implemented. Engagement and sponsorship/payment/settlement APIs remain future work.
+- `pnpm test:e2e` boots the real app against the local database and cleans up its own fixtures.
+  It does not reset or reseed the database.

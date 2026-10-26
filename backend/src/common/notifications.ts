@@ -1,6 +1,5 @@
 import type { NotificationType, UserRole } from '../generated/prisma/enums.js';
-import type { Prisma } from '../generated/prisma/client.js';
-import { NotificationType as NotificationTypeEnum } from '../generated/prisma/enums.js';
+import { Prisma } from '../generated/prisma/client.js';
 import { normalizePrefs } from '../users/users.service.js';
 
 export type NotificationInput = {
@@ -14,40 +13,36 @@ export type NotificationInput = {
   link?: string;
 };
 
-/**
- * Writes one notification row. A User-targeted notification respects the
- * recipient's `prefs`; role broadcasts (for example to every Admin) are always
- * written so each Admin keeps their own read state.
- */
-export async function notify(
-  tx: Prisma.TransactionClient,
-  input: NotificationInput,
-): Promise<void> {
-  if (input.userId) {
-    const user = await tx.user.findUnique({
-      where: { id: input.userId },
-      select: { prefs: true },
-    });
-    const prefs = normalizePrefs(user?.prefs);
-    if (
-      (input.type === NotificationTypeEnum.system && !prefs.system) ||
-      (input.type === NotificationTypeEnum.reminder && !prefs.reminders) ||
-      (input.type === NotificationTypeEnum.status && !prefs.status)
-    ) {
-      return;
-    }
-  }
-
-  await tx.notification.create({
-    data: {
-      ...(input.userId ? { recipientId: input.userId } : {}),
-      ...(input.role ? { recipientRole: input.role } : {}),
+export async function notify(tx: Prisma.TransactionClient, input: NotificationInput): Promise<void> {
+  const recipients = await tx.user.findMany({
+    where: input.userId ? { id: input.userId } : input.role ? { role: input.role, status: 'active' } : { id: { in: [] } },
+    select: { id: true, prefs: true },
+  });
+  const enabled = recipients.filter((user) => {
+    const prefs = normalizePrefs(user.prefs);
+    return !((input.type === 'system' && !prefs.system) ||
+      (input.type === 'reminder' && !prefs.reminders) ||
+      (input.type === 'status' && !prefs.status));
+  });
+  if (!enabled.length) return;
+  // Keep recipients alive until the notification foreign keys are written.
+  const existing = await tx.$queryRaw<Array<{ id: string }>>(Prisma.sql`
+    SELECT "id" FROM "User"
+    WHERE "id" IN (${Prisma.join(enabled.map((user) => user.id))})
+    ORDER BY "id" FOR KEY SHARE
+  `);
+  const ids = new Set(existing.map((user) => user.id));
+  const retained = enabled.filter((user) => ids.has(user.id));
+  if (!retained.length) return;
+  await tx.notification.createMany({
+    data: retained.map((user) => ({
+      recipientId: user.id,
       type: input.type,
       titleKey: input.titleKey,
       titleParams: input.titleParams as Prisma.InputJsonValue | undefined,
       bodyKey: input.bodyKey,
       bodyParams: input.bodyParams as Prisma.InputJsonValue | undefined,
       link: input.link,
-    },
+    })),
   });
 }
