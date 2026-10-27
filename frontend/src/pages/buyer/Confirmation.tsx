@@ -28,7 +28,7 @@ export function Confirmation() {
             <span>Payment Status</span>
             <strong className="buy-paid">
               <Glyph name="check" />
-              Paid · Demo
+              Paid
             </strong>
           </div>
           <div>
@@ -56,10 +56,6 @@ export function Confirmation() {
           <Glyph name="arrow" />
         </BuyButton>
       </div>
-      <p className="buy-fine-print">
-        This is a demo order. No payment was collected and no fish will be
-        shipped.
-      </p>
     </div>
   );
 }

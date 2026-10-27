@@ -25,6 +25,7 @@ export const portalVi: Record<string, string> = {
   "My Listings": "Tin đăng của tôi",
   "Add New Fish": "Đăng cá mới",
   Profile: "Hồ sơ",
+  "Profile & settings": "Hồ sơ và cài đặt",
   "Account Settings": "Cài đặt tài khoản",
   Notifications: "Thông báo",
   "Activity History": "Lịch sử hoạt động",

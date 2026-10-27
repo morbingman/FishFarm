@@ -6,7 +6,6 @@ import {
   Icon,
   useHash,
   ROLE_NAV,
-  ACCOUNT_NAV,
   FARM_ORDERS_NAV,
   type NavItem,
 } from "@/components/common/Portal";
@@ -43,7 +42,6 @@ function WorkspaceSidebar({
           FARM_ORDERS_NAV,
         ]
       : []),
-    ...(user.role === "Admin" ? [] : ACCOUNT_NAV),
   ];
   const rawRoute = (hash || "#home").split("?")[0];
   const route = user.role === "Admin" ? adminActive(rawRoute) : rawRoute;
@@ -95,7 +93,6 @@ function WorkspaceSidebar({
             <span className="workspace-label">{label(item.label)}</span>
           </a>
         ))}
-
       </nav>
     </aside>
   );

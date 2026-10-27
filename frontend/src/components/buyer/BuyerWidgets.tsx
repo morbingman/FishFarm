@@ -42,9 +42,7 @@ export function Summary({ showAction = false }: { showAction?: boolean }) {
           <span>{money(fee)}</span>
         </div>
         <div className="buy-total">
-          <strong>
-            Total <small>USD</small>
-          </strong>
+          <strong>Total</strong>
           <strong>{money(total)}</strong>
         </div>
       </div>
@@ -59,8 +57,7 @@ export function Summary({ showAction = false }: { showAction?: boolean }) {
         Your purchase is protected from checkout to delivery.
       </p>
       <p className="buy-fine-print">
-        Live-fish shipping includes insulated packaging and oxygen support. All
-        amounts are demo prices.
+        Live-fish shipping includes insulated packaging and oxygen support.
       </p>
     </aside>
   );

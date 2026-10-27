@@ -25,41 +25,43 @@ export default function Account({
   const { parts } = useHash();
   const [toast, show] = useToast();
   const sec = parts[1] ?? "profile";
-  const body =
-    sec === "profile" ? (
+  const accountDetails = sec === "profile" || sec === "settings";
+  const body = accountDetails ? (
+    <>
       <Profile user={user} show={show} />
-    ) : sec === "settings" ? (
       <Settings
+        embedded
         user={user}
         language={language}
         setLanguage={setLanguage}
         show={show}
       />
-    ) : sec === "notifications" ? (
-      <Notifications user={user} language={language} />
-    ) : sec === "activity" ? (
-      <History user={user} />
-    ) : sec === "farming-orders" && user.role === "Buyer" ? (
-      <FarmingOrders user={user} language={language} show={show} />
-    ) : (
-      <StateBlock
-        card
-        icon="search"
-        tone="info"
-        title="Page not found"
-        body="This account page doesn't exist."
-        actions={
-          <a className="sl-btn sl-btn-primary" href="#account/profile">
-            Go to profile
-          </a>
-        }
-      />
-    );
+    </>
+  ) : sec === "notifications" ? (
+    <Notifications user={user} language={language} />
+  ) : sec === "activity" ? (
+    <History user={user} />
+  ) : sec === "farming-orders" && user.role === "Buyer" ? (
+    <FarmingOrders user={user} language={language} show={show} />
+  ) : (
+    <StateBlock
+      card
+      icon="search"
+      tone="info"
+      title="Page not found"
+      body="This account page doesn't exist."
+      actions={
+        <a className="sl-btn sl-btn-primary" href="#account/profile">
+          Go to profile
+        </a>
+      }
+    />
+  );
   const unread = notifsFor(useStore(), user).filter((n) => !n.read).length;
   return (
     <PortalShell
       user={user}
-      active={`#account/${sec}`}
+      active={`#account/${accountDetails ? "profile" : sec}`}
       language={language}
       setLanguage={setLanguage}
       dict={portalVi}

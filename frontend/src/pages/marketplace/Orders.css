@@ -1,0 +1,10 @@
+.orders select { border: 1px solid #b5d7e5; background: white; border-radius: 9px; padding: 10px; max-width: 100%; }
+.orders-timeline { list-style: none; padding: 0 0 0 18px; margin: 24px 0; border-left: 3px solid #168dbc; }
+.orders-timeline li { display: grid; gap: 6px; padding: 0 0 22px 8px; }
+.orders-timeline time { font-size: 14px; color: #466477; }
+.orders-payment { border-bottom: 1px solid #d4e9f3; padding: 8px 0; }
+.orders-method { display: grid; gap: 10px; margin: 16px 0; }
+.orders h2, .orders strong { overflow-wrap: anywhere; }
+.orders small { color: #466477; }
+.orders textarea { width: 100%; min-width: 0; min-height: 100px; border: 1px solid #b5d7e5; border-radius: 9px; padding: 10px; background: white; resize: vertical; }
+.orders fieldset { min-width: 0; }

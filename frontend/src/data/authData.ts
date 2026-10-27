@@ -1,7 +1,6 @@
 export type Screen =
   | "login"
   | "register"
-  | "verify"
   | "created"
   | "forgot"
   | "email"
@@ -14,13 +13,9 @@ export const screenMeta: Record<Screen, [string, string]> = {
     "Create Your Account",
     "Your next great trade starts here. Let's get you set up.",
   ],
-  verify: [
-    "Verify Your Account",
-    "We've sent a verification code to your email.",
-  ],
   created: [
     "You're All Set",
-    "Your account is verified. A world of better trading awaits.",
+    "Your account is ready. A world of better trading awaits.",
   ],
   forgot: [
     "Forgot Your Password?",
@@ -46,6 +41,5 @@ export const screenMeta: Record<Screen, [string, string]> = {
 export const steps: [Screen, string][] = [
   ["login", "Sign in"],
   ["register", "Create account"],
-  ["verify", "Verification"],
   ["forgot", "Recovery"],
 ];

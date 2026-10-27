@@ -14,7 +14,7 @@ export function Dispute() {
     errors,
     setErrors,
     disputeSent,
-    setDisputeSent,
+    submitDispute,
     reason,
     setReason,
     problem,
@@ -33,18 +33,18 @@ export function Dispute() {
       </h1>
       <p>
         {disputeSent
-          ? "Your demo case #DS-10248 has been opened. The order is marked for review, not completed."
+          ? "Your case has been opened. The order is marked for review."
           : "Tell us what happened. We'll help you and the seller find a fair resolution."}
       </p>
       {disputeSent ? (
         <>
           <section className="buy-panel buy-dispute-success">
-            <strong>Case #DS-10248 · Review pending</strong>
+            <strong>Case submitted · Review pending</strong>
             <p>Reason: {reason}</p>
             <p>{problem}</p>
             <p className="buy-fine-print">
-              In a live transaction, support would review the evidence and
-              contact you. This report is saved only in this session.
+              Support will review the report and contact you if more information
+              is required.
             </p>
           </section>
           <BuyButton onClick={() => go("tracking")}>
@@ -67,7 +67,12 @@ export function Dispute() {
               next.problem =
                 "Please describe the issue in at least 15 characters.";
             setErrors(next);
-            if (!Object.keys(next).length) setDisputeSent(true);
+            if (!Object.keys(next).length)
+              void submitDispute().catch(() =>
+                setErrors({
+                  problem: "Could not open the dispute. Please try again.",
+                }),
+              );
           }}
         >
           <OrderProduct />

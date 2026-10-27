@@ -39,29 +39,42 @@ export function Summary({
         <div>
           <b>{L(fish.name, language)}</b>
           <small>
-            {fmtNum(qty, language)} {t("con", "fish")} ·{" "}
-            {t(`~${fish.months} tháng`, `~${fish.months} mo.`)}
+            {fish.singleFish
+              ? t(
+                  `1 cá thể · mục tiêu ${fish.sizeTarget} cm`,
+                  `1 fish · target ${fish.sizeTarget} cm`,
+                )
+              : `${fmtNum(qty, language)} ${t("con", "fish")} · ${t(`~${fish.months} tháng`, `~${fish.months} mo.`)}`}
           </small>
         </div>
       </div>
       <div className="fm-line">
-        <span>{t("Tiền cá", "Fish subtotal")}</span>
+        <span>
+          {fish.singleFish
+            ? t("Chi phí đầu tư nuôi cá", "Fish sponsorship cost")
+            : t("Tiền cá", "Fish subtotal")}
+        </span>
         <b>{fmtMoney(q.fishSubtotal, language)}</b>
       </div>
-      <div className="fm-line">
-        <span>{L(PKG_LABEL[pkg], language)}</span>
-        <b>
-          {pkg === "custom" && addons.length === 0
-            ? "—"
-            : fmtMoney(q.serviceCost, language)}
-        </b>
-      </div>
-      {q.addonLines.map((l) => (
-        <div key={l.id} className="fm-line sub">
-          <span>+ {L(ADDONS.find((a) => a.id === l.id)!.name, language)}</span>
-          <b>{fmtMoney(l.amount, language)}</b>
+      {!fish.singleFish && (
+        <div className="fm-line">
+          <span>{L(PKG_LABEL[pkg], language)}</span>
+          <b>
+            {pkg === "custom" && addons.length === 0
+              ? "—"
+              : fmtMoney(q.serviceCost, language)}
+          </b>
         </div>
-      ))}
+      )}
+      {!fish.singleFish &&
+        q.addonLines.map((l) => (
+          <div key={l.id} className="fm-line sub">
+            <span>
+              + {L(ADDONS.find((a) => a.id === l.id)!.name, language)}
+            </span>
+            <b>{fmtMoney(l.amount, language)}</b>
+          </div>
+        ))}
       <div className="fm-line">
         <span>{t("Phí giao hàng (ước tính)", "Delivery fee (est.)")}</span>
         <b>
@@ -77,7 +90,11 @@ export function Summary({
         <b>{fmtMoney(q.total, language)}</b>
       </div>
       <div className="fm-line big">
-        <span>{t("Đặt cọc hôm nay", "Deposit due now")}</span>
+        <span>
+          {fish.singleFish
+            ? t("Thanh toán đầu tư hôm nay", "Sponsorship payment due now")
+            : t("Đặt cọc hôm nay", "Deposit due now")}
+        </span>
         <b>{fmtMoney(q.deposit, language)}</b>
       </div>
       <div className="fm-line">
@@ -85,18 +102,25 @@ export function Summary({
         <b>{fmtMoney(q.balance, language)}</b>
       </div>
       <p className="summary-view-2">
-        {t(
-          "Lịch thanh toán: đặt cọc ngay; số dư thanh toán khi nhận cá. Tiền cọc nằm trong tổng đơn, không thu hai lần.",
-          "Schedule: deposit now; balance at handover. The deposit is part of the total and is never charged twice.",
-        )}
+        {fish.singleFish
+          ? t(
+              "Khoản đầu tư được thanh toán một lần để trang trại bắt đầu chăm sóc cá.",
+              "The sponsorship is paid once so the farm can begin caring for the fish.",
+            )
+          : t(
+              "Lịch thanh toán: đặt cọc ngay; số dư thanh toán khi nhận cá. Tiền cọc nằm trong tổng đơn, không thu hai lần.",
+              "Schedule: deposit now; balance at handover. The deposit is part of the total and is never charged twice.",
+            )}
       </p>
-      <p className="fm-demo-note summary-view-4">
-        <Icon name="info" size={14} />
-        {t(
-          `Tỷ lệ cọc ${Math.round(RULES.depositRate * 100)}% (tối thiểu 100.000 ₫) là cấu hình demo.`,
-          `${Math.round(RULES.depositRate * 100)}% deposit rate (min 100,000 ₫) is a demo configuration.`,
-        )}
-      </p>
+      {!fish.singleFish && (
+        <p className="fm-demo-note summary-view-4">
+          <Icon name="info" size={14} />
+          {t(
+            `Tỷ lệ cọc ${Math.round(RULES.depositRate * 100)}% (tối thiểu 100.000 ₫) là cấu hình demo.`,
+            `${Math.round(RULES.depositRate * 100)}% deposit rate (min 100,000 ₫) is a demo configuration.`,
+          )}
+        </p>
+      )}
     </div>
   );
 }

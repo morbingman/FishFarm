@@ -8,13 +8,27 @@ export function Tracking() {
     currentPurchase,
     shipping,
     delivered,
-    setDelivered,
     completed,
     reviewSent,
     disputeSent,
     heading,
     go,
   } = useBuyer();
+  const statusRank = {
+    confirmed: 1,
+    preparing: 2,
+    shipped: 3,
+    delivered: 4,
+    completed: 5,
+    cancelled: 0,
+  }[currentPurchase?.status ?? "confirmed"];
+  const dateTime = (value?: string) =>
+    value
+      ? new Intl.DateTimeFormat(undefined, {
+          dateStyle: "medium",
+          timeStyle: "short",
+        }).format(new Date(value))
+      : "Pending";
   return (
     <>
       <div className="buy-page-heading">
@@ -49,45 +63,44 @@ export function Tracking() {
             {[
               [
                 "Order Placed",
-                "10 Jul 2026",
-                "09:30 AM",
-                "Your order has been received. A great find is on its way.",
+                currentPurchase?.createdAt,
+                "Your order has been received.",
               ],
               [
                 "Payment Confirmed",
-                "10 Jul 2026",
-                "09:31 AM",
-                "Payment verified. Your purchase is covered by buyer protection.",
+                currentPurchase?.paidAt,
+                "Payment has been recorded.",
               ],
               [
                 "Farm Preparing",
-                "10 Jul 2026",
-                "11:15 AM",
-                "Health check, oxygen support, and insulated packaging are underway.",
+                currentPurchase?.readyAt,
+                "The seller is preparing the order for dispatch.",
               ],
               [
                 "Shipped",
-                delivered ? "11 Jul 2026" : "Expected 11 Jul",
-                delivered ? "08:00 AM" : "Awaiting dispatch",
-                "Specialist live-fish courier. Tracking reference: LF-829104.",
+                statusRank >= 3 ? currentPurchase?.updatedAt : undefined,
+                "The order has been handed to the delivery service.",
               ],
               [
                 "Delivered",
-                delivered ? "12 Jul 2026" : "Expected 12 Jul",
-                delivered ? "10:20 AM" : "Before 6:00 PM",
-                "Delivered with care. Please inspect your fish and confirm receipt.",
+                currentPurchase?.deliveredAt,
+                "Please inspect your fish and confirm receipt.",
               ],
-            ].map(([title, date, time, description], i) => (
+            ].map(([title, at, description], i) => (
               <li
                 key={title}
                 className={
-                  delivered || i < 2 ? "done" : i === 2 ? "current" : "pending"
+                  statusRank > i
+                    ? "done"
+                    : statusRank === i
+                      ? "current"
+                      : "pending"
                 }
               >
                 <span className="buy-timeline-marker">
-                  {delivered || i < 2 ? (
+                  {statusRank > i ? (
                     <Glyph name="check" />
-                  ) : i === 2 ? (
+                  ) : statusRank === i ? (
                     <Glyph name="box" />
                   ) : (
                     <span />
@@ -96,9 +109,7 @@ export function Tracking() {
                 <div>
                   <div className="buy-timeline-title">
                     <h3>{title}</h3>
-                    <span>
-                      {date} · {time}
-                    </span>
+                    <span>{dateTime(at)}</span>
                   </div>
                   <p>{description}</p>
                 </div>
@@ -136,31 +147,29 @@ export function Tracking() {
               </UiButton>
             </div>
           </section>
-          <section className="buy-demo-advance">
-            <span className="buy-eyebrow">EXPLORE THE PROTOTYPE</span>
+          <section className="buy-panel">
+            <span className="buy-eyebrow">ORDER ACTIONS</span>
             <h3>
               {disputeSent
                 ? "Your issue is under review."
                 : completed
                   ? "Thanks for completing your trade."
-                  : "Ready to see the next step?"}
+                  : "We'll update this page as your order progresses."}
             </h3>
             <p>
               {disputeSent
                 ? "We've kept your order open while your report is reviewed. You can check your case details below."
                 : completed
-                  ? "Your receipt and review are attached to this demo order."
-                  : "Skip the wait and preview delivery confirmation. No shipment is actually sent."}
+                  ? "You can view or submit your review below."
+                  : "Delivery confirmation becomes available after the seller marks the order delivered."}
             </p>
             <BuyButton
               onClick={() => {
                 if (disputeSent) go("dispute");
                 else if (completed) go("review");
-                else {
-                  setDelivered(true);
-                  go("delivery");
-                }
+                else if (delivered) go("delivery");
               }}
+              disabled={!disputeSent && !completed && !delivered}
             >
               {disputeSent
                 ? "View Issue Report"
@@ -170,7 +179,7 @@ export function Tracking() {
                     : "Leave a Review"
                   : delivered
                     ? "Confirm Your Delivery"
-                    : "Simulate Delivery"}
+                    : "Waiting for Delivery"}
               <Glyph name="arrow" />
             </BuyButton>
           </section>

@@ -17,31 +17,23 @@ export function Detail() {
     size,
     location,
     cart,
-    setCart,
     gallery,
     setGallery,
     setModal,
-    setToast,
     rating,
     heading,
     galleryImages,
     go,
     favorite,
     beginCheckout,
+    addToCart,
   } = useBuyer();
   return (
     <>
       <div className="buy-detail-layout">
         <div>
           <div className="buy-detail-main-image">
-            <img
-              src={galleryImages[gallery]}
-              alt={
-                gallery === 0
-                  ? selected.name
-                  : `${selected.species} collection reference photo`
-              }
-            />
+            <img src={galleryImages[gallery]} alt={selected.name} />
             <span className="buy-product-label">{selected.label}</span>
             <UiButton
               variant="plain"
@@ -50,11 +42,7 @@ export function Detail() {
             >
               <Glyph name="zoom" />
             </UiButton>
-            <span className="buy-gallery-note">
-              {gallery === 0
-                ? "Listing photography"
-                : "Collection reference · not the exact specimen"}
-            </span>
+            <span className="buy-gallery-note">Listing photography</span>
           </div>
           <div className="buy-thumbnails">
             {galleryImages.map((src, i) => (
@@ -63,9 +51,7 @@ export function Detail() {
                 className={gallery === i ? "selected" : ""}
                 onClick={() => setGallery(i)}
                 key={i}
-                aria-label={`View ${
-                  i === 0 ? "listing" : "reference"
-                } photo ${i + 1}`}
+                aria-label={`View listing photo ${i + 1}`}
                 aria-pressed={gallery === i}
               >
                 <img src={src} alt="" />
@@ -76,15 +62,8 @@ export function Detail() {
             <span className="buy-eyebrow">RAISED WITH CARE</span>
             <h2>Exceptional stock. No guesswork.</h2>
             <p>
-              Carefully selected by {selected.seller} for vibrant coloration,
-              balanced form, and active behavior. Every listing includes a
-              health review before dispatch and specialist packaging for a safe
-              journey.
-            </p>
-            <p className="buy-fine-print">
-              This is a demonstration listing. Photos are illustrative; confirm
-              the exact specimen and delivery requirements with the seller
-              before a real purchase.
+              {selected.description ||
+                `Listed by ${selected.seller}. Contact the seller if you need more information before ordering.`}
             </p>
           </div>
         </div>
@@ -97,8 +76,7 @@ export function Detail() {
             </span>
           </div>
           <span className="buy-eyebrow">
-            {selected.species.toUpperCase()} COLLECTION · FM-
-            {10247 + selected.id}
+            {selected.species.toUpperCase()} COLLECTION · {selected.code}
           </span>
           <h1 ref={heading} tabIndex={-1}>
             {selected.name}
@@ -125,8 +103,8 @@ export function Detail() {
               ["Age", selected.age],
               ["Gender", selected.gender],
               ["Origin", selected.origin],
-              ["Health Status", "Health checked"],
-              ["Availability", "1 specimen"],
+              ["Health Status", selected.health || "Not provided"],
+              ["Availability", `${selected.quantity ?? 0} available`],
             ].map(([label, value]) => (
               <div key={label}>
                 <dt>{label}</dt>
@@ -142,8 +120,8 @@ export function Detail() {
               <strong>{selected.seller}</strong>
               <Verified />
               <span>
-                <Rating value={selected.rating} /> · 128 Listings ·{" "}
-                {selected.location}
+                <Rating value={selected.rating} /> · {selected.reviewCount ?? 0}{" "}
+                reviews · {selected.location}
               </span>
             </div>
             <UiButton
@@ -165,8 +143,7 @@ export function Detail() {
                 if (cart.some((f) => f.id === selected.id)) {
                   go("cart");
                 } else {
-                  setCart((old) => [...old, selected]);
-                  setToast(`${selected.name} added to your cart.`);
+                  void addToCart(selected);
                 }
               }}
             >

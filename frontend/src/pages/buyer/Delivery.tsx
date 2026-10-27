@@ -2,7 +2,7 @@ import { BuyButton, Glyph } from "@/components/buyer/BuyerParts";
 import { useBuyer } from "@/context/BuyerContext";
 import { OrderProduct } from "@/components/buyer/BuyerWidgets";
 export function Delivery() {
-  const { setCompleted, setFiles, heading, go } = useBuyer();
+  const { confirmDelivery, setFiles, heading, go } = useBuyer();
   return (
     <div className="buy-centered-flow">
       <span className="buy-state-icon">
@@ -34,9 +34,8 @@ export function Delivery() {
       </section>
       <BuyButton
         onClick={() => {
-          setCompleted(true);
           setFiles([]);
-          go("review");
+          void confirmDelivery().then(() => go("review"));
         }}
       >
         <Glyph name="check" />
@@ -54,7 +53,7 @@ export function Delivery() {
       </BuyButton>
       <p className="buy-fine-print">
         <Glyph name="shield" />
-        Confirming receipt completes your demo order. Report any issue first.
+        Confirming receipt completes your order. Report any issue first.
       </p>
     </div>
   );

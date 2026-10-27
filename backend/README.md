@@ -29,9 +29,10 @@ docker compose up -d
 
 The API listens on **4000**. Change `PORT` in `.env` if needed.
 
-The FishFarm frontend is a Vite app whose exported config uses port **8443** (`strictPort`).
-`CORS_ORIGINS` therefore allows 8443 and 5173; if you override the frontend port with
-`PORT=5173 pnpm dev`, both are covered.
+The FishFarm frontend is a Vite app on **5173** by default. Its development proxy
+forwards `/v1` and `/uploads` to `http://127.0.0.1:4000` without rewriting the paths.
+This keeps the refresh cookie's `/v1/auth` path valid. See the
+[frontend setup guide](../frontend/README.md). Deployment routing is deferred.
 
 ## Endpoints
 
@@ -123,8 +124,8 @@ as an optional internal quality gate between Admins — `publish` moves a draft 
   `15plus`), `location`, `rating` and `available` (`true` hides sold-out listings and is the
   default). `sort` is `recommended` (default), `price_asc`, `price_desc` or `newest`; the UI labels
   for size and sort are accepted too. `page`/`pageSize` are capped at 100.
-- Items use a product projection: id (`FM-…`), name, species, breed, description, size, price,
-  quantity, negotiable, age, gender, origin, health, location, region, shipping, images, a display
+- Items use a product projection: id (`FM-…`), name, species, breed, description, `sizeCm`, price,
+  quantity, negotiable, `ageMonths`, gender, origin, health, location, region, shipping, images, a display
   label (`pre_order` | `new` | `verified`), sale-mode fields, views and the company summary with the
   company-level rating and review count.
 - `rating` is the single company rating aggregated from `Review` rows. Because one company sells
@@ -255,6 +256,33 @@ approved. Its share model is 40 × 5 kg from 200,000 g expected total biomass.
 `pnpm db:seed` **resets demo data** and is guarded against `NODE_ENV=production` unless
 `ALLOW_DEMO_SEED=1` is set.
 
+## Isolated automated-test database
+
+End-to-end tests use `fishfarm_test`, not the development database `fishfarm`.
+`test-database.ts` loads the ordinary `.env`, preserves its host/credentials, and selects
+`fishfarm_test` unless `TEST_DATABASE_URL` supplies a separate connection. The database
+name must end in `_test` and its URL must differ from the development datasource; unsafe
+configurations fail before the app starts.
+
+Create this database once on the existing local Postgres instance. For the default
+Docker setup (if it does not already exist):
+
+```bash
+docker exec fishfarm-postgres createdb -U fishfarm fishfarm_test
+pnpm db:test:migrate
+pnpm test:e2e
+```
+
+`db:test:migrate` deploys the retained migration history using `prisma.test.config.ts`.
+It does not reset or seed either database. End-to-end suites create and clean up their
+own fixtures. Use a separate disposable test instance in CI, or set `TEST_DATABASE_URL`
+explicitly. Do not use `db:reset` or `db:seed` for routine regression checks.
+
+The end-to-end runner uses at most two workers: eight concurrent suites exhausted
+Argon2 allocation memory while both local dev servers were running. Password-hashing
+settings were not weakened. The known `pg` concurrent-query deprecation warning still
+appears and does not fail the tests.
+
 ## Commands
 
 ```bash
@@ -262,7 +290,8 @@ pnpm start:dev            # watch mode
 pnpm build                # compile to dist/
 pnpm start:prod           # run compiled build
 pnpm test                 # unit tests (Vitest)
-pnpm test:e2e             # e2e tests (needs Postgres running)
+pnpm test:e2e             # e2e tests against isolated fishfarm_test
+pnpm db:test:migrate      # deploy retained migrations to test database
 pnpm lint                 # oxlint
 pnpm prisma:generate      # regenerate the client after schema edits
 pnpm db:migrate           # create + apply a migration in development
@@ -305,5 +334,5 @@ src/
 - The schema includes both products: marketplace entities (§3) and batch sponsorship (§11).
   Auth/users, listings, marketplace, uploads, cart/orders/tracking/disputes and batch/facility
   management are implemented. Engagement and sponsorship/payment/settlement APIs remain future work.
-- `pnpm test:e2e` boots the real app against the local database and cleans up its own fixtures.
-  It does not reset or reseed the database.
+- `pnpm test:e2e` boots the real app against the isolated test database and cleans up its own
+  fixtures. It does not reset or reseed the development database.

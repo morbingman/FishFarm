@@ -1,0 +1,23 @@
+.commerce h1 { font-size: clamp(28px, 4vw, 42px); margin: 18px 0; font-weight: 800; }
+.commerce h2 { font-size: 22px; margin-bottom: 16px; font-weight: 700; }
+.commerce h3 { font-weight: 700; margin-top: 20px; }
+.commerce p { margin: 12px 0; line-height: 1.65; overflow-wrap: anywhere; }
+.commerce a { text-decoration: underline; text-underline-offset: 3px; }
+.commerce-steps { display: flex; flex-wrap: wrap; gap: 24px; margin: 20px 0 28px; }
+.commerce-steps [aria-current] { font-weight: 800; }
+.commerce-layout { display: grid; grid-template-columns: minmax(0, 1.6fr) minmax(0, 1fr); gap: 24px; align-items: start; }
+.commerce-panel { border: 1px solid #d4e9f3; border-radius: 18px; background: white; padding: 24px; margin-bottom: 20px; min-width: 0; }
+.commerce-line { display: flex; gap: 18px; padding: 20px 0; border-bottom: 1px solid #d4e9f3; }
+.commerce-line img { width: 100px; height: 100px; object-fit: cover; border-radius: 12px; }
+.commerce-line > div { min-width: 0; }
+.commerce-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 12px; }
+.commerce button, .commerce-primary { display: inline-block; border: 1px solid #b5d7e5; padding: 10px 16px; border-radius: 10px; margin: 8px 8px 8px 0; cursor: pointer; }
+.commerce .commerce-primary { background: #003152; color: white; text-decoration: none; }
+.commerce button:disabled { opacity: .5; cursor: not-allowed; }
+.commerce-fields { display: grid; gap: 16px; }
+.commerce-fields legend { font-size: 22px; font-weight: 700; padding: 0 8px; }
+.commerce-fields label { display: grid; gap: 8px; font-weight: 600; }
+.commerce-fields input, .commerce-fields select { width: 100%; min-width: 0; background: white; border: 1px solid #b5d7e5; border-radius: 9px; padding: 12px; font-weight: 400; }
+.commerce-alert { border: 1px solid #d9a03c; background: #fff8e9; color: #664719; padding: 18px; border-radius: 12px; margin: 16px 0; }
+.commerce :focus-visible { outline: 3px solid #168dbc; outline-offset: 3px; }
+@media (max-width: 760px) { .commerce-layout { grid-template-columns: minmax(0, 1fr); } .commerce-panel { padding: 18px; } .commerce-line img { width: 64px; height: 64px; } }

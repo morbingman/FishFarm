@@ -33,7 +33,7 @@ export class AuthController {
 
   @Public()
   @Post('register')
-  @ApiOperation({ summary: 'Create a Buyer or Seller account and start a session' })
+  @ApiOperation({ summary: 'Create a User account and start a session' })
   @ApiCreatedResponse({ description: 'Access token in the body; refresh token in an httpOnly cookie.' })
   async register(
     @Body() dto: RegisterDto,

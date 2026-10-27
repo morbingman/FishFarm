@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MoreHorizontal, Ban, Trash2, Unlock } from "lucide-react";
+import { MoreHorizontal, Ban, Unlock } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -30,17 +30,16 @@ export function Users({
   const [page, setPage] = useState(1);
   const [target, setTarget] = useState<{
     user: User;
-    action: BlockKind | "unblock" | "delete";
+    action: BlockKind | "unblock";
   } | null>(null);
   const [reason, setReason] = useState("");
   const [error, setError] = useState("");
-  const actionName = (action: BlockKind | "unblock" | "delete") =>
+  const actionName = (action: BlockKind | "unblock") =>
     ({
       "24h": t("Khóa 24 giờ", "Block 24 hours"),
       "7d": t("Khóa 7 ngày", "Block 7 days"),
       permanent: t("Khóa vĩnh viễn", "Block permanently"),
       unblock: t("Mở khóa", "Unblock"),
-      delete: t("Xóa tài khoản", "Delete account"),
     })[action];
   const rows = store.users.filter(
     (account) =>
@@ -54,7 +53,7 @@ export function Users({
   );
   const pages = Math.max(1, Math.ceil(rows.length / 10));
   const safePage = Math.min(page, pages);
-  const select = (account: User, action: BlockKind | "unblock" | "delete") => {
+  const select = (account: User, action: BlockKind | "unblock") => {
     setTarget({ user: account, action });
     setReason("");
     setError("");
@@ -170,13 +169,6 @@ export function Users({
                             {actionName("unblock")}
                           </DropdownMenuItem>
                         )}
-                        <DropdownMenuItem
-                          className="admin-danger"
-                          onSelect={() => select(account, "delete")}
-                        >
-                          <Trash2 size={15} />
-                          {actionName("delete")}
-                        </DropdownMenuItem>
                       </DropdownMenuContent>
                     </DropdownMenu>
                   </td>
@@ -204,17 +196,10 @@ export function Users({
       {target && (
         <ConfirmDialog
           title={`${actionName(target.action)}: ${target.user.name}`}
-          body={
-            target.action === "delete"
-              ? t(
-                  "Tài khoản sẽ bị xóa khỏi danh sách và không thể đăng nhập. Lịch sử đơn hàng được giữ lại.",
-                  "The account will be removed and cannot sign in. Order history is retained.",
-                )
-              : t(
-                  "Thao tác này thay đổi quyền truy cập tài khoản và được ghi vào nhật ký.",
-                  "This changes account access and is recorded in the activity log.",
-                )
-          }
+          body={t(
+            "Thao tác này thay đổi quyền truy cập tài khoản và được ghi vào nhật ký.",
+            "This changes account access and is recorded in the activity log.",
+          )}
           danger={target.action !== "unblock"}
           confirmLabel={actionName(target.action)}
           error={error}

@@ -49,6 +49,15 @@ export function Marketplace() {
     filtered,
     activeFilters,
   } = useBuyer();
+  const speciesOptions = [...new Set(stock.map((fish) => fish.species))];
+  const locationOptions = [
+    ...new Set(stock.map((fish) => fish.location).filter(Boolean)),
+  ];
+  const ratingOptions = [
+    ...new Set(stock.map((fish) => fish.rating).filter((value) => value > 0)),
+  ]
+    .sort((a, b) => b - a)
+    .map(String);
   return (
     <>
       <section className="buy-market-hero">
@@ -131,7 +140,7 @@ export function Marketplace() {
             <h3>
               Species <Glyph name="chevron" />
             </h3>
-            {["Koi", "Betta", "Goldfish"].map((s) => (
+            {speciesOptions.map((s) => (
               <UiLabel className="buy-filter-check" key={s}>
                 <UiInput
                   type="checkbox"
@@ -163,7 +172,7 @@ export function Marketplace() {
           </div>
           <div className="buy-filter-group">
             <h3>
-              Price range <span>USD</span>
+              Price range <span>VND</span>
             </h3>
             <UiInput
               className="buy-range"
@@ -194,13 +203,13 @@ export function Marketplace() {
               label: "Location",
               value: location,
               setter: setLocation,
-              options: ["All locations", "Vietnam", "Thailand"],
+              options: ["All locations", ...locationOptions],
             },
             {
               label: "Seller Rating",
               value: sellerRating,
               setter: setSellerRating,
-              options: ["Any rating", "4.9", "4.8", "4.7"],
+              options: ["Any rating", ...ratingOptions],
             },
           ].map(({ label, value, setter, options }) => (
             <div className="buy-filter-group" key={label}>
@@ -300,7 +309,7 @@ export function Marketplace() {
             </div>
           </div>
           <div className="buy-collection-tabs">
-            {["All fish", "Koi", "Betta", "Goldfish"].map((s) => (
+            {["All fish", ...speciesOptions].map((s) => (
               <UiButton
                 variant="plain"
                 className={
@@ -420,9 +429,7 @@ export function Marketplace() {
                   <div className="buy-product-footer">
                     <div>
                       <span>Asking price</span>
-                      <strong>
-                        {money(fish.price)} <small>USD</small>
-                      </strong>
+                      <strong>{money(fish.price)}</strong>
                     </div>
                     <UiButton variant="plain" onClick={() => openFish(fish)}>
                       View Details

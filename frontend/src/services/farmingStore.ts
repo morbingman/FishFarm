@@ -1,6 +1,7 @@
 import type { Lang } from "@/hooks/useTranslation";
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { log, notify, currentUser } from "@/services/demoStore";
+import { api, domainApi } from "@/services/api";
 
 /* ============ types ============ */
 export type Bi = {
@@ -39,6 +40,9 @@ export type Facility = {
 };
 export type Fish = {
   id: string;
+  singleFish?: boolean;
+  hasSchedule?: boolean;
+  catalogVisible?: boolean;
   name: Bi;
   sci: string;
   category: Category;
@@ -644,6 +648,9 @@ export const FISH: Fish[] = [
     ],
   },
 ];
+// The catalogue is populated from /batches. The former design-time examples above only
+// document the shape and are never exposed as application data.
+FISH.splice(0, FISH.length);
 export const fishById = (id?: string | null) => FISH.find((f) => f.id === id);
 export const CAT_LABEL: Record<Category, Bi> = {
   carp: bi("Cá chép & Koi", "Carp & Koi"),
@@ -753,8 +760,9 @@ export function quote(
       ? Math.min(2_000_000, 80_000 + 12_000 * Math.ceil(q / fish.perBox))
       : 0;
   const total = fishSubtotal + serviceCost + deliveryFee;
-  const deposit =
-    total === 0
+  const deposit = fish.singleFish
+    ? total
+    : total === 0
       ? 0
       : Math.min(
           total,
@@ -1113,15 +1121,7 @@ function seed(): State {
     seq: 8,
   };
 }
-let state: State = (() => {
-  try {
-    const s = localStorage.getItem(KEY);
-    if (s) return JSON.parse(s) as State;
-  } catch {
-    /* ignore */
-  }
-  return seed();
-})();
+let state: State = { orders: [], used: {}, seq: 1 };
 const subs = new Set<() => void>();
 function commit(next: State) {
   state = next;
@@ -1135,13 +1135,30 @@ function commit(next: State) {
 window.addEventListener("storage", (event) => {
   if (event.key !== KEY) return;
   try {
-    state = event.newValue ? (JSON.parse(event.newValue) as State) : seed();
+    state = event.newValue
+      ? (JSON.parse(event.newValue) as State)
+      : { orders: [], used: {}, seq: 1 };
     subs.forEach((fn) => fn());
   } catch {
     /* Ignore malformed updates. */
   }
 });
 export function useFarming(): State {
+  useEffect(() => {
+    void refreshFarming();
+    const refreshOnFocus = () => void refreshFarming();
+    const refreshWhenVisible = () => {
+      if (document.visibilityState === "visible") void refreshFarming();
+    };
+    const interval = window.setInterval(() => void refreshFarming(), 15_000);
+    window.addEventListener("focus", refreshOnFocus);
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => {
+      window.clearInterval(interval);
+      window.removeEventListener("focus", refreshOnFocus);
+      document.removeEventListener("visibilitychange", refreshWhenVisible);
+    };
+  }, []);
   return useSyncExternalStore(
     (cb) => {
       subs.add(cb);
@@ -1152,7 +1169,187 @@ export function useFarming(): State {
     () => state,
   );
 }
-export const resetFarmingData = () => commit(seed());
+export async function refreshFarming() {
+  try {
+    const user = currentUser();
+    const [batches, sponsorships] = await Promise.all([
+      domainApi.batches(),
+      !user
+        ? Promise.resolve([])
+        : user.role === "Admin"
+          ? domainApi.adminSponsorships()
+          : domainApi.sponsorships(),
+    ]);
+    const publicBatchIds = new Set(batches.map((batch: any) => batch.code));
+    const allBatches = Array.from(
+      new Map(
+        [
+          ...batches,
+          ...sponsorships.map((sponsorship: any) => sponsorship.batch),
+        ]
+          .filter(Boolean)
+          .map((batch: any) => [batch.code, batch]),
+      ).values(),
+    );
+    const mapped: Fish[] = allBatches.map((batch: any) => {
+      const start = batch.stockingDate
+        ? new Date(batch.stockingDate)
+        : new Date();
+      const end = batch.expectedHarvestDate
+        ? new Date(batch.expectedHarvestDate)
+        : start;
+      const hasSchedule = Boolean(
+        batch.stockingDate && batch.expectedHarvestDate,
+      );
+      const months = hasSchedule
+        ? Math.max(1, Math.ceil((end.getTime() - start.getTime()) / (30 * day)))
+        : 0;
+      const text = { vi: batch.title, en: batch.title };
+      const singleFish = batch.stockCount === 1 && batch.totalShares === 1;
+      const facilityId = `farm-${batch.code}`;
+      const hasFacility = Boolean(batch.location || batch.region);
+      if (
+        hasFacility &&
+        !FACILITIES.some((facility) => facility.id === facilityId)
+      ) {
+        FACILITIES.push({
+          id: facilityId,
+          name: {
+            vi: batch.location ?? batch.region,
+            en: batch.location ?? batch.region,
+          },
+          address: {
+            vi: batch.region ?? batch.location,
+            en: batch.region ?? batch.location,
+          },
+        });
+      }
+      return {
+        id: batch.code,
+        singleFish,
+        hasSchedule,
+        catalogVisible: publicBatchIds.has(batch.code),
+        name: text,
+        sci: batch.breed ?? batch.species,
+        category: /tilapia/i.test(batch.species)
+          ? "tilapia"
+          : /cat|basa/i.test(batch.species)
+            ? "catfish"
+            : "carp",
+        kind: /koi|betta|gold/i.test(batch.species)
+          ? "ornamental"
+          : "commercial",
+        water: "fresh",
+        stage: singleFish
+          ? {
+              vi: `Cá con ${batch.ageMonths ?? 0} tháng`,
+              en: `${batch.ageMonths ?? 0}-month juvenile`,
+            }
+          : { vi: batch.status, en: batch.status },
+        sizeStart: Number(batch.currentSizeCm ?? 0),
+        sizeTarget: Number(batch.targetSizeCm ?? 0),
+        months,
+        fishPrice: batch.packagePricePerShare,
+        care: 0,
+        minQty: 1,
+        perBox: 1,
+        total: singleFish ? 1 : batch.totalShares,
+        capacity: singleFish ? 1 : batch.totalShares,
+        paused: batch.status !== "open",
+        facilities: hasFacility ? [facilityId] : [],
+        deliveryAreas: batch.region ? [batch.region] : [],
+        photos: batch.images?.map((x: any) => x.url) ?? [],
+        desc: { vi: batch.description, en: batch.description },
+        info: [
+          ...(batch.carePlan
+            ? [
+                {
+                  k: { vi: "Kế hoạch chăm sóc", en: "Care plan" },
+                  v: { vi: batch.carePlan, en: batch.carePlan },
+                },
+              ]
+            : []),
+        ],
+      } as Fish;
+    });
+    FISH.splice(0, FISH.length, ...mapped);
+    const used = Object.fromEntries(
+      batches.map((b: any) => [b.code, b.totalShares - b.sharesAvailable]),
+    );
+    const orders: Order[] = sponsorships.map((s: any) => ({
+      id: s.id,
+      owner: s.sponsor?.email ?? user?.email ?? "",
+      fishId: s.batch.code,
+      qty: s.shares,
+      confirmedQty: s.shares,
+      pkg: "basic",
+      addons: [],
+      facility: FACILITIES[0]?.id ?? "main",
+      createdAt: s.createdAt,
+      startDate: s.batch.stockingDate?.slice(0, 10) ?? s.createdAt.slice(0, 10),
+      months: 1,
+      fishSubtotal: s.packageAmount,
+      serviceCost: 0,
+      deliveryFee: s.deliveryFee,
+      total: s.totalAmount,
+      deposit: s.totalAmount,
+      balance: 0,
+      status:
+        (
+          {
+            pending_payment: "awaiting_deposit",
+            funded: "confirmed",
+            preparing: "preparing",
+            growing: "farming",
+            ready_for_delivery: "ready",
+            handover: "handover",
+            delivered: "completed",
+            settled: "completed",
+            cancelled: "cancelled",
+            refunded: "cancelled",
+          } as any
+        )[s.status] ?? "pending",
+      delivery: s.deliveryMethod ? "delivery" : "pickup",
+      area: s.province ?? s.city ?? "",
+      address: s.address,
+      name: s.recipientName,
+      phone: s.phone,
+      notes: "",
+      payments: (s.payments ?? []).map((p: any) => ({
+        id: p.id,
+        at: p.createdAt,
+        amount: p.amount,
+        method:
+          p.method === "e_wallet"
+            ? "wallet"
+            : p.method === "bank_card"
+              ? "gateway"
+              : "bank",
+        status: p.state,
+        ref: p.providerRef ?? p.id,
+        kind: "deposit",
+      })),
+      care: (s.batch.updates ?? []).map((u: any) => ({
+        id: u.id,
+        at: u.createdAt,
+        type: u.photos?.length ? "photo" : "note",
+        text: { vi: u.note ?? u.stage, en: u.note ?? u.stage },
+        by: { vi: "Quản trị viên", en: "Administrator" },
+        photo: u.photos?.[0]?.url,
+      })),
+      meas: [],
+      handover: null,
+      sample: false,
+    }));
+    commit({ orders, used, seq: orders.length + 1 });
+  } catch {
+    /* The page renders an empty state if Supabase is temporarily unavailable. */
+  }
+}
+export const resetFarmingData = () => {
+  commit({ orders: [], used: {}, seq: 1 });
+  void refreshFarming();
+};
 
 /* ============ availability ============ */
 export const remaining = (f: Fish, s: State) =>
@@ -1189,8 +1386,39 @@ export async function submitDeposit(
   simulateFail: boolean,
   lang: Lang,
 ): Promise<Order> {
-  await wait(1600);
-  if (simulateFail) throw new Error("payment_failed");
+  const sponsorship = await domainApi.sponsor(input.fishId, {
+    shares: input.qty,
+    deliveryFee:
+      input.delivery === "delivery"
+        ? quote(
+            fishById(input.fishId)!,
+            input.qty,
+            input.pkg,
+            input.addons,
+            input.delivery,
+          ).deliveryFee
+        : 0,
+    recipientName: input.name,
+    phone: input.phone,
+    address: input.address || input.area,
+    province: input.area,
+    deliveryMethod: input.delivery,
+  });
+  const payment = await domainApi.paySponsorship(sponsorship.id, {
+    method:
+      method === "wallet"
+        ? "e_wallet"
+        : method === "gateway"
+          ? "bank_card"
+          : "bank_transfer",
+    simulateFailure: simulateFail,
+    idempotencyKey: `${sponsorship.id}-package`,
+  });
+  if (payment.state === "failed") throw new Error("payment_failed");
+  await refreshFarming();
+  const saved = state.orders.find((item) => item.id === sponsorship.id);
+  if (saved) return saved;
+  await wait(100);
   const fish = fishById(input.fishId)!;
   if (input.qty > remaining(fish, state)) throw new Error("capacity");
   const q = quote(fish, input.qty, input.pkg, input.addons, input.delivery);
@@ -1450,7 +1678,7 @@ export const ADMIN_BOOKING_NEXT: Partial<Record<OrderStatus, OrderStatus>> = {
   ready: "handover",
   handover: "completed",
 };
-export function adminSetBookingStatus(id: string, next: OrderStatus) {
+export async function adminSetBookingStatus(id: string, next: OrderStatus) {
   const admin = currentUser();
   const order = state.orders.find((item) => item.id === id);
   if (admin?.role !== "Admin" || !order) throw new Error("Access denied");
@@ -1482,64 +1710,8 @@ export function adminSetBookingStatus(id: string, next: OrderStatus) {
     throw new Error(
       "Record the remaining payment before completing the booking",
     );
-  const release =
-    (next === "completed" || next === "cancelled") &&
-    order.status !== "awaiting_deposit";
-  commit({
-    ...state,
-    used: release
-      ? {
-          ...state.used,
-          [order.fishId]: Math.max(
-            0,
-            (state.used[order.fishId] ?? 0) - order.qty,
-          ),
-        }
-      : state.used,
-    orders: state.orders.map((item) =>
-      item.id === id
-        ? {
-            ...item,
-            status: next,
-            confirmedQty:
-              item.confirmedQty ?? (next === "confirmed" ? item.qty : null),
-            handover:
-              next === "handover"
-                ? {
-                    method: item.delivery,
-                    date: new Date().toISOString().slice(0, 10),
-                    address: item.address,
-                    status: "scheduled",
-                    requestedAt: new Date().toISOString(),
-                  }
-                : next === "completed" && item.handover
-                  ? { ...item.handover, status: "done" }
-                  : item.handover,
-            payments:
-              next === "cancelled"
-                ? item.payments.map((payment) =>
-                    payment.status === "paid"
-                      ? { ...payment, status: "refund_pending" as const }
-                      : payment,
-                  )
-                : item.payments,
-            care: [
-              ...item.care,
-              {
-                id: `admin-${Date.now()}`,
-                at: new Date().toISOString(),
-                type: "note" as const,
-                text: {
-                  vi: `Trang trại cập nhật: ${STATUS_LABEL[next].vi}`,
-                  en: `Farm update: ${STATUS_LABEL[next].en}`,
-                },
-                by: { vi: admin.name, en: admin.name },
-              },
-            ],
-          }
-        : item,
-    ),
-  });
+  await domainApi.updateSponsorshipStatus(id, next);
+  await refreshFarming();
   log(
     admin.name,
     "Admin",

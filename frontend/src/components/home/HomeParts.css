@@ -348,3 +348,281 @@
 .home-parts-view-116 {
   @apply mx-auto flex max-w-[1220px] flex-col justify-between gap-3 px-5 py-6 text-xs text-[#63879c] sm:flex-row;
 }
+
+/* Full-bleed, silent background video underneath the introduction. */
+.home-video-hero {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  min-height: 640px;
+  padding: 88px 24px;
+  overflow: hidden;
+  background: #003152;
+}
+.home-video-background {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: #003152 url("/hero-koi.jpg") center / cover no-repeat;
+}
+.home-video-background > video {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: center;
+  pointer-events: none;
+}
+.home-video-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    #001d32e8 0%,
+    #003152c4 38%,
+    #00315270 68%,
+    #0031522b 100%
+  );
+}
+.home-video-layout {
+  position: relative;
+  z-index: 2;
+  width: min(1220px, 100%);
+  margin: 0 auto;
+}
+html body .home-video-hero .home-video-copy {
+  max-width: 690px;
+  min-width: 0;
+  padding: 0;
+}
+.home-video-copy h1 {
+  margin: 0;
+  font-size: clamp(48px, 5.5vw, 76px);
+  font-weight: 800;
+  line-height: 1.06;
+  letter-spacing: -0.045em;
+}
+.home-video-copy > p {
+  margin-top: 26px;
+  max-width: 600px;
+  font-size: 17px;
+  line-height: 1.9;
+}
+html body .home-video-hero .hero-copy > p {
+  color: #e0f0f8;
+}
+.home-video-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 32px;
+}
+html body .home-video-hero .home-video-actions button:first-child {
+  background: #addef1;
+  color: #003152;
+  box-shadow: 0 8px 24px #001d3240;
+}
+html body .home-video-hero .home-video-actions button:last-child {
+  background: #ffffff14;
+  color: #fff;
+  border: 1px solid #addef199;
+  backdrop-filter: blur(12px);
+}
+
+/* Fixed card slots keep every CTA aligned, even with very long content. */
+.home-view-9 {
+  align-items: stretch;
+}
+html body .market-listing.home-parts-view-54 {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
+  border: 1px solid #bbdcea;
+  border-radius: 18px;
+  box-shadow: 0 8px 24px #0031520c;
+  background: linear-gradient(160deg, #fff 65%, #edf8fd);
+}
+html body .market-listing.home-parts-view-54:hover {
+  border-color: #6ab8d8;
+  box-shadow: 0 16px 38px #00315220;
+}
+.market-listing .home-parts-view-55 {
+  height: auto;
+  aspect-ratio: 1.18;
+  flex-shrink: 0;
+  border-bottom: 1px solid #d4e9f3;
+}
+.market-listing .home-parts-view-57 {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+  padding: 20px;
+}
+.market-listing .home-parts-view-4 {
+  align-self: flex-start;
+  max-width: 100%;
+  flex-shrink: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.market-listing .home-parts-view-58 {
+  margin-top: 16px;
+  height: 17px;
+  line-height: 17px;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.market-listing .home-parts-view-59 {
+  margin-top: 7px;
+  height: 48px;
+  line-height: 24px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
+.market-listing .home-parts-view-60 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  align-content: start;
+  gap: 5px;
+  height: 41px;
+  margin-top: 10px;
+  line-height: 18px;
+}
+.market-listing .home-parts-view-60 > span:first-child {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.market-listing .home-parts-view-62 {
+  min-width: 0;
+}
+.market-listing .home-parts-view-62 > svg {
+  flex-shrink: 0;
+}
+.market-listing .home-parts-view-62 > span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.listing-card-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, auto);
+  align-items: end;
+  gap: 10px;
+  min-height: 64px;
+  margin-top: 18px;
+  padding-top: 14px;
+  border-top: 1px solid #d4e9f3;
+}
+.listing-card-summary > div {
+  min-width: 0;
+}
+.market-listing .home-parts-view-64 {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  height: 19px;
+  line-height: 19px;
+}
+.market-listing .home-parts-view-67 {
+  font-size: clamp(17px, 1.6vw, 22px);
+  white-space: nowrap;
+}
+html body .market-listing .home-parts-view-57 > .home-parts-view-68 {
+  flex-shrink: 0;
+  height: 44px;
+  margin-top: 20px;
+  color: #fff;
+  background: linear-gradient(120deg, #003152, #145b80);
+  border: 1px solid #003152;
+  border-radius: 10px;
+  box-shadow: 0 6px 14px #00315220;
+}
+html body .market-listing .home-parts-view-57 > .home-parts-view-68:hover {
+  background: #164e70;
+  transform: translateY(-1px);
+}
+
+/* Four backgrounds crossfade beneath one permanent blue overlay and copy. */
+.promo-slides {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+.promo-slides .promo-slide {
+  opacity: 0;
+  transition: opacity 1600ms ease-in-out;
+}
+.promo-slides .promo-slide.is-active {
+  opacity: 1;
+}
+.home-parts-view-97 .promo-overlay {
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    90deg,
+    #003152e8 0%,
+    #003152b8 55%,
+    #00315278 100%
+  );
+}
+.home-parts-view-97 .home-parts-view-100 {
+  z-index: 2;
+}
+@media (max-width: 900px) {
+  .home-video-hero {
+    min-height: 580px;
+    padding: 72px 24px;
+  }
+  .home-video-copy > p {
+    max-width: 570px;
+  }
+  .home-video-copy h1 {
+    font-size: clamp(44px, 7.5vw, 64px);
+  }
+  .home-video-overlay {
+    background: linear-gradient(90deg, #001d32e0, #00315291);
+  }
+}
+@media (max-width: 480px) {
+  .home-video-hero {
+    min-height: 560px;
+    padding: 58px 20px;
+  }
+  .home-video-copy h1 {
+    font-size: clamp(40px, 10.5vw, 48px);
+  }
+  .home-video-copy > p {
+    font-size: 15px;
+    line-height: 1.8;
+  }
+  .home-video-background > video {
+    object-position: 60% center;
+  }
+  .market-listing .home-parts-view-67 {
+    font-size: 21px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .promo-slides .promo-slide {
+    transition: none;
+  }
+}
+/* Override the previous hero's desktop inset; align intro copy with the container. */
+.home-video-hero.market-hero > .home-video-layout > .home-video-copy {
+  padding: 0;
+}

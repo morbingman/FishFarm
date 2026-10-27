@@ -153,7 +153,7 @@ export function Checkout() {
             </div>
             <p className="buy-fine-print">
               <Glyph name="lock" />
-              All payment methods are simulated. No real charges are made.
+              Payment status is recorded with your order after authorization.
             </p>
           </section>
         </div>

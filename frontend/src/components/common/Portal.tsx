@@ -739,19 +739,7 @@ export function UserMenu({ user, dark }: { user: User; dark?: boolean }) {
                 }}
               >
                 <Icon name="user" size={16} />
-                Profile
-              </UiButton>
-            </DropdownMenuItem>
-            <DropdownMenuItem asChild>
-              <UiButton
-                variant="plain"
-                onClick={() => {
-                  setOpen(false);
-                  go("account/settings");
-                }}
-              >
-                <Icon name="gear" size={16} />
-                Account settings
+                Profile & settings
               </UiButton>
             </DropdownMenuItem>
             <DropdownMenuItem asChild>
@@ -828,28 +816,6 @@ export const ROLE_NAV: Record<Role, NavItem[]> = {
   ],
   Admin: ADMIN_NAV,
 };
-export const ACCOUNT_NAV: NavItem[] = [
-  {
-    label: "Profile",
-    href: "#account/profile",
-    icon: "user",
-  },
-  {
-    label: "Account Settings",
-    href: "#account/settings",
-    icon: "gear",
-  },
-  {
-    label: "Notifications",
-    href: "#account/notifications",
-    icon: "bell",
-  },
-  {
-    label: "Activity History",
-    href: "#account/activity",
-    icon: "activity",
-  },
-];
 export function PortalShell({
   user,
   active,
@@ -902,7 +868,7 @@ export function AccessDenied({
     "Switch account": "Đổi tài khoản",
     "Back to homepage": "Về trang chủ",
   });
-  const home = user.role === "Admin" ? "#admin" : "#marketplace";
+  const home = user.role === "Admin" ? "#admin/listings" : "#marketplace";
   return (
     <FullState>
       <div className="pt-fullbody">
@@ -945,7 +911,8 @@ export function SessionExpired({
 }) {
   useDomTranslation(language, {
     "Your session expired": "Phiên đăng nhập đã hết hạn",
-    "Your seven-day session has expired. Sign in again to continue.": "Phiên đăng nhập 7 ngày đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.",
+    "Your seven-day session has expired. Sign in again to continue.":
+      "Phiên đăng nhập 7 ngày đã hết hạn. Vui lòng đăng nhập lại để tiếp tục.",
     "Sign in again": "Đăng nhập lại",
     "Back to homepage": "Về trang chủ",
   });

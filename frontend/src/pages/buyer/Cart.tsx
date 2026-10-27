@@ -4,7 +4,7 @@ import { BuyButton, Glyph, TrustRow } from "@/components/buyer/BuyerParts";
 import { useBuyer } from "@/context/BuyerContext";
 import { Stepper } from "@/components/buyer/BuyerWidgets";
 export function Cart() {
-  const { size, cart, setCart, heading, go, openFish, beginCheckout } =
+  const { size, cart, heading, go, openFish, beginCheckout, removeFromCart } =
     useBuyer();
   return (
     <>
@@ -33,9 +33,7 @@ export function Cart() {
                 <UiButton
                   variant="plain"
                   className="buy-icon-button"
-                  onClick={() =>
-                    setCart((old) => old.filter((f) => f.id !== fish.id))
-                  }
+                  onClick={() => void removeFromCart(fish)}
                   aria-label={`Remove ${fish.name}`}
                 >
                   <Glyph name="close" />

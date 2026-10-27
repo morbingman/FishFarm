@@ -1,5 +1,18 @@
 @reference "@/styles/global.css";
 /* Styles for App.tsx */
+.integration-auth-fields { border: 0; padding: 0; margin: 0; display: grid; gap: 20px; min-width: 0; }
+.integration-hero-image { width: 100%; height: 100%; object-fit: cover; }
+.integration-no-image { padding: 40px 20px; text-align: center; }
+.integration-header .ds-header-in { height: auto; min-height: 72px; flex-wrap: wrap; padding-block: 12px; }
+.ds-header.ribbon-header.integration-header .ds-nav { display: flex; }
+.integration-user { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+@media (max-width: 760px) {
+  .integration-header .ds-brand { padding-right: 0; }
+  .integration-header .ds-brand::after { display: none; }
+  .integration-header .ds-nav { order: 3; width: 100%; }
+  .integration-header .ds-header-right { flex-wrap: wrap; }
+  .integration-user { max-width: 100px; }
+}
 .app-view-1 {
   @apply grid min-h-screen place-items-center bg-white text-market-navy;
 }

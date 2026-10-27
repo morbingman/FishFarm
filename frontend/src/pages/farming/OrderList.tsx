@@ -256,13 +256,6 @@ function OrderList({
           </>
         )}
       </section>
-      <p className="fm-demo-note order-list-view-18">
-        <Icon name="info" size={14} />
-        {t(
-          "Dữ liệu đơn mẫu chỉ để minh họa.",
-          "Sample orders are for demonstration only.",
-        )}
-      </p>
     </>
   );
 }

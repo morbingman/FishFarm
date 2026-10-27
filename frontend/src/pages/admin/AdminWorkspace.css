@@ -199,6 +199,109 @@ html body .dialog-view-2 {
   flex-wrap: wrap;
   margin-top: 20px;
 }
+.batch-form {
+  max-width: 1050px;
+}
+.batch-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+.batch-form-grid .sl-field {
+  display: grid;
+  gap: 7px;
+}
+.batch-wide {
+  grid-column: 1 / -1;
+}
+.batch-images {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 24px;
+  padding-top: 22px;
+  border-top: 1px solid #d4e9f3;
+}
+.batch-images .admin-note {
+  margin: 5px 0 0;
+}
+.batch-image-grid {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+.batch-image-grid figure {
+  position: relative;
+  margin: 0;
+}
+.batch-image-grid img {
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  object-fit: cover;
+  border-radius: 10px;
+}
+.batch-image-grid button {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  border: 0;
+  border-radius: 7px;
+  padding: 5px 8px;
+  background: #ffffffeb;
+  color: #a92f3a;
+  cursor: pointer;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+}
+.batch-error {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: #fbe9ea;
+  color: #a92f3a;
+  font-weight: 700;
+}
+.admin-juvenile-list {
+  margin-bottom: 20px;
+}
+.admin-section-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 16px;
+}
+.admin-section-heading h2,
+.admin-section-heading p {
+  margin-top: 0;
+}
+.admin-section-heading > strong {
+  display: grid;
+  place-items: center;
+  min-width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: #dff2fb;
+  color: #003152;
+}
+.admin-juvenile-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 210px;
+}
+.admin-juvenile-cell img {
+  width: 56px;
+  height: 44px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.admin-juvenile-cell span {
+  display: grid;
+  gap: 3px;
+}
 @media (max-width: 1200px) {
   .admin-module-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -222,5 +325,18 @@ html body .dialog-view-2 {
   }
   .admin-pad {
     padding: 18px;
+  }
+  .batch-form-grid {
+    grid-template-columns: 1fr;
+  }
+  .batch-wide {
+    grid-column: auto;
+  }
+  .batch-images {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .batch-image-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 }

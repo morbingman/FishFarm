@@ -62,29 +62,51 @@ export function FishCard({ fish, language }: { fish: Fish; language: Lang }) {
             <dd>{L(fish.stage, language)}</dd>
           </div>
           <div>
-            <dt>{t("Thời gian nuôi", "Duration")}</dt>
-            <dd>{t(`~${fish.months} tháng`, `~${fish.months} months`)}</dd>
+            <dt>
+              {fish.singleFish
+                ? t("Mục tiêu", "Target")
+                : t("Thời gian nuôi", "Duration")}
+            </dt>
+            <dd>
+              {fish.singleFish
+                ? `${fish.sizeTarget} cm`
+                : t(`~${fish.months} tháng`, `~${fish.months} months`)}
+            </dd>
           </div>
         </dl>
         <div className="fm-price">
           <div>
-            <small>{t("Giá cá giống từ", "Fish from")}</small>
+            <small>
+              {fish.singleFish
+                ? t("Chi phí đầu tư nuôi", "Sponsorship cost")
+                : t("Giá cá giống từ", "Fish from")}
+            </small>
             <b>{fmtMoney(fish.fishPrice, language)}</b>
-            <small>{t("/ con", "/ fish")}</small>
+            {!fish.singleFish && <small>{t("/ con", "/ fish")}</small>}
           </div>
-          <div className="fish-card-view-4">
-            <small>{t("Phí nuôi ước tính", "Est. farming fee")}</small>
-            <b>{fmtMoney(fish.care, language)}</b>
-            <small>{t("/ con / tháng", "/ fish / month")}</small>
-          </div>
+          {!fish.singleFish && (
+            <div className="fish-card-view-4">
+              <small>{t("Phí nuôi ước tính", "Est. farming fee")}</small>
+              <b>{fmtMoney(fish.care, language)}</b>
+              <small>{t("/ con / tháng", "/ fish / month")}</small>
+            </div>
+          )}
         </div>
         <div className="fm-cap">
           <div>
-            <span>{t("Chỗ nuôi còn lại", "Capacity left")}</span>
+            <span>
+              {fish.singleFish
+                ? t("Trạng thái đầu tư", "Sponsorship status")
+                : t("Chỗ nuôi còn lại", "Capacity left")}
+            </span>
             <b className="fish-card-view-6">
-              {fish.paused
-                ? "—"
-                : `${fmtNum(rem, language)} / ${fmtNum(fish.total, language)}`}
+              {fish.singleFish
+                ? ok
+                  ? t("Đang nhận đầu tư", "Open")
+                  : t("Đã có người đầu tư", "Sponsored")
+                : fish.paused
+                  ? "—"
+                  : `${fmtNum(rem, language)} / ${fmtNum(fish.total, language)}`}
             </b>
           </div>
           <div
@@ -111,7 +133,9 @@ export function FishCard({ fish, language }: { fish: Fish; language: Lang }) {
               className="sl-btn sl-btn-primary"
               href={`#farming/booking?fish=${fish.id}`}
             >
-              {t("Đặt nuôi", "Book now")}
+              {fish.singleFish
+                ? t("Đầu tư nuôi", "Sponsor fish")
+                : t("Đặt nuôi", "Book now")}
             </a>
           ) : (
             <UiButton
@@ -120,7 +144,9 @@ export function FishCard({ fish, language }: { fish: Fish; language: Lang }) {
               disabled
               title={L(AVAIL_LABEL[a], language)}
             >
-              {t("Đặt nuôi", "Book now")}
+              {fish.singleFish
+                ? t("Đã được đầu tư", "Sponsored")
+                : t("Đặt nuôi", "Book now")}
             </UiButton>
           )}
         </div>

@@ -1,5 +1,6 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useSyncExternalStore } from "react";
 import { currentUser, log, notify } from "./demoStore";
+import { api } from "./api";
 export type SaleStatus =
   | "confirmed"
   | "preparing"
@@ -22,30 +23,76 @@ export type Sale = {
   };
   status: SaleStatus;
   payment: "paid" | "refund_pending";
+  paidAt?: string;
+  readyAt?: string;
+  deliveredAt?: string;
+  completedAt?: string;
+  updatedAt?: string;
 };
-const KEY = "fishmarket-purchase-orders-v1";
-const load = (): Sale[] => {
-  try {
-    return JSON.parse(localStorage.getItem(KEY) || "[]");
-  } catch {
-    return [];
-  }
-};
-let orders = load();
+let orders: Sale[] = [];
 const listeners = new Set<() => void>();
 function save(next: Sale[]) {
   orders = next;
-  localStorage.setItem(KEY, JSON.stringify(next));
   listeners.forEach((fn) => fn());
 }
-window.addEventListener("storage", (event) => {
-  if (event.key === KEY) {
-    orders = load();
-    listeners.forEach((fn) => fn());
+export async function refreshSales() {
+  const user = currentUser();
+  if (!user) return;
+  try {
+    const rows = await api<any[]>(
+      user.role === "Admin" ? "/admin/orders" : "/me/orders",
+    );
+    const status = (value: string): SaleStatus =>
+      (({
+        pending_payment: "confirmed",
+        paid: "confirmed",
+        ready: "preparing",
+        shipped: "shipped",
+        delivered: "delivered",
+        completed: "completed",
+        cancelled: "cancelled",
+        refunded: "cancelled",
+      })[value] as SaleStatus) ?? "confirmed";
+    save(
+      rows.map((row) => ({
+        id: row.code,
+        owner: row.buyer?.email ?? user.email,
+        createdAt: row.placedAt,
+        items: row.items.map((item: any) => ({
+          id: Number(String(item.listing.code).replace(/\D/g, "")),
+          name: item.listing.draft?.name ?? item.listing.code,
+          price: item.unitPrice,
+          image:
+            item.listing.draft?.images?.find((x: any) => x.isMain)?.url ??
+            item.listing.draft?.images?.[0]?.url ??
+            "",
+        })),
+        total: row.total,
+        shipping: {
+          name: row.recipientName,
+          phone: row.phone,
+          address: row.address,
+          city: row.city ?? "",
+          province: row.province ?? "",
+        },
+        status: status(row.status),
+        payment: row.paymentStatus === "refunded" ? "refund_pending" : "paid",
+        paidAt: row.paidAt ?? undefined,
+        readyAt: row.readyAt ?? undefined,
+        deliveredAt: row.deliveredAt ?? undefined,
+        completedAt: row.completedAt ?? undefined,
+        updatedAt: row.updatedAt ?? undefined,
+      })),
+    );
+  } catch {
+    /* Authentication bootstrap will retry when the screen mounts again. */
   }
-});
-export const useSales = () =>
-  useSyncExternalStore(
+}
+export const useSales = () => {
+  useEffect(() => {
+    void refreshSales();
+  }, []);
+  return useSyncExternalStore(
     (callback) => {
       listeners.add(callback);
       return () => {
@@ -54,29 +101,7 @@ export const useSales = () =>
     },
     () => orders,
   );
-export function recordPurchase(
-  input: Omit<Sale, "id" | "createdAt" | "status" | "payment">,
-) {
-  const actor = currentUser();
-  if (actor?.role !== "Buyer" || actor.email !== input.owner)
-    throw new Error("Buyer access required");
-  const sale: Sale = {
-    ...input,
-    id: `PO-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
-    createdAt: new Date().toISOString(),
-    status: "confirmed",
-    payment: "paid",
-  };
-  save([sale, ...orders]);
-  notify(
-    "Admin",
-    "status",
-    "New purchase order",
-    `${sale.id} · ${input.shipping.name}`,
-    `#admin/orders/${sale.id}`,
-  );
-  return sale;
-}
+};
 const NEXT: Partial<Record<SaleStatus, SaleStatus>> = {
   confirmed: "preparing",
   preparing: "shipped",
@@ -119,4 +144,20 @@ export function updatePurchase(id: string, status: SaleStatus) {
     `${id}: ${status}`,
     "#marketplace/orders",
   );
+  const apiStatus = (
+    {
+      confirmed: "paid",
+      preparing: "ready",
+      shipped: "shipped",
+      delivered: "delivered",
+      completed: "completed",
+      cancelled: "cancelled",
+    } as const
+  )[status];
+  void api(`/admin/orders/${id}/status`, {
+    method: "PATCH",
+    body: JSON.stringify({ status: apiStatus }),
+  })
+    .then(refreshSales)
+    .catch(() => undefined);
 }

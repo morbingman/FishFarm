@@ -17,6 +17,7 @@ export function BuyerLayout() {
     language,
     setLanguage,
     page,
+    stock,
     selected,
     favorites,
     favoritesOnly,
@@ -32,7 +33,7 @@ export function BuyerLayout() {
     message,
     setMessage,
     sent,
-    setSent,
+    sendSellerMessage,
     toast,
     setToast,
     hasOrder,
@@ -118,7 +119,7 @@ export function BuyerLayout() {
             >
               Marketplace
             </UiButton>
-            {["Koi", "Betta", "Goldfish"].map((s) => (
+            {[...new Set(stock.map((fish) => fish.species))].map((s) => (
               <UiButton
                 variant="plain"
                 key={s}
@@ -132,18 +133,6 @@ export function BuyerLayout() {
                 {s === "Koi" ? "Koi Fish" : `${s} Fish`}
               </UiButton>
             ))}
-            <UiButton
-              variant="plain"
-              onClick={() => {
-                clearFilters();
-                setSort("Newest");
-                setFavoritesOnly(false);
-                go("marketplace");
-              }}
-            >
-              New Arrivals
-              <span className="buy-new-dot" />
-            </UiButton>
             <span className="buy-nav-spacer" />
             <span className="buy-nav-assurance">
               <Glyph name="truck" />
@@ -169,12 +158,6 @@ export function BuyerLayout() {
             </UiButton>
             <Glyph name="chevron" />
             <span>{pageTitles[page]}</span>
-            {page !== "detail" && (
-              <span className="buy-prototype-tag">
-                <span />
-                BUYER JOURNEY PROTOTYPE
-              </span>
-            )}
           </div>
           {page === "detail" && <Detail />}
 
@@ -246,17 +229,6 @@ export function BuyerLayout() {
           <span>© 2026 FISHMARKET</span>
         </div>
       </footer>
-      <div className="buy-prototype-footer">
-        <span>
-          <span />
-          BUYER PURCHASE PROTOTYPE
-        </span>
-        <span>
-          Discover <Glyph name="chevron" /> Purchase <Glyph name="chevron" />{" "}
-          Track <Glyph name="chevron" /> Review
-        </span>
-        <span>No real payments or shipments</span>
-      </div>
       {toast && (
         <div className="buy-toast" role="status">
           <Glyph name="check" />
@@ -273,6 +245,7 @@ export function BuyerLayout() {
       {modal && (
         <Dialog
           open={!!modal}
+          modal={modal !== "messages"}
           onOpenChange={(open) => {
             if (!open) setModal(null);
           }}
@@ -289,8 +262,12 @@ export function BuyerLayout() {
             }
             className={
               "buyer-app " +
-              `buy-modal ${modal === "zoom" ? "buy-zoom-modal" : ""}`
+              `buy-modal ${modal === "zoom" ? "buy-zoom-modal" : ""} ${modal === "messages" ? "buy-chat-modal" : ""}`
             }
+            showOverlay={modal !== "messages"}
+            onInteractOutside={(event) => {
+              if (modal === "messages") event.preventDefault();
+            }}
             aria-describedby={undefined}
           >
             <DialogTitle className="buyer-view-1">FISHMARKET</DialogTitle>
@@ -360,16 +337,23 @@ export function BuyerLayout() {
                   ))}
                 </div>
                 <form
+                  className={modal === "messages" ? "buy-chat-composer" : ""}
                   onSubmit={(e) => {
                     e.preventDefault();
                     if (message.trim()) {
-                      setSent((old) => [...old, message.trim()]);
+                      void sendSellerMessage(message.trim()).catch(() =>
+                        setToast("Could not send message."),
+                      );
                       setMessage("");
                     }
                   }}
                 >
                   <UiLabel className="buy-field">
-                    <span>Your message</span>
+                    <span
+                      className={modal === "messages" ? "buy-chat-label" : ""}
+                    >
+                      Your message
+                    </span>
                     <UiTextarea
                       rows={3}
                       value={message}
@@ -384,7 +368,7 @@ export function BuyerLayout() {
                   </BuyButton>
                 </form>
                 <p className="buy-fine-print">
-                  Local prototype chat. Messages aren't sent to real people.
+                  Messages are saved to your conversation with the seller.
                 </p>
               </>
             )}
