@@ -63,9 +63,18 @@ export type CompanyListingInput = Partial<Omit<CompanyListingDraft, "images" | "
 export type CompanyListing = {
   id: string; company: { id: string; name: string; location: string | null }; createdBy: string | null;
   status: CompanyListingStatus; draft: CompanyListingDraft | null;
-  decision: { kind: string; reason: string | null; feedback: string | null; step: number | null; by: string; at: string } | null;
+  decision: { kind: "changes" | "rejected"; reason: string | null; feedback: string | null; step: number; by: string | null; at: string | null } | null;
   createdAt: string; updatedAt: string; submittedAt: string | null; views: number;
   history: { at: string; by: string; action: string; note?: string }[];
+};
+
+export type ListingReviewTab = "pending" | "approved" | "changes";
+export type ListingReviewFeedback = { reason: string; feedback: string; step?: number };
+export type ListingCheck = { key: "images" | "details" | "pricing" | "location" | "preorder"; ok: boolean };
+export type ReviewListing = CompanyListing & { checks: ListingCheck[] };
+export type AdminActivity = {
+  id: string; actorId: string | null; actorLabel: string; role: "User" | "Admin" | "System";
+  action: string; target: string | null; link: string | null; createdAt: string;
 };
 
 export type ApiUser = {

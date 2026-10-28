@@ -5,13 +5,69 @@
 **Saved local baseline:** `integration/team-baseline` at `ca6eb49`
 **Saved application integration checkpoint:** `38f0dd7` — real auth, marketplace, checkout and order fulfilment (2026-10-28; not pushed)
 **Saved dispute checkpoint:** `90c00a0` — buyer disputes, company review and protected evidence (2026-10-28; not pushed)
+**Saved catalog checkpoint:** `3c333f1` — shared company catalog editing and direct publication (2026-10-28; not pushed)
 **Purpose:** decide what to keep, adapt, restore, build or defer for each component before changing application code.
 
 This is an implementation guide and decision register, not a claim that integration is complete. The user requested incremental integration and deferred deployment. Recommendations below are not all approved product decisions. No application changes, branch merges or deployment are performed by creating this document.
 
+## Admin account directory and User status — implemented on 2026-10-28
+
+This bounded slice follows catalog checkpoint `3c333f1` on `integration/team-baseline`. It and the preceding review/activity slice remain uncommitted; nothing was pushed, merged or deployed. Backend user endpoints and session issuance changed, but schema, migrations, dependencies and lockfiles did not. Backend-unchanged statements in earlier sections describe those earlier slices only.
+
+### Connected scope
+
+- Standalone Admin-only `#admin/users` mounts `pages/company/AdminUsers.tsx`, scoped CSS and dedicated helpers/transport. Header, guest login-return and activity link allowlists recognize the route. Broad legacy Admin/Portal/demo workspaces remain unmounted.
+- `GET /v1/admin/users` reuses `user.view` with server name/email search (trimmed, max 100), role/status filters, bounded page/limit and authoritative totals. A repeatable-read page/count snapshot returns only immutable ID, email, name, actual User/Admin role, active/suspended status and joined timestamp, newest first then ID. Stored names remain escaped display text, without stricter frontend-only registration rules that could reject a whole directory page.
+- `PATCH /v1/admin/users/{encodedEmail}/status` reuses `user.manage` and accepts exactly `{status,expectedStatus}`. A target row lock rejects stale/same-state transitions with `409 user.statusConflict`. All Admin targets, including self, are visible but protected from either action (`409 user.protectedAccount`). This is a conservative User-management boundary, not approval or implementation of the complete staff suspension/recovery/provisioning policy.
+- Suspension updates User status, revokes every target session and records activity atomically. Reactivation permits fresh login without restoring old access/refresh tokens. Session issuance uses the same account lock and rereads current status/password so a stale login cannot issue a live session after suspension. Existing orders, payments, carts, evidence and profile/history remain intact.
+- UI actions confirm the exact email and expected transition, guard duplicates and validate server identity/status acknowledgements. Accepted writes hide old rows and refetch. Failed/uncertain writes require successful Refresh before another action; status writes never replay automatically, including on 401. Private reads are aborted/session-bound. Suspended-account errors or invalid refresh invalidate the current session and late private results, while ordinary permission errors and older-session failures cannot clear a newer login.
+- No deletion, timed block, reason collection, role editing or Admin bootstrap was added. Idle tabs discover revocation on the next protected request; already authorized in-flight work is not undone. `expectedStatus` is not a version token and cannot detect an intervening cycle ending in the same state.
+
+### Verification and acceptance limits
+
+- Frontend: **152 tests in fifteen files passed**, including 22 added helper/transport/session regressions; TypeScript/build passed and audit reported zero vulnerabilities. The final run includes search/page bounds and permitted stored-name regression fixes. No component interaction suite was added.
+- Backend: **27 unit and 162 isolated e2e tests passed**, TypeScript/build passed and lint reported zero warnings/errors. The new 91-case users suite covers exact permissions/projection/validation, protected active/suspended Admins, concurrent duplicate transitions, transactional audit/session behavior, stale-login race and nonempty customer-data preservation. Known `pg` concurrent-query deprecation remains.
+- Browser: actual guest users deep-link login returned to the directory. Search uniquely identified fresh User `cmvrzc1ak000aekj5e7b24q5w`; explicit suspend/reactivate confirmations and authoritative refetch completed the Active/Suspended/Active cycle. Both roles and protected Admin rows were visible. Ten-row server paging returned ten then one row while preserving total 11; applying Admin filtering reset page 1 and returned four protected rows with no status controls. Vietnamese text and mobile width were checked (375 pixels at 390 × 844); desktop width was 1265 at 1280 × 720. English/desktop were restored and Admin sign-out reached settled guest Home with the original four available fish.
+- Separate localhost API verification: **30 HTTP requests and 11 assertion-group executions** across the corrected setup/final pass, excluding browser requests and an earlier incomplete verifier attempt. Verified guest/User denial, strict bodies, missing/protected accounts, stale duplicate conflict, role/status/search/paging, both old sessions revoked before and after reactivation, suspended login denial, fresh login success, exact audit and original row fingerprints. PostgreSQL verification was read-only; mutations used actual HTTP.
+- Limits: normal pointer clicks and some keyboard/fill actions were unreliable; snapshot-grounded observed controls invoked actual UI handlers/requests only after readback. No full pointer/keyboard-only or screenshot visual-layout acceptance is claimed. Keep-unchanged, failed/uncertain action with Refresh, active User tab discovering suspension, User route denial, status-filter UI interaction, activity-to-users link and unusual-name rendering remain unexercised GUI journeys. Their automated/API coverage is not component acceptance. An existing success notice retained its original English wording after a language switch; fresh Vietnamese labels/timestamps were verified.
+
+### Fixture disposition
+
+Only two uniquely labelled fresh local test Users were created; only those targets were status-mutated. The first (`cmvrz9zn20001ekj5gasgckh5`) completed its API cycle but the verifier stopped on parsing bodyless logout; it remains active and retained, with no blind mutation replay or cleanup deletion. The corrected fixture (`cmvrzc1ak000aekj5e7b24q5w`) is active with exactly four successful status audit entries (API suspend/reactivate, then UI suspend/reactivate), all attributed to Local Fulfilment Admin A with `#admin/users`, and no unrevoked target sessions. No broad Admin-session cleanup was performed.
+
+All ten User rows in the corrected-pass baseline, including the first fixture, are unchanged; the final count is eleven. Original 18 listings, 18 drafts, 15 images, 54 listing-history rows, 13 orders, 13 order items, 15 payments and two uploads retain exact fingerprints. No new listing/order/payment/upload, reset/reseed, direct database write, migration replacement or deletion occurred. Exposed group-chat credentials were not used. Profile/preferences, notifications, farming/compliance, analytics, sponsorship transactions/settlement and Admin lifecycle policy remain separate; deployment stays deferred.
+
+## Optional listing review and recorded activity — implemented on 2026-10-28
+
+This slice follows saved catalog checkpoint `3c333f1` on `integration/team-baseline` and remains uncommitted. Nothing was pushed, merged or deployed. Backend source/schema/migrations/tests and dependencies are unchanged. Earlier sections remain historical slice records.
+
+### Connected scope
+
+- Standalone `pages/company/ListingReview.tsx`, `AdminActivity.tsx` and scoped CSS mount Admin-only `#admin/queue`, `#admin/review/:id` and `#admin/activity`. Active auth preserves allowlisted destinations; malformed encodings fail safely and database aliases canonicalize. Broad legacy Admin/demo workspaces remain unmounted.
+- Shared company catalog now offers bodyless submit/withdraw for complete saved records. Submission locks editing, clears current decision and immediately hides approved content; paused cannot submit. Pending withdrawal returns to hidden draft and clears submission time. Direct publication remains available/default; Admins may review their own or other Admins' submissions.
+- Dedicated `listingReviewApi.ts` validates canonical queue filters, complete unique five-check detail projections, nullable decisions and exact returned decision acknowledgements. Feedback bodies whitelist trimmed reason (1–120), feedback (10–2000) and integer step 1–6. Takedown accepts trimmed reason 10–2000 and validates the returned policy rejection. All writes use explicit existing endpoints, confirmation, duplicate locks and no uncertain transport replay.
+- Queue server tabs are pending, approved excluding paused, and combined changes/rejected. Search and ten-row paging are local to the returned array. Detail renders all six saved field groups/media, backend hints, nullable current decision and recorded history, with integer VND/UTC. Hints omit submission rules such as age/size/shipping and are not certification or full completeness guarantees. Approval publishes; takedown hides without cancelling/refunding orders. Submit emits preference-controlled Admin notifications; decisions record history/activity without an invented notification promise. Inbox UI remains absent.
+- Private review reads are aborted/session-bound; dirty text guards navigation/reload and confirmed Refresh discards it. Accepted decisions hide old detail and refetch because mutation responses lack checks. Failures disable decisions until successful reconciliation. Retained backend moderation is not atomic: concurrent decisions can both commit, last update wins and history/activity can contain both. Frontend locks/Refresh do not fix this; backend concurrency hardening is separate scope.
+- Activity is an independent real newest-first array with integer 100/200/300 windows. Local search/ten-row paging and counts are explicitly window-scoped, not analytics or complete audit history. Recorded roles/actions are unchanged; System is only server-recorded. Only known active Admin links are clickable; external/unknown/User-only/unintegrated links remain recorded text. Fictional Overview totals and editable roles remain unmounted.
+
+### Verification and acceptance limits
+
+- Frontend: **130 tests in thirteen files passed**, TypeScript/build passed, audit zero vulnerabilities. Added 27 regressions for review helpers/transport/activity, company submit/withdraw and nullable decisions. No component interaction suite was added.
+- Backend: **23 unit and 71 isolated e2e tests**, TypeScript/build/lint passed again, with no changed behavior/assertions. Known `pg` concurrent-query deprecation remains.
+- Browser: fresh `FM-48383` showed six field groups/hints and shared creator attribution. Empty reason blocked; whitespace was trimmed into exact feedback/step 2 confirmation. Request changes persisted in review/company readback, resubmission locked editing, withdrawal returned draft, submission and approval succeeded, then takedown recorded the exact policy rejection with no order/refund promise. Accepted decisions read authoritative detail/checks before re-enabling.
+- Browser: pending/live/combined sent-back server filters and local empty/matching search passed. Activity showed actual events, ten-row Next paging, empty/matching search, 100 and 300 windows (243 returned at the latter) and a real review deep link. Vietnamese text and mobile document width were checked for review/activity: 375 pixels at 390 × 844; activity desktop width 1265 at 1280 × 720. Desktop English restored and Admin sign-out confirmed settled guest Home.
+- Separate localhost API verification: **96 HTTP requests**, browser requests excluded; 42 successful assertion-group executions across 33 unique labels. Verified full optional lifecycle including reject, shared/self-review, anonymous/User denial, pending edit/delete lock, canonical queue/check/activity projections and exact history/activity decisions. Confirmed UI fixture public 200 when approved and 404 after takedown, with read-only fingerprints preserving original data.
+- Limits: normal pointer clicks timed out repeatedly; snapshot-grounded controls invoked actual UI handlers/requests. No full pointer/keyboard-only or screenshot visual acceptance is claimed. Direct reject, approved resubmission hiding, guest login-return/User denial, uncertain decision/Refresh, dirty decision navigation, alias canonicalization, 200-window selection and unsafe-link rendering remain unexercised GUI journeys; helper/transport/API tests are not component acceptance. Queue pagination lacked enough matching rows. Final catalog UTC decision/history formatting passed automated checks but was not separately browser-rerun. Backend concurrent decisions remain unfixed.
+
+### Fixture disposition
+
+Only fresh labelled local test listings were mutated. `FM-48382` remains untouched draft; `FM-48383` is rejected after UI takedown, retaining eight exact history/activity entries; `FM-48384` retains its independent rejected API lifecycle. All three anonymous public details return 404 and have zero dependencies. Draft/media/history/accounts are retained; no cleanup deletion was needed. Original row fingerprints across nine protected tables, all 13 orders, 13 order items, 15 payments and two uploads are unchanged. Available public IDs are again exactly `FM-18420`, `FM-18877`, `FM-19544`, `FM-20761`; `available=false` also retains sold-out `FM-19102`. No reset/reseed, direct database write, new upload or migration replacement occurred. Exposed group-chat credentials were not used.
+
+Optional review/activity are connected with these limits. Account/farming, notification inbox, analytics, sponsorship transactions/settlement and full marketplace acceptance remain separate; deployment stays deferred.
+
 ## Company catalog slice — implemented on 2026-10-28
 
-The dispute checkpoint `90c00a0` is saved; this catalog slice remains uncommitted on `integration/team-baseline`. Nothing was pushed, merged or deployed. Backend source, schema, migration history and tests are unchanged. Earlier sections are historical slice records.
+This catalog slice is saved as `3c333f1` on `integration/team-baseline`, following dispute checkpoint `90c00a0`. Nothing was pushed, merged or deployed. Backend source, schema, migration history and tests are unchanged. Earlier sections are historical slice records.
 
 ### Connected scope
 
@@ -404,34 +460,33 @@ Suggested responsibilities: backend owner defines DTOs, projections and missing 
 
 - **Implemented:** shared Admin list/create/edit/detail with six-step form mapping, bounded integer VND/quantity, nullable fish fields, preorder terms and URL-based media. DTO whitelisting strips prototype fields and image IDs; changed-field PATCH avoids replacing unchanged media. Partial draft saving and bodyless direct publication are separate confirmed actions. Approved edits immediately change public content; pending records are read-only.
 - **Verified:** name-only draft, complete save, direct publication, public readback and live edit passed through the UI. Separate API checks verified shared access across Admins, public media bytes, incomplete publication and pending-write rejection. Catalog helper/transport and navigation regressions passed; failed or malformed writes are not acknowledged as saved or automatically replayed.
-- **Limits:** media order/cover/removal, preorder form interaction and failure/Refresh still need GUI acceptance. Public uploads are not deleted when references are removed; uncertain creates have no durable idempotent recovery. Optional review/activity and pause/resume/delete controls remain separate. Full verification and browser limitations are recorded in the catalog slice above.
+- **Limits:** media order/cover/removal, preorder form interaction and failure/Refresh still need GUI acceptance. Public uploads are not deleted when references are removed; uncertain creates have no durable idempotent recovery. Optional review/activity are connected in §4.15–4.16; pause/resume/delete controls remain separate. Full verification and browser limitations are recorded in the slice sections above.
 
-### 4.15 Optional internal listing review — Restore / Adapt
+### 4.15 Optional internal listing review — Implemented; acceptance limits remain
 
-**Files:** local `pages/admin/Queue.tsx`, `Review.*`, `data/adminNavigation.ts`, `pages/admin/Admin.tsx`; `backend/src/listings/admin-listings.controller.ts`.
+**Active files:** `pages/company/ListingReview.*`, `services/listingReview.ts`, `services/listingReviewApi.ts`, their tests and company submit/withdraw controls. Legacy `pages/admin/Queue.tsx`, `Review.*` and broad Admin workspace remain unmounted; retained listing controllers are unchanged.
 
-- **Local:** supported queue and decision screens plus backend review transitions.
-- **Remote:** main deletes Queue/Review and redirects their routes to listings, presenting direct publication only.
-- **Recommendation:** restore local review screens as optional company quality-control functionality. Direct publish remains the default path. Use the existing Admin review routes, not company draft CRUD routes.
-- **Verify:** pending/approved/changes tabs, approve/reject/request-changes/takedown, feedback, status restrictions and review notification/activity links.
+- **Implemented:** optional shared queue/detail, pending/approved/combined changes tabs, six read-only groups, server hints/history/nullable decision and confirmed approve/reject/request-changes/takedown. Exact feedback bodies and acknowledgements are validated; successful decisions refetch detail/checks, failures require reconciliation. Submit/withdraw use company endpoints; direct publication still does not require review.
+- **Verified:** UI request changes/resubmit/withdraw/submit/approve/takedown, feedback readback, filtering/search and activity links; full lifecycle/permissions/projections separately API-verified. Detailed results are above.
+- **Limits:** hints are incomplete, self-review is allowed, decision notifications are not emitted and takedown does not cancel/refund orders. Concurrent backend decisions can both commit with last-write-wins; atomic moderation and outstanding GUI journeys remain separate.
 
-### 4.16 Admin overview, activity and role information — Restore selectively / Build gaps
+### 4.16 Admin overview, activity and role information — Activity implemented; overview/roles deferred
 
-**Files:** local `pages/admin/Overview.*`, `ActivityLog.tsx`, `Roles.tsx`, `data/adminData.ts`; `backend/src/listings/admin-activity.controller.ts`, `backend/src/auth/permissions.ts`.
+**Active files:** `pages/company/AdminActivity.tsx`, `services/listingReviewApi.ts`, `services/listingReview.ts` and tests. Legacy `pages/admin/Overview.*`, `ActivityLog.tsx`, `Roles.tsx` and `data/adminData.ts` remain unmounted; retained activity controller is unchanged.
 
-- **Local:** activity endpoint exists; overview is largely mock-derived. Roles component exists but the current router redirects it to Users.
-- **Remote:** main removes Overview and disables activity routing; its broader backend has summary/role endpoints absent locally.
-- **Action:** restore activity using its real array projection and `limit` parameter (default 100, bounded to 300). Adapt actual actor/action fields. Server-side page/offset pagination is not implemented; use client pagination over the fetched window or add a separate backend enhancement. Do not restore fictional KPI totals as live analytics. A read-only two-role capability view can be added deliberately; it must not suggest roles are editable.
-- **Verify:** real activity from integrated mutations, paging/empty states, role restrictions and valid links. Analytics needs a separate backend feature pass.
+- **Implemented:** independent real activity loader, integer 100/200/300 windows, local ten-row paging/search, raw roles/actions and UTC timestamps. Counts describe returned windows rather than platform totals. Only active Admin destinations are clickable; other recorded links remain plain text.
+- **Verified:** real review/company events, Next paging, empty/matching search, 100/300 windows, review deep link, Vietnamese/mobile width and final sign-out. Adapter/helper tests validate limits/projections/safe links; complete GUI limits are above.
+- **Deferred:** complete audit pagination, Overview analytics and deliberately designed read-only role capabilities require separate work. No fictional totals or editable-role claims were restored.
 
-### 4.17 Admin users, suspension and provisioning — Build, then Adapt
+### 4.17 Admin users, suspension and provisioning — Implemented bounded directory/status slice; provisioning deferred
 
-**Files:** `pages/admin/Users.*`, account-management helpers in `services/demoStore.ts`, `backend/src/users/*`, `auth/permissions.ts`; frontend-branch Admin bootstrap code.
+**Active files:** `pages/company/AdminUsers.*`, `services/adminUsers*`, `backend/src/users/admin-users.*`, `users/dto/admin-users.dto.ts`, `auth/auth.service.ts`; legacy `pages/admin/Users.*` and demo helpers remain unmounted.
 
-- **Local:** account status enforced by auth, but no Admin list/status mutation endpoints. Schema supports active/suspended, not the UI's timed block/deletion policy.
-- **Remote:** main removes misleading Delete Account behavior, but timed blocks still live mostly in local client state; status requests send active/suspended. Frontend branch reintroduces deletion language and automatic Admin bootstrap with source defaults.
-- **Recommendation:** implement explicit list and suspend/reactivate operations with audit/session enforcement first. Hide timed block choices until server-backed expiry exists. Preserve main's non-deletion wording and retain orders/history. Do not import automatic startup Admin provisioning blindly.
-- **Verify:** permission restrictions, suspended access/refresh denied, reactivation, cross-client consistency and no client-only timed unlocking.
+- **Implemented:** `GET /admin/users` requires `user.view`, searches/paginates on the server and returns only immutable ID, email, name, role, status and join time. Both roles appear; all Admin targets, including self, are protected from either status action. This is an explicit conservative slice boundary, not an imported legacy filter or complete Admin recovery policy.
+- **Status contract:** `PATCH /admin/users/{encodedEmail}/status` requires `user.manage` and exact `{status,expectedStatus}`. Row-locked transitions reject mismatched/same-state confirmation with `409 user.statusConflict`. Suspension/status/activity/session revocation commit atomically. Login issuance locks/rereads the same account; reactivation never restores old sessions. Activity records only actor/action/email/time/link, not an invented reason or expiry.
+- **Frontend:** standalone Admin-only `#admin/users`, guest-return/header/safe activity navigation, server search/status/role filters and paging, exact runtime projection/acknowledgement validation and confirmed actions. Private reads are aborted/session-bound; failed or uncertain mutations hide stale data and require Refresh. No optimistic state or uncertain replay. Suspended-account 403 and invalid refresh clear the current frontend session and invalidate pending private data; ordinary permission denial and late errors from an older identity do not clear a newer session.
+- **Retained/deferred:** no deletion, timed client unlocking, role changes, Admin provisioning or automatic bootstrap. Suspension preserves orders, payments, carts, evidence and history and cannot undo already authorized in-flight requests. Idle tabs are not instantly notified; enforcement occurs on subsequent requests. Expected status is not a durable version and cannot detect a full intervening cycle returning to the same state. Full component/browser acceptance limits are recorded in the latest slice section.
+
 
 ### 4.18 Account profile, preferences, password and history — Adapt / Build gaps
 
@@ -599,7 +654,7 @@ This is a proposed sequence. It prevents missing secondary APIs from blocking a 
 ### Pass C — Company operations and contained missing features
 
 - [x] Adapt shared company catalog forms, public media and direct publication (GUI acceptance limits recorded above).
-- [ ] Restore optional internal listing review and real activity screens.
+- [x] Connect optional internal listing review and real activity screens; remaining acceptance limits are recorded above.
 - [ ] Build Admin list/suspend/reactivate and notification inbox operations.
 - [ ] Integrate profile/prefs and remove client-only password/block/deletion claims.
 - [ ] Build favorites if included in this pass.
@@ -630,7 +685,7 @@ pnpm --dir C:/Mythic/Works/Projects/FishFarm/backend lint
 git diff --check
 ```
 
-The frontend now has 103 automated tests covering API/session behavior, commerce/dispute/catalog transport and rules, checkout recovery, buyer/company presentation and guarded hash navigation; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
+The frontend now has 130 automated tests covering API/session behavior, commerce/dispute/catalog/review/activity transport and rules, checkout recovery, buyer/company presentation and guarded hash navigation; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
 
 Preserve all eight backend end-to-end suites: app, auth, listings, marketplace, uploads, orders, disputes, batches-facilities. Preserve unit coverage for permissions and notification fan-out. Add tests for new endpoints/adapters instead of weakening existing assertions to match remote behavior.
 

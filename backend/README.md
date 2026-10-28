@@ -46,6 +46,7 @@ This keeps the refresh cookie's `/v1/auth` path valid. See the
 | `/v1/company/listings` | Company catalog CRUD, publish and submit/withdraw/pause/resume (Admin only) |
 | `/v1/admin/listings` | Internal review queue, review detail and approve/reject/request-changes/takedown |
 | `GET /v1/admin/activity` | Recent platform activity log |
+| `GET /v1/admin/users`, `PATCH /v1/admin/users/:email/status` | Shared account directory and User suspension/reactivation (Admin only) |
 | `GET /v1/marketplace/listings` | Public marketplace search, filters, sorting and pagination |
 | `GET /v1/marketplace/listings/:id` | Public listing detail by `FM-…` code or internal id |
 | `GET /v1/marketplace/store` | The company store profile with rating and catalog summary |
@@ -95,6 +96,15 @@ are no per-user stores and no independent sellers.
 Every Admin can operate every company resource; `createdBy` on a listing or batch records which
 Admin created it for audit only. The review stages (`pending`, `changes`, `rejected`) still exist
 as an optional internal quality gate between Admins — `publish` moves a draft straight to `approved`.
+
+### Account management
+
+- `GET /v1/admin/users` requires `user.view`. Optional `q` searches name/email case-insensitively (trimmed, max 100 characters), `status=active|suspended` and `role=User|Admin` filter on the server. `page` defaults to 1 (1–1,000,000), `limit` to 25 (1–100). The response is `{items,total,page,limit}`, ordered by joined date descending then immutable ID. Items contain only `id,email,name,role,status,joinedAt`; no password, preferences, session or refresh data. Count and page share a repeatable-read snapshot.
+- `PATCH /v1/admin/users/{encodedEmail}/status` requires `user.manage` and exactly `{status,expectedStatus}` using `active|suspended`. Email is normalized to lowercase. Requested status must differ from the expected current status. A row lock serializes changes; mismatched or same-state requests return `409 user.statusConflict`, missing accounts `404 user.notFound`. The response is the same minimal account projection.
+- All Admin accounts, including the caller, are visible but protected from either status action (`409 user.protectedAccount`). This bounded integration manages User status only; Admin suspension/recovery policy and internal provisioning remain separate, not a last-Admin safeguard implemented implicitly by the UI.
+- Suspension updates status, revokes every unrevoked target session and appends `Suspended user` activity in one transaction. Reactivation appends `Reactivated user` but never restores sessions: old access/refresh tokens stay invalid and a fresh login is required. Session issuance locks/rereads the account so a stale login cannot create a live session after suspension. Activity records actor, target email, action/time and `#admin/users`; no unpersisted reason or suspension-expiry field is accepted.
+- Suspension does not delete accounts, cancel/refund orders, clear carts or undo previously authorized in-flight work. Access/session state is checked on subsequent protected requests, not pushed instantly into idle tabs. The expected-status check is not a version token and cannot detect an intervening suspend/reactivate cycle returning to the same status. Timed blocks, role changes, account deletion and automatic Admin provisioning are not exposed.
+- Verified on 2026-10-28: 27 unit tests and 162 isolated e2e tests passed, including 91 Admin-user cases; TypeScript/build passed and lint reported zero warnings/errors. The existing `pg` concurrent-query deprecation warning remains. Development fixtures and browser acceptance limits are recorded in the [integration map](../docs/INTEGRATION_MAP_2026-10-26.md).
 
 ### Listings
 

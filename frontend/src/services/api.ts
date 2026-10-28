@@ -65,7 +65,8 @@ export function refreshSession(): Promise<AuthPayload | null> {
       return payload;
     })
     .catch((error: unknown) => {
-      if (version === generation && error instanceof ApiError && error.status === 401) acceptSession(null);
+      const invalidSession = error instanceof ApiError && (error.status === 401 || (error.status === 403 && error.code === "auth.accountSuspended"));
+      if (version === generation && invalidSession) clearApiSession();
       if (error instanceof ApiError && error.status === 401) return null;
       throw error;
     })
@@ -82,6 +83,10 @@ async function protectedRequest<T>(path: string, init: RequestInit, retry: boole
     if (version !== generation || originalIdentity?.id !== identity?.id || originalIdentity?.role !== identity?.role) throw new ApiError(401, "auth.sessionChanged");
     return result;
   } catch (error) {
+    if (error instanceof ApiError && error.status === 403 && error.code === "auth.accountSuspended" && version === generation) {
+      clearApiSession();
+      throw error;
+    }
     if (error instanceof ApiError && error.status === 401 && error.code !== "auth.sessionChanged" && retry && version === generation) {
       if (await refreshSession()) {
         if (originalIdentity && (originalIdentity.id !== identity?.id || originalIdentity.role !== identity?.role)) throw new ApiError(401, "auth.sessionChanged");
@@ -141,12 +146,19 @@ export function errorMessage(error: unknown, language: "en" | "vi") {
   if (error.code === "order.openDispute") return vi ? "Không thể hoàn tất đơn khi khiếu nại đang mở hoặc xét duyệt." : "This order cannot be completed while a dispute is open or being reviewed.";
   if (error.code === "order.balanceNotDue") return vi ? "Chưa đến hạn thanh toán phần còn lại hoặc trạng thái đã thay đổi." : "The balance is not currently due or the order state has changed.";
   if (error.code === "order.invalidTransition") return vi ? "Trạng thái đơn đã thay đổi hoặc không cho phép thao tác này." : "The order state has changed or does not allow this action.";
+  if (error.code === "listing.incomplete") return vi ? `Cần bổ sung trước khi xuất bản hoặc gửi xét duyệt: ${error.params.field ?? "thông tin tin đăng"}.` : `Required before publication or review submission: ${error.params.field ?? "listing details"}.`;
+  if (error.code === "listing.underReview") return vi ? "Không thể sửa khi đang xét duyệt. Làm mới để xem trạng thái hiện tại." : "Editing is locked while under review. Refresh to read the current state.";
+  if (error.code === "listing.invalidTransition") return vi ? "Trạng thái tin đã thay đổi hoặc không cho phép thao tác này. Làm mới trước khi thử lại." : "The listing state changed or does not allow this action. Refresh before another attempt.";
+  if (error.code === "listing.invalidResponse" || error.code === "activity.invalidResponse") return vi ? "Máy chủ trả dữ liệu không hợp lệ. Chưa xác nhận thành công; cần làm mới để đối chiếu." : "The server returned an invalid response. Success is not confirmed; refresh to reconcile.";
   if (error.code === "dispute.alreadyExists") return vi ? "Đơn này đã có khiếu nại. Làm mới để xem bản ghi." : "This order already has a dispute. Refresh to view it.";
   if (error.code === "dispute.orderNotEligible") return vi ? "Đơn hoặc lý do chưa đủ điều kiện khiếu nại." : "This order or reason is not eligible for a dispute.";
   if (error.code === "dispute.invalidTransition") return vi ? "Trạng thái khiếu nại đã thay đổi. Làm mới trước khi thao tác." : "The dispute state has changed. Refresh before another action.";
   if (error.code === "uploads.alreadyUsed" || error.code === "uploads.invalidReference") return vi ? "Tệp không hợp lệ hoặc đã liên kết khiếu nại khác." : "The evidence is invalid or already linked to another dispute.";
   if (error.status === 413) return vi ? "Tệp vượt giới hạn tải lên của máy chủ." : "The file exceeds the server upload limit.";
   if (error.status === 415) return vi ? "Loại tệp không được hỗ trợ." : "This file type is not supported.";
+  if (error.code === "user.statusConflict") return vi ? "Trạng thái tài khoản đã thay đổi. Làm mới trước khi xác nhận lại." : "The account status changed. Refresh before confirming again.";
+  if (error.code === "user.protectedAccount") return vi ? "Tài khoản Admin được bảo vệ; không thể đổi trạng thái tại đây." : "Admin accounts are protected; their status cannot be changed here.";
+  if (error.code === "user.invalidResponse") return vi ? "Dữ liệu tài khoản không hợp lệ. Chưa xác nhận thành công; cần làm mới." : "The account response is invalid. Success is not confirmed; refresh to reconcile.";
   if (error.code === "auth.accountSuspended") return vi ? "Tài khoản đã bị tạm khóa." : "This account is suspended. Contact support.";
   if (error.code.includes("invalidCredentials")) return vi ? "Email hoặc mật khẩu không đúng." : "Incorrect email or password.";
   if (error.code.includes("emailTaken") || error.code.includes("emailExists")) return vi ? "Email đã được đăng ký." : "This email is already registered.";

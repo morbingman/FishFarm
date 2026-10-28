@@ -239,19 +239,28 @@ export class AuthService {
 
   private async issueSession(user: UserRecord, meta: SessionMeta): Promise<AuthResult> {
     const refreshToken = this.newRefreshToken();
-    const session = await this.prisma.session.create({
-      data: {
-        userId: user.id,
-        refreshTokenHash: sha256(refreshToken),
-        expiresAt: this.refreshExpiry(),
-        userAgent: meta.userAgent,
-        ip: meta.ip,
-      },
+    const { session, current } = await this.prisma.$transaction(async (tx) => {
+      // Serialize session issuance with account suspension and its session revocations.
+      await tx.$queryRaw<Array<{ id: string }>>`SELECT "id" FROM "User" WHERE "id" = ${user.id} FOR UPDATE`;
+      const current = await tx.user.findUnique({ where: { id: user.id } });
+      if (!current) throw new AppException('auth.invalidCredentials', HttpStatus.UNAUTHORIZED);
+      if (current.status !== 'active') throw new AppException('auth.accountSuspended', HttpStatus.FORBIDDEN);
+      if (current.passwordHash !== user.passwordHash) throw new AppException('auth.invalidCredentials', HttpStatus.UNAUTHORIZED);
+      const session = await tx.session.create({
+        data: {
+          userId: current.id,
+          refreshTokenHash: sha256(refreshToken),
+          expiresAt: this.refreshExpiry(),
+          userAgent: meta.userAgent,
+          ip: meta.ip,
+        },
+      });
+      return { session, current };
     });
 
     return {
       refreshToken,
-      payload: await this.buildPayload(user, session.id),
+      payload: await this.buildPayload(current, session.id),
     };
   }
 

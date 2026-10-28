@@ -1,0 +1,42 @@
+.admin-users .admin-users-navigation,
+.admin-users .admin-users-pager { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; margin: 18px 0; }
+.admin-users .admin-users-navigation a { font-weight: 700; }
+.admin-users .admin-users-toolbar { margin: 24px 0 16px; }
+.admin-users .admin-users-toolbar fieldset { display: flex; flex-wrap: wrap; align-items: end; gap: 16px; border: 0; padding: 0; min-width: 0; }
+.admin-users .admin-users-toolbar label { display: grid; gap: 8px; flex: 1 1 140px; min-width: 0; }
+.admin-users .admin-users-toolbar label:first-child { flex: 2 1 260px; }
+.admin-users input,
+.admin-users select { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px; border: 1px solid #bdd1dc; border-radius: 8px; background: white; color: #073446; font: inherit; }
+.admin-users button:disabled { opacity: .55; cursor: not-allowed; }
+.admin-users button:focus-visible,
+.admin-users a:focus-visible,
+.admin-users input:focus-visible,
+.admin-users select:focus-visible { outline: 3px solid #23728c; outline-offset: 3px; }
+.admin-users .admin-users-table-wrap { overflow-x: auto; }
+.admin-users table { width: 100%; border-collapse: collapse; }
+.admin-users th,
+.admin-users td { padding: 14px 12px; text-align: left; vertical-align: top; border-bottom: 1px solid #d0e0e7; overflow-wrap: anywhere; }
+.admin-users th { color: #073446; }
+.admin-users .admin-users-badge { display: block; width: fit-content; border: 1px solid #9db8c6; border-radius: 8px; padding: 4px 8px; margin-top: 6px; background: #eaf3f8; color: #073446; font-size: .82rem; font-weight: 700; }
+.admin-users .admin-users-status { display: inline-block; border-radius: 8px; padding: 4px 8px; font-weight: 700; }
+.admin-users .admin-users-status-active { background: #e2f3e9; color: #195738; }
+.admin-users .admin-users-status-suspended { background: #fff0da; color: #79420b; }
+.admin-users .admin-users-confirm { border: 2px solid #8caeba; padding: 24px; margin: 24px 0; }
+.admin-users .admin-users-confirm:focus { outline: 3px solid #23728c; outline-offset: 3px; }
+.admin-users .admin-users-email { overflow-wrap: anywhere; }
+.admin-users .admin-users-sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; border: 0; }
+@media (max-width: 760px) {
+  .admin-users .admin-users-toolbar fieldset { align-items: stretch; }
+  .admin-users .admin-users-toolbar label,
+  .admin-users .admin-users-toolbar label:first-child { flex-basis: 100%; }
+  .admin-users .admin-users-toolbar button { width: 100%; }
+  .admin-users table,
+  .admin-users tbody,
+  .admin-users tr,
+  .admin-users td { display: block; }
+  .admin-users thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); }
+  .admin-users tr { margin: 16px 0; padding: 8px; border: 1px solid #d0e0e7; border-radius: 10px; }
+  .admin-users td { border: 0; padding: 8px; }
+  .admin-users td::before { display: block; content: attr(data-label); color: #486774; font-size: .85rem; margin-bottom: 6px; }
+  .admin-users .admin-users-confirm { padding: 16px; }
+}

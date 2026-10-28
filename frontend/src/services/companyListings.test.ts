@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPublish, isCompanyListingRoute, listingForm, listingInput, listingRoute, parseCompanyListingRoute, publicationMissing, validateListingFile } from "./companyListings";
+import { canPublish, canSubmitForReview, isCompanyListingRoute, listingForm, listingInput, listingRoute, parseCompanyListingRoute, publicationMissing, validateListingFile } from "./companyListings";
 
 describe("company catalog rules", () => {
   it("recognizes bounded company routes and encodes IDs", () => {
@@ -50,6 +50,11 @@ describe("company catalog rules", () => {
     const form = listingForm(); expect(publicationMissing(form)).toContain("images"); expect(() => listingInput(form)).not.toThrow();
     for (const status of ["draft", "changes", "rejected", "paused"] as const) expect(canPublish(status)).toBe(true);
     expect(canPublish("approved")).toBe(false); expect(canPublish("pending")).toBe(false);
+  });
+  it("keeps optional submission separate from publication and excludes paused records", () => {
+    for (const status of ["draft", "changes", "rejected", "approved"] as const) expect(canSubmitForReview(status)).toBe(true);
+    expect(canSubmitForReview("paused")).toBe(false); expect(canSubmitForReview("pending")).toBe(false);
+    expect(canPublish("approved")).toBe(false); expect(canPublish("paused")).toBe(true);
   });
   it("accepts only bounded public image files", () => {
     expect(() => validateListingFile(new File(["png"], "a.png", { type: "image/png" }), 7)).not.toThrow();

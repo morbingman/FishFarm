@@ -18,6 +18,7 @@ export function parseCompanyListingRoute(route: string): CompanyListingRoute | n
   } catch { return null; }
 }
 export const isCompanyListingRoute = (route: string) => parseCompanyListingRoute(route) !== null;
+export const canSubmitForReview = (status: CompanyListingStatus) => ["draft", "changes", "rejected", "approved"].includes(status);
 export const canPublish = (status: CompanyListingStatus) => ["draft", "changes", "rejected", "paused"].includes(status);
 export function listingLabel(status: CompanyListingStatus, language: "en" | "vi") {
   const labels = { draft: ["Draft", "Bản nháp"], pending: ["Under review", "Đang xét duyệt"], approved: ["Live", "Đang hiển thị"], paused: ["Paused", "Tạm dừng"], changes: ["Changes requested", "Yêu cầu sửa"], rejected: ["Rejected", "Đã từ chối"] };

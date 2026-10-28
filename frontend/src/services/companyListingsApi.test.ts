@@ -72,6 +72,25 @@ describe("company catalog transport", () => {
     await expect(companyListingsApi.list("pending")).rejects.toMatchObject({ code: "listing.invalidResponse" });
     await expect(companyListingsApi.list("attention")).rejects.toMatchObject({ code: "listing.invalidResponse" });
   });
+  it("submits and withdraws through exact bodyless endpoints", async () => {
+    const fetch = vi.fn(async (url: string, _init: RequestInit) => { const value = fixture(url.endsWith("submit") ? "pending" : "draft"); value.submittedAt = url.endsWith("submit") ? "2026-10-28T01:00:00Z" : null; return response(value); }); vi.stubGlobal("fetch", fetch);
+    const { companyListingsApi } = await import("./companyListingsApi"); await companyListingsApi.submit("FM/1"); await companyListingsApi.withdraw("FM/1");
+    expect(fetch.mock.calls.map(([url, init]) => [url, init.method, init.body])).toEqual([["/v1/company/listings/FM%2F1/submit", "POST", undefined], ["/v1/company/listings/FM%2F1/withdraw", "POST", undefined]]);
+  });
+  it("rejects inconsistent review transitions and does not replay unknown outcomes", async () => {
+    const fetch = vi.fn(async () => response(fixture())); vi.stubGlobal("fetch", fetch); const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi.submit("FM/1")).rejects.toMatchObject({ code: "listing.invalidResponse" });
+    fetch.mockImplementation(async () => { const value = fixture(); value.submittedAt = "2026-10-28T01:00:00Z"; return response(value); });
+    await expect(companyListingsApi.withdraw("FM/1")).rejects.toMatchObject({ code: "listing.invalidResponse" });
+    fetch.mockRejectedValue(new TypeError("Lost response")); await expect(companyListingsApi.submit("FM/1")).rejects.toThrow("Lost response"); await expect(companyListingsApi.withdraw("FM/1")).rejects.toThrow("Lost response"); expect(fetch).toHaveBeenCalledTimes(4);
+  });
+  it("accepts nullable recorded decision fields and rejects malformed decision values", async () => {
+    const value = fixture("changes"); value.decision = { kind: "changes", reason: null, feedback: null, by: null, at: null, step: 1 };
+    const fetch = vi.fn(async () => response(value)); vi.stubGlobal("fetch", fetch); const { companyListingsApi } = await import("./companyListingsApi"); await expect(companyListingsApi.detail("FM/1")).resolves.toEqual(value);
+    for (const bad of [{ ...value.decision, kind: "approved" }, { ...value.decision, step: 0 }, { ...value.decision, at: "invalid" }, { ...value.decision, feedback: {} }]) {
+      fetch.mockImplementation(async () => response({ ...value, decision: bad })); await expect(companyListingsApi.detail("FM/1")).rejects.toMatchObject({ code: "listing.invalidResponse" });
+    }
+  });
   it("propagates incomplete/locked server responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response({ code: "listing.incomplete", params: { field: "images" } }, 400))); const { companyListingsApi } = await import("./companyListingsApi");
     await expect(companyListingsApi.publish("FM/1")).rejects.toMatchObject({ code: "listing.incomplete", params: { field: "images" } });

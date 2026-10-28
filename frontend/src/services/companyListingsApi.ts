@@ -8,7 +8,7 @@ const text = (value: unknown): value is string => typeof value === "string" && v
 const date = (value: unknown): value is string => text(value) && Number.isFinite(Date.parse(value));
 const nullableText = (value: unknown) => value === null || typeof value === "string";
 const integer = (value: unknown) => typeof value === "number" && Number.isSafeInteger(value) && value >= 0;
-function listing(value: unknown, id?: string): CompanyListing {
+export function validateCompanyListing(value: unknown, id?: string): CompanyListing {
   if (!record(value) || !text(value.id) || (id && id !== value.id) || !listingStatuses.includes(value.status as CompanyListing["status"])
     || !record(value.company) || !text(value.company.id) || !text(value.company.name) || !nullableText(value.company.location)
     || !nullableText(value.createdBy) || !date(value.createdAt) || !date(value.updatedAt) || !(value.submittedAt === null || date(value.submittedAt))
@@ -25,6 +25,12 @@ function listing(value: unknown, id?: string): CompanyListing {
       || !Array.isArray(draft.images) || draft.images.length > 8 || draft.images.some(image => !record(image) || !text(image.id) || !text(image.url) || !validImageUrl(image.url) || !integer(image.position) || typeof image.isMain !== "boolean")
       || !(draft.mainId === null || (text(draft.mainId) && draft.images.some(image => image.id === draft.mainId)))
       || new Set(draft.images.map(image => image.id)).size !== draft.images.length) throw new ApiError(502, "listing.invalidResponse");
+  }
+  if (value.decision !== null) {
+    const decision = value.decision;
+    if (!record(decision) || !["changes", "rejected"].includes(decision.kind as string)
+      || !nullableText(decision.reason) || !nullableText(decision.feedback) || !nullableText(decision.by)
+      || !(decision.at === null || date(decision.at)) || !integer(decision.step) || (decision.step as number) < 1 || (decision.step as number) > 6) throw new ApiError(502, "listing.invalidResponse");
   }
   return value as CompanyListing;
 }
@@ -52,20 +58,30 @@ export const companyListingsApi = {
   list: async (status: CompanyListingFilter = "all", signal?: AbortSignal) => {
     const values = await api<unknown>(`${path()}${status === "all" ? "" : `?status=${encodeURIComponent(status)}`}`, { signal });
     if (!Array.isArray(values)) throw new ApiError(502, "listing.invalidResponse");
-    const rows = values.map(value => listing(value));
+    const rows = values.map(value => validateCompanyListing(value));
     if (rows.some(value => status !== "all" && (status === "attention" ? !["changes", "rejected"].includes(value.status) : value.status !== status))) throw new ApiError(502, "listing.invalidResponse");
     return rows;
   },
-  detail: async (id: string, signal?: AbortSignal) => listing(await api<unknown>(path(id), { signal })),
+  detail: async (id: string, signal?: AbortSignal) => validateCompanyListing(await api<unknown>(path(id), { signal })),
   create: async (input: CompanyListingInput) => {
-    const value = listing(await api<unknown>(path(), { method: "POST", body: body(input) }));
+    const value = validateCompanyListing(await api<unknown>(path(), { method: "POST", body: body(input) }));
     if (value.status !== "draft" || !value.draft) throw new ApiError(502, "listing.invalidResponse");
     return saved(value, input);
   },
-  save: async (id: string, input: CompanyListingInput) => saved(listing(await api<unknown>(path(id), { method: "PATCH", body: body(input) }), id), input),
+  save: async (id: string, input: CompanyListingInput) => saved(validateCompanyListing(await api<unknown>(path(id), { method: "PATCH", body: body(input) }), id), input),
   publish: async (id: string) => {
-    const value = listing(await api<unknown>(`${path(id)}/publish`, { method: "POST" }), id);
+    const value = validateCompanyListing(await api<unknown>(`${path(id)}/publish`, { method: "POST" }), id);
     if (value.status !== "approved") throw new ApiError(502, "listing.invalidResponse");
+    return value;
+  },
+  submit: async (id: string) => {
+    const value = validateCompanyListing(await api<unknown>(`${path(id)}/submit`, { method: "POST" }), id);
+    if (value.status !== "pending" || value.decision !== null || !date(value.submittedAt)) throw new ApiError(502, "listing.invalidResponse");
+    return value;
+  },
+  withdraw: async (id: string) => {
+    const value = validateCompanyListing(await api<unknown>(`${path(id)}/withdraw`, { method: "POST" }), id);
+    if (value.status !== "draft" || value.decision !== null || value.submittedAt !== null) throw new ApiError(502, "listing.invalidResponse");
     return value;
   },
   upload: async (file: File) => {

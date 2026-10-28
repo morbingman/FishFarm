@@ -101,6 +101,58 @@ describe("API integration boundary", () => {
     const pending = refreshSession(); await authApi.logout(); finish(response(payload()));
     expect(await pending).toBeNull(); expect(listener).toHaveBeenLastCalledWith(null);
   });
+  it("clears a suspended session without refresh or write replay and rejects late private data", async () => {
+    let finish: (value: Response) => void = () => {};
+    const fetch = vi.fn((url: string) => url.endsWith("/auth/login") ? Promise.resolve(response(payload())) : url.endsWith("/me/orders") ? new Promise<Response>(resolve => { finish = resolve; }) : Promise.resolve(response({ code: "auth.accountSuspended" }, 403)));
+    vi.stubGlobal("fetch", fetch);
+    const { authApi, api, onApiSession } = await import("./api");
+    await authApi.login(user.email, "Test12345");
+    const listener = vi.fn(); onApiSession(listener);
+    const pending = api("/me/orders");
+    await expect(api("/me/profile", { method: "PATCH", body: "{}" })).rejects.toMatchObject({ status: 403, code: "auth.accountSuspended" });
+    expect(listener).toHaveBeenLastCalledWith(null);
+    finish(response([]));
+    await expect(pending).rejects.toMatchObject({ code: "auth.sessionChanged" });
+    expect(fetch.mock.calls.filter(([url]) => url.endsWith("/me/profile"))).toHaveLength(1);
+    expect(fetch.mock.calls.some(([url]) => url.endsWith("/auth/refresh"))).toBe(false);
+  });
+  it.each([401, 403])("clears invalid refresh %s and invalidates concurrent private results", async status => {
+    let finish: (value: Response) => void = () => {};
+    const fetch = vi.fn((url: string) => url.endsWith("/auth/login") ? Promise.resolve(response(payload())) : url.endsWith("/auth/refresh") ? Promise.resolve(response({ code: status === 403 ? "auth.accountSuspended" : "auth.sessionExpired" }, status)) : new Promise<Response>(resolve => { finish = resolve; }));
+    vi.stubGlobal("fetch", fetch);
+    const { authApi, api, refreshSession, onApiSession } = await import("./api");
+    await authApi.login(user.email, "Test12345");
+    const listener = vi.fn(); onApiSession(listener);
+    const pending = api("/me/orders");
+    if (status === 401) expect(await refreshSession()).toBeNull();
+    else await expect(refreshSession()).rejects.toMatchObject({ code: "auth.accountSuspended" });
+    expect(listener).toHaveBeenLastCalledWith(null);
+    finish(response([]));
+    await expect(pending).rejects.toMatchObject({ code: "auth.sessionChanged" });
+  });
+  it("does not let a late suspension error clear a newly signed-in account", async () => {
+    let finish: (value: Response) => void = () => {};
+    let logins = 0;
+    const fetch = vi.fn((url: string) => url.endsWith("/auth/login") ? Promise.resolve(response({ ...payload(), user: { ...user, id: ++logins === 1 ? "u1" : "u2" } })) : new Promise<Response>(resolve => { finish = resolve; }));
+    vi.stubGlobal("fetch", fetch);
+    const { authApi, api, onApiSession } = await import("./api");
+    await authApi.login(user.email, "Test12345");
+    const listener = vi.fn(); onApiSession(listener);
+    const pending = api("/me");
+    await authApi.login("other@example.test", "Test12345");
+    finish(response({ code: "auth.accountSuspended" }, 403));
+    await expect(pending).rejects.toMatchObject({ code: "auth.accountSuspended" });
+    expect(listener).toHaveBeenLastCalledWith(expect.objectContaining({ id: "u2" }));
+  });
+  it("does not clear an active session for an ordinary permission denial", async () => {
+    const fetch = vi.fn((url: string) => Promise.resolve(url.endsWith("/auth/login") ? response(payload()) : response({ code: "auth.forbidden" }, 403)));
+    vi.stubGlobal("fetch", fetch);
+    const { authApi, api, onApiSession } = await import("./api");
+    await authApi.login(user.email, "Test12345");
+    const listener = vi.fn(); onApiSession(listener);
+    await expect(api("/admin/users")).rejects.toMatchObject({ status: 403 });
+    expect(listener).not.toHaveBeenCalled();
+  });
   it("translates the backend suspended-account error in both languages", async () => {
     const { ApiError, errorMessage } = await import("./api");
     const error = new ApiError(403, "auth.accountSuspended");

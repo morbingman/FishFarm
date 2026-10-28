@@ -107,6 +107,18 @@ prefs: { status, system, reminders }   # notification preferences
 Company branding (store name, location, description) is a platform setting, not a per-user
 field. Admins are provisioned internally; only `User` is publicly registerable.
 
+**Implemented management boundary (2026-10-28):** Prisma uses an immutable `id` primary key and
+unique lowercase email, not email as a primary key. Admins can search/page both roles through
+`GET /admin/users` (`q`, `status`, `role`, `page`, `limit`) with only
+`id,email,name,role,status,joinedAt` returned. `PATCH /admin/users/{encodedEmail}/status` accepts
+only `{status,expectedStatus}`. Row-locked changes reject stale/same-state requests, record activity
+and revoke all sessions on suspension; reactivation requires fresh login. Every Admin target is
+protected from both status actions in this bounded slice, including self. Status still applies to
+all accounts for auth enforcement; designing Admin suspension/recovery/provisioning remains separate.
+No deletion, timed expiry, reason collection, role change or automatic Admin bootstrap is integrated.
+Suspension preserves orders, payments, carts, evidence and other history.
+
+
 ### 3.2 Listing (canonical, company-owned)
 ```
 id            # "FM-20817" — human-readable, sequential (frontend seq starts 48300)
