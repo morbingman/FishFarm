@@ -30,10 +30,12 @@ describe("commerce transport", () => {
   it("preserves the checkout key through an authenticated refresh retry", async () => {
     const bodies: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith("/auth/refresh")) return response({ accessToken: "new-token", user: null });
+      if (url.endsWith("/auth/login")) return response({ accessToken: "initial-token", user: { id: "buyer-1", role: "User" } });
+      if (url.endsWith("/auth/refresh")) return response({ accessToken: "new-token", user: { id: "buyer-1", role: "User" } });
       bodies.push(String(init.body));
-      return new Headers(init.headers).has("Authorization") ? response({ id: "ORD-10025" }) : response({ code: "auth.sessionExpired" }, 401);
+      return new Headers(init.headers).get("Authorization") === "Bearer new-token" ? response({ id: "ORD-10025" }) : response({ code: "auth.sessionExpired" }, 401);
     }));
+    const { authApi } = await import("./api"); await authApi.login("buyer@example.test", "Test12345");
     const { commerceApi } = await import("./commerceApi");
     await expect(commerceApi.checkout(input, "same-key-123")).resolves.toEqual({ id: "ORD-10025" });
     expect(bodies).toHaveLength(2); expect(bodies[1]).toBe(bodies[0]);

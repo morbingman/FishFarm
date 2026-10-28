@@ -37,6 +37,34 @@ describe("API integration boundary", () => {
     expect(await Promise.all([first, second])).toEqual([{ ok: true }, { ok: true }]);
     expect(fetch.mock.calls.filter(([url]) => url.endsWith("/auth/refresh"))).toHaveLength(1);
   });
+  it.each([{ id: "u2", role: "User" }, { id: "u1", role: "Admin" }])("does not replay a write after refresh changes identity %j", async changed => {
+    const fetch = vi.fn(async (url: string) => url.endsWith("/auth/login") ? response(payload()) : url.endsWith("/auth/refresh") ? response({ ...payload("different-token"), user: { ...user, ...changed } }) : response({ code: "auth.sessionExpired" }, 401)); vi.stubGlobal("fetch", fetch);
+    const { authApi, api } = await import("./api");
+    await authApi.login(user.email, "Test12345");
+    await expect(api("/admin/disputes/d1/resolve", { method: "POST", body: JSON.stringify({ resolution: "Decision" }) })).rejects.toMatchObject({ code: "auth.sessionChanged" });
+    expect(fetch.mock.calls.filter(([url]) => url.includes("/disputes/"))).toHaveLength(1);
+  });
+  it("retries a rejected write once when refresh preserves identity", async () => {
+    const fetch = vi.fn(async (url: string, init: RequestInit) => url.endsWith("/auth/login") ? response(payload()) : url.endsWith("/auth/refresh") ? response(payload("fresh")) : new Headers(init.headers).get("Authorization") === "Bearer fresh" ? response({ ok: true }) : response({ code: "auth.sessionExpired" }, 401)); vi.stubGlobal("fetch", fetch);
+    const { authApi, api } = await import("./api");
+    await authApi.login(user.email, "Test12345");
+    await expect(api("/me/orders/ORD-1/dispute", { method: "POST", body: "{}" })).resolves.toEqual({ ok: true });
+    expect(fetch.mock.calls.filter(([url]) => url.includes("/dispute"))).toHaveLength(2);
+  });
+  it("does not replay an unauthenticated write as a newly refreshed account", async () => {
+    const fetch = vi.fn(async (url: string) => url.endsWith("/auth/refresh") ? response(payload()) : response({ code: "auth.sessionExpired" }, 401)); vi.stubGlobal("fetch", fetch);
+    const { api } = await import("./api");
+    await expect(api("/uploads", { method: "POST", body: new FormData() })).rejects.toMatchObject({ code: "auth.sessionChanged" });
+    expect(fetch.mock.calls.filter(([url]) => url.endsWith("/uploads"))).toHaveLength(1);
+  });
+  it("rejects late successful private responses after logout", async () => {
+    let finish: (value: Response) => void = () => {};
+    const fetch = vi.fn((url: string) => url.endsWith("/auth/login") ? Promise.resolve(response(payload())) : url.endsWith("/auth/logout") ? Promise.resolve(response(null, 204)) : new Promise<Response>(resolve => { finish = resolve; })); vi.stubGlobal("fetch", fetch);
+    const { authApi, api } = await import("./api");
+    await authApi.login(user.email, "Test12345"); const pending = api("/me/disputes");
+    await authApi.logout(); finish(response([]));
+    await expect(pending).rejects.toMatchObject({ code: "auth.sessionChanged" });
+  });
   it("does not refresh failed login credentials", async () => {
     const fetch = vi.fn().mockResolvedValue(response({ code: "auth.invalidCredentials", params: {} }, 401)); vi.stubGlobal("fetch", fetch);
     const { authApi } = await import("./api");

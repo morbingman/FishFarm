@@ -20,6 +20,7 @@ export function SiteHeader({ language, setLanguage }: { language: Lang; setLangu
           <a href="#home">{vi ? "Trang chủ" : "Home"}</a>
           <a href="#marketplace">{vi ? "Chợ cá" : "Marketplace"}</a>
           {user?.role === "Buyer" && <><a href="#marketplace/cart">{vi ? "Giỏ hàng" : "Cart"}</a><a href="#marketplace/orders">{vi ? "Đơn hàng" : "Orders"}</a></>}
+          {user && <a href={user.role === "Admin" ? "#admin/disputes" : "#marketplace/disputes"}>{vi ? "Khiếu nại" : "Disputes"}</a>}
           {user?.role === "Admin" && <a href="#company/orders">{vi ? "Đơn hàng công ty" : "Company orders"}</a>}
         </nav>
         <div className="ds-header-right">

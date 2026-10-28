@@ -26,10 +26,12 @@ describe("company fulfilment transport", () => {
   it("preserves the exact shipment payload during one auth refresh retry", async () => {
     const bodies: string[] = [];
     vi.stubGlobal("fetch", vi.fn(async (url: string, init: RequestInit) => {
-      if (url.endsWith("/auth/refresh")) return response({ accessToken: "new-token", user: null });
+      if (url.endsWith("/auth/login")) return response({ accessToken: "initial-token", user: { id: "admin-1", role: "Admin" } });
+      if (url.endsWith("/auth/refresh")) return response({ accessToken: "new-token", user: { id: "admin-1", role: "Admin" } });
       bodies.push(String(init.body));
-      return new Headers(init.headers).has("Authorization") ? response({ id: "ORD-1", status: "shipped" }) : response({ code: "auth.sessionExpired" }, 401);
+      return new Headers(init.headers).get("Authorization") === "Bearer new-token" ? response({ id: "ORD-1", status: "shipped" }) : response({ code: "auth.sessionExpired" }, 401);
     }));
+    const { authApi } = await import("./api"); await authApi.login("admin@example.test", "Test12345");
     const { companyOrdersApi } = await import("./companyOrdersApi");
     await companyOrdersApi.ship("ORD-1", { trackingNumber: "ABC" });
     expect(bodies).toHaveLength(2); expect(bodies[1]).toBe(bodies[0]);

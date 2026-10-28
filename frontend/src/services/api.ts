@@ -2,6 +2,7 @@ import type { ApiUser, AuthPayload, CompanyStore, MarketplaceListing, Marketplac
 
 const API_URL = (import.meta.env.VITE_API_URL as string | undefined)?.replace(/\/$/, "") ?? "/v1";
 let accessToken: string | null = null;
+let identity: { id: string; role: ApiUser["role"] } | null = null;
 let generation = 0;
 let refreshPending: Promise<AuthPayload | null> | null = null;
 const sessionListeners = new Set<(user: ApiUser | null) => void>();
@@ -19,6 +20,7 @@ export function onApiSession(listener: (user: ApiUser | null) => void) {
 }
 function acceptSession(payload: AuthPayload | null) {
   accessToken = payload?.accessToken ?? null;
+  identity = payload?.user ? { id: payload.user.id, role: payload.user.role } : null;
   sessionListeners.forEach((listener) => listener(payload?.user ?? null));
 }
 export function clearApiSession() {
@@ -27,7 +29,7 @@ export function clearApiSession() {
   acceptSession(null);
 }
 
-async function request<T>(path: string, init: RequestInit, authenticated: boolean): Promise<T> {
+async function request<T>(path: string, init: RequestInit, authenticated: boolean, binary = false): Promise<T> {
   const controller = new AbortController();
   const abort = () => controller.abort(init.signal?.reason);
   if (init.signal?.aborted) abort();
@@ -46,7 +48,7 @@ async function request<T>(path: string, init: RequestInit, authenticated: boolea
       throw new ApiError(response.status, error.code ?? `http.${response.status}`, error.details, error.params ?? {});
     }
     if (response.status === 204) return undefined as T;
-    return await response.json() as T;
+    return binary ? await response.blob() as T : await response.json() as T;
   } finally {
     clearTimeout(timeout);
     init.signal?.removeEventListener("abort", abort);
@@ -72,19 +74,26 @@ export function refreshSession(): Promise<AuthPayload | null> {
   return pending;
 }
 
-export async function api<T>(path: string, init: RequestInit = {}, retry = true): Promise<T> {
+async function protectedRequest<T>(path: string, init: RequestInit, retry: boolean, binary = false): Promise<T> {
   const version = generation;
+  const originalIdentity = identity;
   try {
-    return await request<T>(path, init, true);
+    const result = await request<T>(path, init, true, binary);
+    if (version !== generation || originalIdentity?.id !== identity?.id || originalIdentity?.role !== identity?.role) throw new ApiError(401, "auth.sessionChanged");
+    return result;
   } catch (error) {
-    if (error instanceof ApiError && error.status === 401 && retry && version === generation) {
+    if (error instanceof ApiError && error.status === 401 && error.code !== "auth.sessionChanged" && retry && version === generation) {
       if (await refreshSession()) {
-        if (version === generation) return api<T>(path, init, false);
+        if (originalIdentity && (originalIdentity.id !== identity?.id || originalIdentity.role !== identity?.role)) throw new ApiError(401, "auth.sessionChanged");
+        if (!originalIdentity && !["GET", "HEAD"].includes((init.method ?? "GET").toUpperCase())) throw new ApiError(401, "auth.sessionChanged");
+        if (version === generation) return protectedRequest<T>(path, init, false, binary);
       }
     }
     throw error;
   }
 }
+export const api = <T>(path: string, init: RequestInit = {}, retry = true) => protectedRequest<T>(path, init, retry);
+export const apiBlob = (path: string, signal?: AbortSignal) => protectedRequest<Blob>(path, { signal }, true, true);
 export const publicApi = <T>(path: string, signal?: AbortSignal) => request<T>(path, { signal }, false);
 
 async function signIn(path: string, body: unknown) {
@@ -132,6 +141,12 @@ export function errorMessage(error: unknown, language: "en" | "vi") {
   if (error.code === "order.openDispute") return vi ? "Không thể hoàn tất đơn khi khiếu nại đang mở hoặc xét duyệt." : "This order cannot be completed while a dispute is open or being reviewed.";
   if (error.code === "order.balanceNotDue") return vi ? "Chưa đến hạn thanh toán phần còn lại hoặc trạng thái đã thay đổi." : "The balance is not currently due or the order state has changed.";
   if (error.code === "order.invalidTransition") return vi ? "Trạng thái đơn đã thay đổi hoặc không cho phép thao tác này." : "The order state has changed or does not allow this action.";
+  if (error.code === "dispute.alreadyExists") return vi ? "Đơn này đã có khiếu nại. Làm mới để xem bản ghi." : "This order already has a dispute. Refresh to view it.";
+  if (error.code === "dispute.orderNotEligible") return vi ? "Đơn hoặc lý do chưa đủ điều kiện khiếu nại." : "This order or reason is not eligible for a dispute.";
+  if (error.code === "dispute.invalidTransition") return vi ? "Trạng thái khiếu nại đã thay đổi. Làm mới trước khi thao tác." : "The dispute state has changed. Refresh before another action.";
+  if (error.code === "uploads.alreadyUsed" || error.code === "uploads.invalidReference") return vi ? "Tệp không hợp lệ hoặc đã liên kết khiếu nại khác." : "The evidence is invalid or already linked to another dispute.";
+  if (error.status === 413) return vi ? "Tệp vượt giới hạn tải lên của máy chủ." : "The file exceeds the server upload limit.";
+  if (error.status === 415) return vi ? "Loại tệp không được hỗ trợ." : "This file type is not supported.";
   if (error.code === "auth.accountSuspended") return vi ? "Tài khoản đã bị tạm khóa." : "This account is suspended. Contact support.";
   if (error.code.includes("invalidCredentials")) return vi ? "Email hoặc mật khẩu không đúng." : "Incorrect email or password.";
   if (error.code.includes("emailTaken") || error.code.includes("emailExists")) return vi ? "Email đã được đăng ký." : "This email is already registered.";

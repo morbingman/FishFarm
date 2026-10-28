@@ -37,6 +37,17 @@ export type Order = {
   trackingCarrier: string | null; trackingNumber: string | null;
 };
 
+export type DisputeStatus = "open" | "reviewing" | "resolved" | "rejected";
+export type DisputeReason = "fish_unwell" | "not_as_described" | "damaged_packaging" | "not_received" | "other";
+export type Dispute = {
+  id: string; order: { id: string; status: OrderStatus }; buyer: { id: string; name: string; email: string };
+  reason: DisputeReason; description: string; status: DisputeStatus; resolution: string | null;
+  attachments: { id: string; mimeType: string | null; sizeBytes: number | null; createdAt: string }[];
+  createdAt: string; resolvedAt: string | null;
+};
+export type DisputeInput = { reason: DisputeReason; description: string; uploadIds?: string[] };
+export type EvidenceUpload = { id: string; url: string; mimeType: string; sizeBytes: number; purpose: string; isPrivate: boolean };
+
 export type ApiUser = {
   id: string;
   email: string;

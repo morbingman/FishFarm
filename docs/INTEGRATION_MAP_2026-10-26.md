@@ -3,9 +3,43 @@
 **Reviewed:** 2026-10-26
 
 **Saved local baseline:** `integration/team-baseline` at `ca6eb49`
+**Saved application integration checkpoint:** `38f0dd7` — real auth, marketplace, checkout and order fulfilment (2026-10-28; not pushed)
 **Purpose:** decide what to keep, adapt, restore, build or defer for each component before changing application code.
 
 This is an implementation guide and decision register, not a claim that integration is complete. The user requested incremental integration and deferred deployment. Recommendations below are not all approved product decisions. No application changes, branch merges or deployment are performed by creating this document.
+
+## Disputes and private evidence slice — implemented on 2026-10-28
+
+The authorized integration checkpoint is saved as `38f0dd7` on `integration/team-baseline`; nothing was pushed. This new dispute slice remains uncommitted. The retained backend source, schema, migrations and tests are unchanged. Earlier slice sections below remain historical records; their uncommitted statements were superseded by this checkpoint.
+
+### Connected scope
+
+- Added active `pages/marketplace/Disputes.tsx`, typed dispute/upload projections, dedicated `services/disputesApi.ts`, canonical eligibility/route/label/evidence helpers in `services/disputes.ts`, and their tests. Updated `App.tsx`, `Auth.tsx`, `SiteHeader.tsx` and order links. Legacy `pages/buyer/Dispute.tsx`, BuyerContext, Cloudinary/public-URL submissions and broad mock Admin workspace remain unmounted.
+- User-only `#marketplace/disputes`, `#marketplace/disputes/:id` and `#marketplace/orders/ORD-…/dispute` read actual owner data. The creation screen joins owner history by public order code, including terminal cases, rather than inventing an order dispute flag. An order permits only one dispute for its lifetime. Shipped orders allow only `not_received`; delivered/completed allow all five canonical reasons; description is trimmed and 15–2000 characters.
+- Admin-only `#admin/disputes` and `#admin/disputes/:id` operate the shared company queue with canonical status filtering. Explicit POST start-review/resolve/reject await the returned projection; finalization requires a trimmed explanation, may start directly from open, and cannot be changed. Backend notification/activity deep links use these dispute database IDs. No automatic refund/replacement/cancellation/completion, owner edits/withdrawal/appeal, fabricated review history or dispute deadline was added.
+- Actions require confirmation and guard duplicate clicks. Failed, malformed or uncertain responses disable mutations until successful Refresh reads the actual record. No idempotency key or automatic transport replay is added. Shared authenticated transport now binds retries to the original user ID/role and rejects late results after session changes; a 401 refresh may retry once only for the same known identity. Dispute responses are runtime-validated for canonical structure and expected case/order/reason/state/decision; the page additionally checks buyer/order identity and attachment count before acknowledging success.
+- Optional multipart `/uploads` uses `purpose=dispute_attachment`; creation sends at most three returned upload IDs. Upload confirmation requires a nonempty ID, private purpose and matching file type/size; duplicate confirmed IDs are rejected. JPEG/PNG/WebP/GIF/PDF and the default local 10 MiB limit are checked. Confirmed references are memory-only and lost on leaving/reload before submission. Unconfirmed uploads are not automatically retried and require acknowledgement before continuing without that file. There is no upload recovery/delete/orphan-cleanup endpoint.
+- Protected content uses shared bearer/refresh/timeout handling and Blob download links, not public static URLs or inline file rendering. Object URLs are revoked on replacement/unmount. The retained backend trusts declared MIME, initially writes private uploads into the public upload directory before moving them (potential transient exposure), and does not verify linked disk existence on creation. Multer exception translation may give generic error codes; this was code-inspected, not runtime-tested. Permanent private static paths are blocked. Production upload hardening remains a separate scoped task.
+
+### Verification and limits
+
+- Frontend: **62 tests in eight files passed**, TypeScript/build passed, and audit reported zero vulnerabilities. This includes 20 dispute helper/transport tests and five new identity-retry/late-response tests in the shared API suite. Existing checkout/shipment retry tests now establish the same identity before testing exact payload preservation rather than mocking an anonymous refresh. No component-level interaction test suite was added.
+- Backend: TypeScript/build/lint passed; all **23 unit and 71 isolated e2e tests** passed. The known `pg` concurrent-query deprecation warning remains. No backend behavior or assertions were weakened to fit the frontend.
+- Browser: guest owner/Admin deep links returned after real login. Buyer creation checked blank-description blocking and explicit one-case confirmation. An open dispute blocked actual buyer receipt completion with the backend conflict, leaving the order delivered/paid. A second Admin reviewed then resolved the case, and directly rejected the evidence case from open. Final decisions persisted on reload and in owner history/detail. Resolution did not complete the order: a later explicit buyer receipt action was required and succeeded.
+- Evidence: actual API setup uploaded a local 68-byte PNG and linked it by upload ID; owner/Admin protected content matched exact bytes. Setup verified private static 404, duplicate creation 409 and Admin denial on the owner route. Owner and Admin UI fetches produced temporary Blob download links. File-selection/upload GUI is unsupported by the browser host; actual save-to-disk download was not verified.
+- Snapshot-grounded locator control fallbacks invoked real UI handlers/requests because normal clicks were unreliable. No complete mouse/keyboard-only or visual acceptance pass was claimed. Dispute failure/Refresh, Admin filter, foreign-owner UI denial and Vietnamese/mobile layout interactions remain unexercised; automated rule/transport/backend coverage is not a substitute for those journeys. The final response-validation fixes passed automated checks but were not rerun through the browser.
+- During wrap-up the existing browser tab failed restoration; final discovery returned no controlled/user tabs. Its last verified state was the signed-in local User on `ORD-10127`; final sign-out/guest handoff was not verified. Node heap exhaustion, Windows process-allocation failures and login 500 were observed while health returned 200/database up. Database-only guarded cleanup succeeded. Later authenticated API verification passed terminal-case duplicate guards, exact owner/Admin evidence bytes, unauthenticated/role denials, private static 404 and canonical status filters. No blind restart was performed; the cause of the earlier browser/resource failures was not established.
+
+### Fixture disposition
+
+Fresh local fixture identities from the company slice were reused; exposed group-chat credentials were not used. Two order creations, initial fulfilment and the second evidence dispute used the actual API during setup; subsequent dispute review and buyer actions used the UI. Payments were simulated.
+
+- `ORD-10127`: completed/paid, resolved `fish_unwell` dispute, no attachments, exactly one unchanged 1,000 ₫ full payment.
+- `ORD-10128`: shipped/paid, rejected `not_received` dispute, retained private PNG attachment, exactly one unchanged 1,000 ₫ full payment.
+- Final database assertions checked statuses, amounts, quantities, decisions, finalization and attachment counts. Stock remains two. Only the inspected `FM-LOCAL-DISPUTE-20261028` listing was soft-archived; its archive marker persisted and public detail returned 404. Orders, disputes, payments, evidence and accounts were retained.
+- Saved `ORD-10121`/`ORD-10122` and previous `ORD-10123`–`ORD-10126` payment/stock/shipment results remained unchanged; the four earlier company fixture listings remain archived. No reset/reseed, hard deletion or migration replacement occurred.
+
+Disputes/private evidence are now connected with these acceptance limits. Missing reviews/messaging, complete browser/visual acceptance and production private-upload hardening remain outstanding; deployment stays deferred.
 
 ## Company order queue and fulfilment slice — completed on 2026-10-28
 
@@ -329,14 +363,14 @@ Suggested responsibilities: backend owner defines DTOs, projections and missing 
 - **Implemented:** company mode in the shared active order presentation awaits explicit company actions and displays eligibility from canonical status/payment state. All Admins share the queue. Shipment metadata and required cancellation reason are supported; legacy local-state queue/store remain unmounted. A failed action requires Refresh before retry.
 - **Verified:** fresh in-stock/preorder lifecycle, shared access across two Admins, outstanding-balance shipment blocking, buyer/Admin refund UI and failure reconciliation. Retained tests cover invalid transitions and active-dispute guards. Detailed browser limits and fixture disposition are recorded in the completed slice above.
 
-### 4.13 Disputes and private evidence — Adapt / Build missing Admin UI
+### 4.13 Disputes and private evidence — Adapted / Admin UI connected
 
-**Files:** `pages/buyer/Dispute.tsx`, `context/BuyerContext.tsx`, `backend/src/disputes/*`, `uploads/private-files.service.ts`.
+**Files:** active `pages/marketplace/Disputes.tsx`, `services/disputesApi.ts`, `services/disputes.ts`, shared `services/api.ts`; retained `backend/src/disputes/*`, `uploads/private-files.service.ts`. Legacy `pages/buyer/Dispute.tsx` and `context/BuyerContext.tsx` remain unmounted.
 
 - **Local:** one dispute per order; eligible reasons/statuses; description and max-three attachment validation; owner-scoped history/detail; Admin review/finalization and authorized evidence routes.
 - **Remote:** sends `attachments: [url]` to `/orders/:id/dispute` via Cloudinary. Our contract is `uploadIds` to `/me/orders/:id/dispute`.
-- **Action:** upload evidence through local multipart API, then link returned IDs. Reuse customer form with canonical reasons and server eligibility. Add customer dispute history/detail and Admin queue/review UI where absent. Fetch evidence with bearer authorization as a blob; do not render protected URLs as public static links.
-- **Verify:** other-user 404, static private path blocked, unauthorized content denied, max/reused/foreign uploads rejected, final decision persisted, no automatic refund implied by resolution.
+- **Implemented:** dedicated owner creation/history/detail and shared Admin queue/review; canonical payloads, confirmations and reconciliation; identity-bound refresh retries and response validation; local multipart private upload references and protected Blob downloads, never public static links.
+- **Verified/remaining:** actual owner/Admin decisions, private bytes/static denial and completion block/unblock passed with fixture preservation. Detailed automated/browser limits, upload hardening caveats and remaining interactions are recorded in the completed slice above.
 
 ### 4.14 Company catalog forms and media — Adapt
 
@@ -532,7 +566,8 @@ This is a proposed sequence. It prevents missing secondary APIs from blocking a 
 - [x] Integrate buyer order history/tracking and supported owner lifecycle actions (browser acceptance limits recorded above).
 - [x] Integrate company fulfilment UI and exercise the buyer/Admin lifecycle on fresh local fixtures (browser control/visual acceptance limits recorded above).
 - [x] Integrate pre-order deposit/balance/deadline presentation and owner balance endpoint (successful simulated balance UI journey verified on a fresh preorder).
-- [ ] Integrate disputes/private evidence and missing review screens.
+- [x] Integrate disputes/private evidence (remaining GUI/security acceptance limits recorded above).
+- [ ] Integrate missing review screens.
 
 **Gate:** User purchase and Admin fulfilment verified end-to-end, including retries, refunds, ownership and active-dispute guards.
 
@@ -569,7 +604,7 @@ pnpm --dir C:/Mythic/Works/Projects/FishFarm/backend lint
 git diff --check
 ```
 
-The frontend now has 37 automated API/session, commerce recovery/transport and buyer/company order presentation/action tests; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
+The frontend now has 62 automated API/session, commerce/dispute recovery/transport and buyer/company presentation/action tests; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
 
 Preserve all eight backend end-to-end suites: app, auth, listings, marketplace, uploads, orders, disputes, batches-facilities. Preserve unit coverage for permissions and notification fan-out. Add tests for new endpoints/adapters instead of weakening existing assertions to match remote behavior.
 
@@ -594,4 +629,4 @@ Preserve all eight backend end-to-end suites: app, auth, listings, marketplace, 
 6. **Engagement order:** recommendation is notifications/Admin users/favorites before full chat/reviews/analytics, after the purchase journey works.
 7. **Individual-fish sponsorship:** possible one-count-share batch, subject to deliberate approval; retain canonical full-prepaid care rather than prototype deposit/balance semantics.
 
-**Current outcome:** the saved backend remains intact. Foundation/auth/public catalog, quantity-bearing cart/atomic simulated checkout, buyer order history/tracking/lifecycle and shared company order fulfilment are implemented in the uncommitted working tree, with verification and acceptance limits above. Fresh preorder/in-stock completion and buyer/Admin refunds have been exercised against the local server; the two saved orders were preserved. Disputes/private evidence, missing reviews and complete browser/visual acceptance remain outstanding, so the full marketplace gate is not yet satisfied. Deployment remains deferred.
+**Current outcome:** the saved backend remains intact. Foundation/auth/public catalog, quantity-bearing cart/atomic simulated checkout, buyer orders/lifecycle and shared company fulfilment are saved in checkpoint `38f0dd7`; nothing was pushed. Owner/Admin disputes and protected evidence are implemented in the new uncommitted slice, with 62 passing frontend tests and the verification/acceptance limits above. Fresh completion/refund and dispute block/review/finalization/unblock journeys used the local server; saved development records were preserved and only inspected test listings were archived. Missing reviews, complete browser/visual acceptance and production private-upload hardening remain outstanding. The later local runtime/browser restoration problem was documented, not declared fixed. The full marketplace gate is not yet satisfied; deployment remains deferred.
