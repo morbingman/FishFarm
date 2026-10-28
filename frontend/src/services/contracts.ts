@@ -48,6 +48,26 @@ export type Dispute = {
 export type DisputeInput = { reason: DisputeReason; description: string; uploadIds?: string[] };
 export type EvidenceUpload = { id: string; url: string; mimeType: string; sizeBytes: number; purpose: string; isPrivate: boolean };
 
+export type CompanyListingStatus = "draft" | "pending" | "approved" | "paused" | "changes" | "rejected";
+export type CompanyListingFilter = "all" | "attention" | CompanyListingStatus;
+export type ListingImageInput = { url: string; isMain: boolean; position: number };
+export type CompanyListingDraft = {
+  name: string; species: string; breed: string; description: string;
+  ageMonths: number | null; sizeCm: number | null; gender: string | null; origin: string | null; health: string | null;
+  price: number; quantity: number; negotiable: boolean; shipping: string[];
+  location: string | null; region: string | null; saleMode: SaleMode;
+  depositPct: number | null; expectedReadyDate: string | null; preorderPolicy: string | null;
+  images: (ListingImageInput & { id: string })[]; mainId: string | null;
+};
+export type CompanyListingInput = Partial<Omit<CompanyListingDraft, "images" | "mainId"> & { images: ListingImageInput[] }>;
+export type CompanyListing = {
+  id: string; company: { id: string; name: string; location: string | null }; createdBy: string | null;
+  status: CompanyListingStatus; draft: CompanyListingDraft | null;
+  decision: { kind: string; reason: string | null; feedback: string | null; step: number | null; by: string; at: string } | null;
+  createdAt: string; updatedAt: string; submittedAt: string | null; views: number;
+  history: { at: string; by: string; action: string; note?: string }[];
+};
+
 export type ApiUser = {
   id: string;
   email: string;

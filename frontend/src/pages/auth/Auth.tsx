@@ -7,6 +7,7 @@ import { useUser } from "@/services/session";
 import { isOrderRoute } from "@/services/orders";
 import { isCompanyOrderRoute } from "@/services/companyOrders";
 import { isDisputeRoute } from "@/services/disputes";
+import { isCompanyListingRoute } from "@/services/companyListings";
 import type { Lang } from "@/hooks/useTranslation";
 
 type Screen = "login" | "register" | "forgot" | "reset" | "verify";
@@ -24,7 +25,7 @@ export default function Auth({ language }: { language: Lang; setLanguage: (l: La
     const back = sessionStorage.getItem("fishmarket-return");
     sessionStorage.removeItem("fishmarket-return");
     const route = back?.split("?")[0];
-    window.location.hash = back && (back.startsWith("marketplace/detail?") || isOrderRoute(route ?? "") || isCompanyOrderRoute(route ?? "") || isDisputeRoute(route ?? "") || ["marketplace/cart", "marketplace/checkout", "marketplace/confirmation"].includes(route ?? "")) ? back : "home";
+    window.location.hash = back && (back.startsWith("marketplace/detail?") || isOrderRoute(route ?? "") || isCompanyOrderRoute(route ?? "") || isCompanyListingRoute(route ?? "") || isDisputeRoute(route ?? "") || ["marketplace/cart", "marketplace/checkout", "marketplace/confirmation"].includes(route ?? "")) ? back : "home";
   };
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

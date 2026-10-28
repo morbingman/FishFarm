@@ -4,13 +4,39 @@
 
 **Saved local baseline:** `integration/team-baseline` at `ca6eb49`
 **Saved application integration checkpoint:** `38f0dd7` — real auth, marketplace, checkout and order fulfilment (2026-10-28; not pushed)
+**Saved dispute checkpoint:** `90c00a0` — buyer disputes, company review and protected evidence (2026-10-28; not pushed)
 **Purpose:** decide what to keep, adapt, restore, build or defer for each component before changing application code.
 
 This is an implementation guide and decision register, not a claim that integration is complete. The user requested incremental integration and deferred deployment. Recommendations below are not all approved product decisions. No application changes, branch merges or deployment are performed by creating this document.
 
+## Company catalog slice — implemented on 2026-10-28
+
+The dispute checkpoint `90c00a0` is saved; this catalog slice remains uncommitted on `integration/team-baseline`. Nothing was pushed, merged or deployed. Backend source, schema, migration history and tests are unchanged. Earlier sections are historical slice records.
+
+### Connected scope
+
+- Active standalone `pages/company/CompanyCatalog.tsx` and scoped CSS mount shared Admin list/create/edit/detail routes: `#company/listings`, `#company/add`, `#company/edit/:id`, `#company/listing/:id`. Legacy Seller/Portal/demo stores remain unmounted. Backend database-ID aliases canonicalize to returned listing codes for future writes; malformed encoded routes reject safely.
+- `companyListings.ts` maps six-step form strings to whitelisted DTO fields, nullable fish fields, integer VND/quantity, ISO UTC preorder dates and `{url,isMain,position}` media. PATCH sends changed fields only; changed media replaces the entire array. Save and direct publication are separate confirmed requests. Approved saves immediately update public content; pending editing is locked. Preorder deposit/date are required even for partial saves. No sample data, third Seller role, mandatory review or prototype `publish` flags were enabled.
+- `companyListingsApi.ts` validates management projections, requested list statuses and returned submitted fields/media before acknowledging success. Public upload confirmation requires the exact listing purpose, nonprivate URL and matching MIME/size. HTTP(S) schemes match the backend case-insensitively. Shared transport retains identity-bound refresh and no uncertain transport replay.
+- Local search and ten-row pagination operate over the full server-filtered array. Preview is editorial, not a fabricated buyer page. Unsaved hash navigation is guarded before the rendered route changes, including header links/history; alias/server-confirmed create route replacement avoids another create history entry. Logout/session changes bypass the dirty guard. Full reload uses beforeunload protection.
+- Public `listing_image` uploads are immediately visible, even before publication. Removing a reference does not delete a file. There is no upload recovery/cleanup, catalog-create idempotency key, version or concurrency lock. Changed-field writes reduce but do not eliminate concurrent Admin overwrites. Unknown creates block repeat submission only within the mounted screen, not durably across leaving/reload. Inspect the shared catalog before another create. Optional review/activity, pause/resume/delete UI and sponsorship remain separate.
+
+### Verification and acceptance limits
+
+- Frontend: **103 tests in eleven files passed**, TypeScript/build passed and audit reported zero vulnerabilities. This includes 17 catalog helper/route, 18 catalog transport and six hash-navigation tests. No component interaction suite was added.
+- Backend: **23 unit and 71 isolated e2e tests**, TypeScript/build/lint passed again. Known `pg` concurrent-query deprecation remains. No backend assertions or behavior were weakened.
+- Browser: `FM-48379` name-only partial create returned its edit route; all six field groups completed with a confirmed public image URL, save remained draft, publication became live, public detail showed saved content, and a confirmed live breed edit persisted. Pending server filtering and local search empty state passed. Vietnamese controls and mobile width were checked; correcting expanded Admin header wrapping reduced document width to 375 pixels at a 390 × 844 viewport. Desktop width remained 1280 pixels at a 1280 × 720 viewport.
+- Browser: cancelled dirty header navigation preserved the editor and unsaved value. Later Back/dialog automation stalled; Back/Forward acceptance and final sign-out are not verified. Malformed encoding/alias and guard rules are covered by automated tests, not claimed complete browser journeys. The final server-confirmed create route replacement passed automated checks but was not rerun through the browser. Normal clicks were unreliable; observed-control fallbacks invoked actual UI handlers. File selection is unsupported, and a captured desktop screenshot could not be visually assessed by this model. No mouse-only or visual-layout acceptance is claimed.
+- Separate local API pass: 48 requests passed for partial create, shared access and saving by Admin B, actual public upload/complete save/direct publish/live update, User denial (403), incomplete publication (400) and pending PATCH rejection (409). The valid 76-byte PNG was anonymously retrieved byte-for-byte. Final UI fixture readback/cleanup added 12 requests and verified its exact saved content/media/history.
+- Unexercised GUI acceptance: multi-image order/cover/removal, preorder input interaction, uncertain create/reload recovery, failure/Refresh, alias/login-return and User denial. Automated rules/transport/backend coverage is not a substitute. Reviews/messaging and full marketplace acceptance remain outstanding; deployment is deferred.
+
+### Fixture disposition
+
+Fresh local test identities were reused; exposed credentials were not used. Exact targets were inspected before supported API cleanup. `FM-48379` (UI) and `FM-48380` (API live edit) are paused; `FM-48381` (pending-lock test) was withdrawn then soft-deleted. All three public details return 404. Images, drafts, audit history and accounts are retained; no files were deleted. The UI fixture records Created draft, Updated draft, Published, Edited live listing and Paused. All 13 existing orders and original listing/upload fingerprints are unchanged. The original available public IDs are again exactly `FM-18420`, `FM-18877`, `FM-19544`, `FM-20761` (`available=false` also retains sold-out `FM-19102`). No reset/reseed or migration replacement occurred.
+
 ## Disputes and private evidence slice — implemented on 2026-10-28
 
-The authorized integration checkpoint is saved as `38f0dd7` on `integration/team-baseline`; nothing was pushed. This new dispute slice remains uncommitted. The retained backend source, schema, migrations and tests are unchanged. Earlier slice sections below remain historical records; their uncommitted statements were superseded by this checkpoint.
+The dispute slice is saved as `90c00a0` on `integration/team-baseline`; nothing was pushed. The retained backend source, schema, migrations and tests are unchanged. Earlier slice sections below remain historical records; their uncommitted statements were superseded by the saved checkpoints.
 
 ### Connected scope
 
@@ -372,14 +398,13 @@ Suggested responsibilities: backend owner defines DTOs, projections and missing 
 - **Implemented:** dedicated owner creation/history/detail and shared Admin queue/review; canonical payloads, confirmations and reconciliation; identity-bound refresh retries and response validation; local multipart private upload references and protected Blob downloads, never public static links.
 - **Verified/remaining:** actual owner/Admin decisions, private bytes/static denial and completion block/unblock passed with fixture preservation. Detailed automated/browser limits, upload hardening caveats and remaining interactions are recorded in the completed slice above.
 
-### 4.14 Company catalog forms and media — Adapt
+### 4.14 Company catalog forms and media — Implemented; acceptance limits remain
 
-**Files:** `pages/seller/Listings.*`, `ListingForm.tsx`, `Detail.*`, `ListingView.*`, `components/seller/*`, `data/sellerData.ts`, `services/demoStore.ts`, `backend/src/listings/*`.
+**Active files:** `pages/company/CompanyCatalog.*`, `services/companyListings.ts`, `services/companyListingsApi.ts`, their tests, and `services/hashNavigation.*`. Legacy `pages/seller/*`, seller components/data and demo stores remain unmounted. The retained `backend/src/listings/*` contract is unchanged.
 
-- **Local:** six-step prototype; backend draft CRUD and live edits under `/company/listings`.
-- **Remote:** useful API-connected form, but writes `/admin/listings` and spreads prototype fields with `publish: true/false`.
-- **Action:** explicitly map string fields to `ageMonths`, `sizeCm`, integer price/quantity. Send only accepted DTO fields; map main image to `{ url, isMain, position }`, not prototype `id/mainId` fields. Save draft separately from POST `/:id/publish`. Maintain partial saves and show validation failures. Treat the seller directory name as legacy organization, not a third role; rename later only if it aids maintainability.
-- **Verify:** partial draft, publish completeness, media order/cover, pre-order terms, live edit remains live, shared access across Admins and failed writes do not look successful.
+- **Implemented:** shared Admin list/create/edit/detail with six-step form mapping, bounded integer VND/quantity, nullable fish fields, preorder terms and URL-based media. DTO whitelisting strips prototype fields and image IDs; changed-field PATCH avoids replacing unchanged media. Partial draft saving and bodyless direct publication are separate confirmed actions. Approved edits immediately change public content; pending records are read-only.
+- **Verified:** name-only draft, complete save, direct publication, public readback and live edit passed through the UI. Separate API checks verified shared access across Admins, public media bytes, incomplete publication and pending-write rejection. Catalog helper/transport and navigation regressions passed; failed or malformed writes are not acknowledged as saved or automatically replayed.
+- **Limits:** media order/cover/removal, preorder form interaction and failure/Refresh still need GUI acceptance. Public uploads are not deleted when references are removed; uncertain creates have no durable idempotent recovery. Optional review/activity and pause/resume/delete controls remain separate. Full verification and browser limitations are recorded in the catalog slice above.
 
 ### 4.15 Optional internal listing review — Restore / Adapt
 
@@ -573,7 +598,8 @@ This is a proposed sequence. It prevents missing secondary APIs from blocking a 
 
 ### Pass C — Company operations and contained missing features
 
-- [ ] Adapt company catalog forms/publication and restore optional listing review/activity.
+- [x] Adapt shared company catalog forms, public media and direct publication (GUI acceptance limits recorded above).
+- [ ] Restore optional internal listing review and real activity screens.
 - [ ] Build Admin list/suspend/reactivate and notification inbox operations.
 - [ ] Integrate profile/prefs and remove client-only password/block/deletion claims.
 - [ ] Build favorites if included in this pass.
@@ -604,7 +630,7 @@ pnpm --dir C:/Mythic/Works/Projects/FishFarm/backend lint
 git diff --check
 ```
 
-The frontend now has 62 automated API/session, commerce/dispute recovery/transport and buyer/company presentation/action tests; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
+The frontend now has 103 automated tests covering API/session behavior, commerce/dispute/catalog transport and rules, checkout recovery, buyer/company presentation and guarded hash navigation; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
 
 Preserve all eight backend end-to-end suites: app, auth, listings, marketplace, uploads, orders, disputes, batches-facilities. Preserve unit coverage for permissions and notification fan-out. Add tests for new endpoints/adapters instead of weakening existing assertions to match remote behavior.
 
