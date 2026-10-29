@@ -93,8 +93,8 @@ Implemented in the API:
   the company order queue and fulfilment, simulated payments, pre-order deposits with a 7-day
   balance window, and cancellations that refund and return stock.
 
-Not implemented yet: reviews, messaging, favourites, company analytics, and the batch-sponsorship
-flow.
+Not implemented yet: reviews, favourites, company analytics, and the batch-sponsorship
+flow. Chat/messaging was dropped from project scope on 2026-10-28; it is not a pending feature.
 
 **Frontend note:** the React app is the Figma Make prototype. It runs entirely on the in-memory
 mock store (`frontend/src/store.ts`) and does not call the API yet, so the site is fully clickable

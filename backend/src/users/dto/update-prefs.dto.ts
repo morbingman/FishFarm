@@ -1,19 +1,23 @@
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsOptional } from 'class-validator';
+import { Transform } from 'class-transformer';
+import { IsBoolean, ValidateIf } from 'class-validator';
 
 export class UpdatePrefsDto {
   @ApiPropertyOptional({ description: 'Order and listing status updates.' })
-  @IsOptional()
+  @Transform(({ obj, key }) => obj[key])
+  @ValidateIf((_object, value) => value !== undefined)
   @IsBoolean({ message: 'validation.boolean' })
   status?: boolean;
 
   @ApiPropertyOptional({ description: 'System announcements.' })
-  @IsOptional()
+  @Transform(({ obj, key }) => obj[key])
+  @ValidateIf((_object, value) => value !== undefined)
   @IsBoolean({ message: 'validation.boolean' })
   system?: boolean;
 
   @ApiPropertyOptional({ description: 'Reminders and follow-ups.' })
-  @IsOptional()
+  @Transform(({ obj, key }) => obj[key])
+  @ValidateIf((_object, value) => value !== undefined)
   @IsBoolean({ message: 'validation.boolean' })
   reminders?: boolean;
 }

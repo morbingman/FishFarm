@@ -11,6 +11,7 @@ import { FacilitiesModule } from './facilities/facilities.module.js';
 import { HealthModule } from './health/health.module.js';
 import { ListingsModule } from './listings/listings.module.js';
 import { MarketplaceModule } from './marketplace/marketplace.module.js';
+import { NotificationsModule } from './notifications/notifications.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
 import { UploadsModule } from './uploads/uploads.module.js';
@@ -23,6 +24,7 @@ import { UsersModule } from './users/users.module.js';
     CompanyModule,
     AuthModule,
     UsersModule,
+    NotificationsModule,
     ListingsModule,
     MarketplaceModule,
     OrdersModule,

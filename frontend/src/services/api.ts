@@ -14,6 +14,17 @@ export class ApiError extends Error {
   }
 }
 
+export type ApiSessionStamp = { generation: number; id: string; role: ApiUser["role"] };
+export const apiSessionStamp = (): ApiSessionStamp | null => identity ? { generation, ...identity } : null;
+export function isApiSession(stamp: ApiSessionStamp | null): boolean {
+  return stamp !== null && stamp.generation === generation && stamp.id === identity?.id && stamp.role === identity?.role;
+}
+// Profile publication changes display data, never tokens or the session generation.
+export function publishApiUser(remote: ApiUser, stamp: ApiSessionStamp): boolean {
+  if (!isApiSession(stamp) || remote.id !== stamp.id || remote.role !== stamp.role || remote.status !== "active") return false;
+  sessionListeners.forEach(listener => listener(remote));
+  return true;
+}
 export function onApiSession(listener: (user: ApiUser | null) => void) {
   sessionListeners.add(listener);
   return () => { sessionListeners.delete(listener); };

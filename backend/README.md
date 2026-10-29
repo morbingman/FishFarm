@@ -43,6 +43,7 @@ This keeps the refresh cookie's `/v1/auth` path valid. See the
 | `GET /docs` | Swagger UI (OpenAPI JSON at `/docs-json`) |
 | `POST /v1/auth/*` | register, login, refresh, logout, verify-email, forgot-password, reset-password |
 | `GET/PATCH /v1/me` | Current profile; `GET/PATCH /v1/me/prefs` for notification prefs |
+| `GET /v1/me/notifications`, `PATCH /v1/notifications/:id`, `POST /v1/notifications/read-all` | Personal inbox, one-way mark-read and full-inbox read-all (both roles) |
 | `/v1/company/listings` | Company catalog CRUD, publish and submit/withdraw/pause/resume (Admin only) |
 | `/v1/admin/listings` | Internal review queue, review detail and approve/reject/request-changes/takedown |
 | `GET /v1/admin/activity` | Recent platform activity log |
@@ -96,6 +97,14 @@ are no per-user stores and no independent sellers.
 Every Admin can operate every company resource; `createdBy` on a listing or batch records which
 Admin created it for audit only. The review stages (`pending`, `changes`, `rejected`) still exist
 as an optional internal quality gate between Admins — `publish` moves a draft straight to `approved`.
+
+### Own profile and notification preferences
+
+Both active roles use `GET/PATCH /v1/me` and `GET/PATCH /v1/me/prefs`; the authenticated ID is the only target. Profile PATCH accepts optional raw strings `name` (1–80, nonblank), `phone` (max 32), `location` (max 120). Empty phone/location strings clear those fields. Null, coerced nonstrings and extra fields are rejected; email, role, status, password and avatar are not editable. The response is the existing public user projection, never credentials/session internals.
+
+Preferences PATCH accepts optional actual JSON booleans `status`, `system`, `reminders` (false is preserved, strings/numbers/null are rejected). Missing stored choices normalize to true. A User-row lock serializes partial read/merge/write transactions so independent partial changes do not erase each other. Writes to the same key are still last-writer-wins; no version or expected-value conflict check exists. The frontend explicitly replaces all three choices. The returned prefs affect future matching categories; existing notification history/read state is unchanged and success/error/approval categories are not controlled by these switches.
+
+Verified on 2026-10-28: **423 isolated e2e tests** passed, including **157 profile/preferences cases**, and **27 unit tests** passed. TypeScript, lint (zero warnings/errors) and build passed. Raw-type/null/blank validation, both roles, ownership, defaults/partial preservation and barrier-controlled independent-key concurrency are covered without changing schema, migrations or dependencies. The known `pg` concurrent-query deprecation remains. Real localhost API/browser checks, retained fresh fixtures and acceptance limits are recorded in the [integration map](../docs/INTEGRATION_MAP_2026-10-26.md).
 
 ### Account management
 
@@ -185,6 +194,30 @@ Payment is simulated: there is no gateway, so an order is created already `paid`
   while a dispute is `open` or `reviewing`.
 - Balance payment requires a ready pre-order with an unexpired deadline. Concurrent retries charge
   once; late payment instead returns the cancelled/refunded order. Cancellation restores stock once.
+
+### Personal notifications
+
+`GET /v1/me/notifications` is available to both active roles. It returns exact
+`{items,total,unreadTotal,page,limit}` with server `read=all|unread|read`, optional existing `type`,
+strict digit-only page 1–1,000,000 and limit 1–100 (defaults 1/25). Order is newest creation first,
+then ID. The filtered page/count and owner-wide unread count share a RepeatableRead snapshot.
+History has no 200-row cap. Items expose only ID/type, title/body keys and nullable arbitrary JSON
+parameters, nullable link/readAt and createdAt. Recipient IDs/roles are omitted; only exact personal
+recipient IDs match, never legacy role-only/unassigned rows.
+
+`PATCH /v1/notifications/:id` accepts exact raw JSON `{read:true}`. Reads are one-way and repeats
+preserve the original timestamp; missing/foreign/role-only IDs return the same
+`404 notification.notFound`. `POST /v1/notifications/read-all` is bodyless (empty object accepted)
+and returns `{updated,readAt}`. Its single UPDATE marks all owner unread history, not one page or
+filter, and preserves previously read timestamps. Arrivals after the update snapshot may remain
+unread, so clients must re-read rather than assume unread zero. Other bodies are rejected.
+
+No deletion, mark-unread, schema, generation-category or preference changes were introduced.
+Existing server-side generation and per-recipient preference behavior remain authoritative.
+Verified on 2026-10-28: 27 unit and 266 isolated e2e tests passed, including 104 notification
+cases; TypeScript/build passed and lint reported zero warnings/errors. The existing `pg`
+concurrent-query deprecation warning remains. Local API/browser results and retained fixtures
+are recorded in the integration map.
 
 ### Disputes
 
@@ -321,6 +354,7 @@ prisma/
 src/
   auth/                   # login/refresh/OTP, guards, permission matrix
   users/                  # /me profile and notification prefs
+  notifications/          # personal inbox, one-way reads and full-history read-all
   company/                # the single company scope used by every Admin
   listings/               # company catalog CRUD, lifecycle state machine, internal review
   marketplace/            # public search, listing detail and the company store page

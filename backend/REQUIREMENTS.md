@@ -17,6 +17,8 @@ marketplace with a **two-role company-operated model**: the company behind FishF
 and runs the farming service itself, so there is no independent Seller. Everything else from v1.0
 (currency, auth, simulated payments, sponsorship mechanics) stands. See §2 and decision 10 in §9.
 
+**Scope update — 2026-10-28:** chat/messaging is dropped from the project requirements, including marketplace and sponsorship conversations. No conversation/message API, chat UI, polling or WebSocket work is planned. Existing unused models and migration history are retained; this decision does not require schema cleanup. Operational notifications and reviews remain in scope.
+
 ---
 
 ## 1. Project state (as of 2026-10-22)
@@ -42,7 +44,7 @@ inventory, the grow-out facilities and the farming service. It is the only comme
 the platform. There is no independent-seller marketplace and no public seller onboarding.
 
 - **`User`** — customer. Browses the public catalog and batches, places orders, sponsors batches,
-  tracks deliveries, writes reviews, and manages favourites, conversations and their own profile.
+  tracks deliveries, writes reviews, and manages favourites and their own profile.
 - **`Admin`** — company staff. Runs the commercial side (catalog, listings, inventory, orders,
   fulfilment, batches, harvest, settlements) and the platform side (users, activity, disputes,
   compliance). Admin is a company operator, not a moderator of third parties.
@@ -150,15 +152,19 @@ Controlled vocabularies already fixed in the UI (`Seller.tsx`):
 Add-listing wizard steps: **Basic Information → Fish Details → Pricing → Media → Location → Preview**.
 
 ### 3.4 Notification
-```
-id  to        # recipient email OR role broadcast ("Admin")
-type: success|error|system|status|approval|reminder
-title body link   at   read: bool
-```
-Filtering rule in the demo `notifsFor()` accepts email or role. Backend notifications now fan out
-as one `recipientId` row per active Admin instead of a shared role row, so read state is independent.
-Direct recipient takes precedence over role; `notify()` skips muted status/system/reminder categories.
-Cap: 200 most recent per the demo. Notification read/delete API routes below remain proposed.
+
+Persisted notifications use `id`, `type` (`success|error|system|status|approval|reminder`),
+`titleKey`, nullable JSON `titleParams`, `bodyKey`, nullable JSON `bodyParams`, nullable `link`,
+nullable ISO UTC `readAt` and ISO UTC `createdAt`. The personal inbox projection omits recipient
+identities. JSON parameters may be primitives, arrays, nested objects or null; they are not
+restricted to template-shaped objects.
+
+Backend notifications fan out as one `recipientId` row per active Admin instead of the demo's
+shared email/role row, so read state is independent. Direct recipient takes precedence over role;
+`notify()` skips muted status/system/reminder categories. Personal endpoints scope exclusively to
+the authenticated `recipientId`; legacy role-only or unassigned rows remain excluded. Inbox history
+is server-paged without the demo's 200-row cap. Read is one-way; deletion and mark-unread remain
+outside the integrated contract. See §5 for endpoints and snapshot semantics.
 
 ### 3.5 Activity (platform audit log, admin-visible)
 ```
@@ -178,7 +184,7 @@ These are rendered from hardcoded/page-local data today and are the real new bui
   paid`; simulated (no gateway), so orders start already paid.
 - **Cart** — built, persisted server-side at `/v1/me/cart`.
 - **Review / Rating** — user posts rating + text after delivery; the company sees reviews at `#company/reviews`; listings show `rating`.
-- **Message / Conversation** — user↔company messaging.
+- **Message / Conversation** — retained unused models; chat/messaging dropped from scope on 2026-10-28.
 - **Favorite** — user favourites list (client-only `number[]` today).
 - **Dispute** — user "Report a Problem" with reason + description + attachments.
 - **Customer** (company view) and **Analytics** (Revenue, Orders, Views, Conversion; ranges This month / Last 7 days / Last 30 days / All time) — derived from orders + listing views.
@@ -259,7 +265,15 @@ Auth
 - `POST /auth/login` → token + user; rejects `suspended`
 - `POST /auth/logout`
 - `POST /auth/verify-email`, `POST /auth/forgot-password`, `POST /auth/reset-password` (OTP flow: 6-digit, 5-min expiry, 45s resend)
-- `GET  /me`, `PATCH /me`, `PATCH /me/prefs`
+- `GET/PATCH /me`, `GET/PATCH /me/prefs` — implemented for both active roles under `/v1`.
+  Own profile PATCH accepts optional raw strings only: nonblank name 1–80, phone max 32,
+  location max 120. Empty phone/location clears the field; null/nonstrings and extra fields
+  are rejected. Immutable identity, status, password and avatar are not editable here.
+  Prefs PATCH accepts optional actual booleans `status,system,reminders`; null/coerced values
+  are rejected and false is preserved. Row-locked partial merging preserves independent
+  concurrent keys; same-key/full-snapshot saves are last-writer-wins without version detection.
+  Existing inbox history/read state remains unchanged. Password change/self-deactivation and
+  general personal activity history remain outside this integration.
 
 Catalog (public) — implemented as `/v1/marketplace/*`
 - `GET  /marketplace/listings` — filters: `q, species[], breed, priceMax, size, location, rating, available`; sort `recommended|price_asc|price_desc|newest`; pagination
@@ -291,8 +305,8 @@ Cart & checkout (User) — implemented as `/v1/me/cart` and `/v1/orders`
   records `resolvedAt`; resolution does not automatically refund money.
 - Reviews remain unimplemented.
 
-Messaging
-- `GET  /me/conversations`, `GET /conversations/{id}/messages`, `POST /conversations/{id}/messages`
+Messaging — dropped from scope (2026-10-28)
+- No conversation/message endpoints are planned. Existing unused schema is retained.
 
 Company operations (Admin only)
 - `GET  /company/summary` (analytics: revenue, orders, views, conversion; ranges)
@@ -312,8 +326,21 @@ Admin (Admin only)
 - `GET  /admin/roles` (the matrix)
 - `GET  /admin/activity`
 
-Notifications (all signed-in accounts)
-- `GET /me/notifications`, `PATCH /notifications/{id}` (read), `POST /notifications/read-all`, `DELETE /notifications/{id}`
+Notifications (both active signed-in roles; implemented under `/v1`)
+- `GET /me/notifications`: `read=all|unread|read` (default `all`), optional existing `type`,
+  strict digit-only `page` 1–1,000,000 (default 1) and `limit` 1–100 (default 25). Exact envelope
+  `{items,total,unreadTotal,page,limit}`; `total` respects filters, while `unreadTotal` counts
+  the owner's entire unread inbox. Order is `createdAt DESC, id ASC`. Page and both counts share
+  a RepeatableRead snapshot. No 200-row history cap.
+- `PATCH /notifications/{id}`: exact raw JSON `{read:true}`; false, strings, null and extra fields
+  are rejected. Returns the same minimal notification projection with nonnull `readAt`.
+  Repeats preserve the first timestamp; missing, foreign and role-only rows return the same
+  `404 notification.notFound`.
+- `POST /notifications/read-all`: bodyless (empty object also accepted; other bodies rejected).
+  One UPDATE marks all owner unread rows across filters/pages, preserving previous timestamps.
+  Returns `{updated,readAt}` with nonnegative count and ISO UTC operation time. Notifications
+  arriving after the UPDATE snapshot may remain unread; the result does not promise unread zero.
+- No delete, mark-unread, new notification generation or preference changes in this slice.
 
 Uploads
 - `POST /uploads` (multipart) → `{ id, url }` for catalog media and dispute attachments.
@@ -367,7 +394,7 @@ Pricing concern, Species policy — plus free-text feedback. Review checklist it
 | M4 | **Marketplace read** | Public catalog list w/ filters/sort/pagination + product projection + company store page. Turns the browse UI live. | M3 |
 | M5 | **Uploads** | Image storage wired to catalog media. | M3 |
 | M6 | **Commerce** | Cart, checkout, orders, payment states, pre-order deposit/balance, tracking, delivery, disputes. | M4 |
-| M7 | **Engagement** | Reviews/ratings, messaging, favourites, company analytics + customers. | M6 |
+| M7 | **Engagement** | Reviews/ratings, favourites, company analytics + customers. Chat/messaging excluded. | M6 |
 | M8 | **Hardening** | OpenAPI finalised + generated client handed to frontend; tests; rate limiting; observability. | M7 |
 | M9 | **Batch sponsorship schema + company batch management** | Grow-out batches, company publishing, compliance records; batches publishable but not yet sponsorable. | M3, M5 |
 | M10 | **Sponsorship + full-care payments** | Reserve shares, full package payment, milestone release ledger, batch update feed, my-sponsorships. | M9, M6 |
@@ -411,7 +438,7 @@ stable; it is not required for the catalog launch.
 ### Adopted defaults (2026-10-22 — no open items)
 1. **Image storage** — storage interface; local disk in dev, S3-compatible object storage in prod.
 2. **Search** — Postgres full-text + trigram initially; swap in an index only if needed.
-3. **Realtime** — polling for messaging (M7) first; WebSockets later.
+3. **Realtime** — messaging polling/WebSockets are no longer planned; chat dropped from scope on 2026-10-28.
 4. **Takedown resubmission** — blocked after an admin takedown unless an admin reactivates.
 5. **Admin notifications** — operational events create one row per Admin, so read state is per person.
 6. **Company order scope** — Admin receives incoming orders through a dedicated company-operations
@@ -672,7 +699,7 @@ harvest published, ready for delivery, refund issued, batch cancelled.
 - `sharesAvailable` must be decremented atomically (no overselling under concurrency).
 - Compliance evidence must be on file before a batch can reach `open`; the company publishes its
   own inspection record rather than an Admin approving a third-party farm.
-- Batch updates are public to sponsors; sponsor↔company chat is out of scope for v1 (reuse messaging later).
+- Batch updates are public to sponsors; sponsor↔company chat is excluded by the 2026-10-28 project-wide scope decision.
 
 ### 11.8 Decisions (all resolved, 2026-10-18)
 

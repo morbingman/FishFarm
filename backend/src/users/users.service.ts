@@ -29,7 +29,9 @@ export class UsersService {
   }
 
   async findByEmail(email: string): Promise<UserRecord | null> {
-    return this.prisma.user.findUnique({ where: { email: email.toLowerCase() } });
+    return this.prisma.user.findUnique({
+      where: { email: email.toLowerCase() },
+    });
   }
 
   toPublicUser(user: UserRecord): PublicUser {
@@ -47,7 +49,10 @@ export class UsersService {
     };
   }
 
-  async updateProfile(userId: string, dto: UpdateProfileDto): Promise<PublicUser> {
+  async updateProfile(
+    userId: string,
+    dto: UpdateProfileDto,
+  ): Promise<PublicUser> {
     const user = await this.prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new AppException('error.notFound', HttpStatus.NOT_FOUND);
 
@@ -72,25 +77,42 @@ export class UsersService {
     return normalizePrefs(user.prefs);
   }
 
-  async updatePrefs(userId: string, dto: UpdatePrefsDto): Promise<NotificationPrefs> {
-    const current = await this.getPrefs(userId);
-    const prefs: NotificationPrefs = {
-      status: dto.status ?? current.status,
-      system: dto.system ?? current.system,
-      reminders: dto.reminders ?? current.reminders,
-    };
+  async updatePrefs(
+    userId: string,
+    dto: UpdatePrefsDto,
+  ): Promise<NotificationPrefs> {
+    return this.prisma.$transaction(async (tx) => {
+      // Serialize partial merges with other writers before reading the current prefs.
+      await tx.$queryRaw<Array<{ id: string }>>`
+        SELECT "id" FROM "User" WHERE "id" = ${userId} FOR UPDATE
+      `;
+      const user = await tx.user.findUnique({
+        where: { id: userId },
+        select: { prefs: true },
+      });
+      if (!user) throw new AppException('error.notFound', HttpStatus.NOT_FOUND);
 
-    await this.prisma.user.update({
-      where: { id: userId },
-      data: { prefs },
+      const current = normalizePrefs(user.prefs);
+      const prefs: NotificationPrefs = {
+        status: dto.status ?? current.status,
+        system: dto.system ?? current.system,
+        reminders: dto.reminders ?? current.reminders,
+      };
+
+      await tx.user.update({
+        where: { id: userId },
+        data: { prefs },
+      });
+
+      return prefs;
     });
-
-    return prefs;
   }
 }
 
 export function normalizePrefs(value: unknown): NotificationPrefs {
-  const prefs = (typeof value === 'object' && value !== null ? value : {}) as Record<string, unknown>;
+  const prefs = (
+    typeof value === 'object' && value !== null ? value : {}
+  ) as Record<string, unknown>;
   return {
     status: prefs.status !== false,
     system: prefs.system !== false,

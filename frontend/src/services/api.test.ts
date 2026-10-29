@@ -19,7 +19,7 @@ describe("API integration boundary", () => {
     await api("/me");
     expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ email: user.email, name: user.name, password: "Test12345" });
     expect(fetch.mock.calls[0][0]).toBe("/v1/auth/register");
-    expect(fetch.mock.calls[1][1].headers.get("Authorization")).toBe("Bearer memory-token");
+    expect(new Headers(fetch.mock.calls[1][1].headers).get("Authorization")).toBe("Bearer memory-token");
     expect(sessionStorage.setItem).not.toHaveBeenCalled();
     expect(localStorage.setItem).not.toHaveBeenCalled();
   });
@@ -158,6 +158,55 @@ describe("API integration boundary", () => {
     const error = new ApiError(403, "auth.accountSuspended");
     expect(errorMessage(error, "en")).toBe("This account is suspended. Contact support.");
     expect(errorMessage(error, "vi")).toBe("Tài khoản đã bị tạm khóa.");
+  });
+  it("publishes server profile display without replacing tokens or invalidating pending reads", async () => {
+    let finish: (value: Response) => void = () => {};
+    const fetch = vi.fn((url: string, _init: RequestInit) => url.endsWith("/auth/login") ? Promise.resolve(response(payload())) : new Promise<Response>(resolve => { finish = resolve; }));
+    vi.stubGlobal("fetch", fetch);
+    const { authApi, api, apiSessionStamp, publishApiUser, isApiSession } = await import("./api");
+    const { currentUser } = await import("./session");
+    await authApi.login(user.email, "Test12345");
+    const stamp = apiSessionStamp()!;
+    const pending = api("/me/orders");
+    expect(publishApiUser({ ...user, name: "Saved name", prefs: { status: false, system: true, reminders: false } } as import("./contracts").ApiUser, stamp)).toBe(true);
+    expect(currentUser()).toMatchObject({ name: "Saved name", prefs: { status: false, system: true, reminders: false } });
+    expect(isApiSession(stamp)).toBe(true);
+    expect(apiSessionStamp()).toEqual(stamp);
+    finish(response([]));
+    await expect(pending).resolves.toEqual([]);
+    expect(new Headers(fetch.mock.calls[1][1].headers).get("Authorization")).toBe("Bearer memory-token");
+    expect(sessionStorage.setItem).not.toHaveBeenCalled();
+  });
+  it("rejects stale profile publication after a fresh login to the same account", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(response(payload()))));
+    const { authApi, apiSessionStamp, publishApiUser, isApiSession } = await import("./api");
+    const { currentUser } = await import("./session");
+    await authApi.login(user.email, "Test12345");
+    const old = apiSessionStamp()!;
+    await authApi.login(user.email, "Test12345");
+    expect(isApiSession(old)).toBe(false);
+    expect(publishApiUser({ ...user, name: "Stale name" } as import("./contracts").ApiUser, old)).toBe(false);
+    expect(currentUser()?.name).toBe(user.name);
+  });
+  it.each([{ id: "u2" }, { role: "Admin" }, { status: "suspended" }])("rejects profile publication that changes session identity or status %j", async changed => {
+    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(response(payload())));
+    const { authApi, apiSessionStamp, publishApiUser } = await import("./api");
+    const { currentUser } = await import("./session");
+    await authApi.login(user.email, "Test12345");
+    expect(publishApiUser({ ...user, ...changed } as import("./contracts").ApiUser, apiSessionStamp()!)).toBe(false);
+    expect(currentUser()?.name).toBe(user.name);
+  });
+  it("rejects profile publication after logout and leaves identity empty", async () => {
+    const fetch = vi.fn((url: string) => Promise.resolve(url.endsWith("/auth/logout") ? response(null, 204) : response(payload())));
+    vi.stubGlobal("fetch", fetch);
+    const { authApi, apiSessionStamp, publishApiUser } = await import("./api");
+    const { currentUser } = await import("./session");
+    expect(apiSessionStamp()).toBeNull();
+    await authApi.login(user.email, "Test12345");
+    const old = apiSessionStamp()!;
+    await authApi.logout();
+    expect(publishApiUser(user as import("./contracts").ApiUser, old)).toBe(false);
+    expect(currentUser()).toBeNull();
   });
   it("maps backend User explicitly to customer UI and rejects unknown roles", async () => {
     const { mapSessionUser } = await import("./session");

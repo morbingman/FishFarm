@@ -16,7 +16,7 @@ Open http://localhost:5173. Vite proxies `/v1` and `/uploads` to `http://127.0.0
 ## Verification
 
 ```bash
-npm run test       # Session, commerce, disputes, catalog, review/activity, Admin users and navigation tests
+npm run test       # Session, account, commerce, disputes, catalog, review/activity, users, inbox and navigation tests
 npm run check      # TypeScript and production build
 npm audit
 ```
@@ -25,9 +25,11 @@ Vitest is pinned to 4.1.12. `--legacy-peer-deps` is used because npm 11.4.0's or
 
 ## Current integration boundary — 2026-10-28
 
+**Scope decision:** chat/messaging is dropped, not a remaining integration task. Legacy chat widgets/providers remain unmounted; no chat API or UI is planned. Notifications and reviews are independent and unaffected.
+
 The active app connects Home, the public marketplace/listing details, and login/registration/email verification/password reset to the retained backend. Access tokens and identity stay in memory; page reload bootstraps from the backend's httpOnly refresh cookie. Public signup creates a `User` only. The temporary adapter maps `User` to the legacy customer UI type `Buyer`, never to `Admin`.
 
-The company order queue is integrated through the active order screen's Admin mode. Shared company catalog, optional review/activity and the bounded Admin account directory are standalone integrations. The broad legacy Admin workspace, profile/preferences/farming workspaces and legacy BuyerContext/payment screens remain unmounted. Their source remains for later integration; its presence does not imply a working feature. Unsupported legacy API methods reject with `integration.unavailable`, and unfinished routes show unavailable/access-denied states rather than demo records or fake transaction success. Google sign-in is not enabled.
+The company order queue is integrated through the active order screen's Admin mode. Shared company catalog, optional review/activity, the bounded Admin account directory and own profile/preferences are standalone integrations. The broad legacy Admin, Account and farming workspaces and legacy BuyerContext/payment screens remain unmounted. Their source remains for later integration; its presence does not imply a working feature. Unsupported legacy API methods reject with `integration.unavailable`, and unfinished routes show unavailable/access-denied states rather than demo records or fake transaction success. Google sign-in is not enabled.
 
 ### Cart and checkout
 
@@ -77,7 +79,7 @@ Admin-only `#admin/queue`, `#admin/review/:id` and `#admin/activity` mount stand
 
 Company submit/withdraw use bodyless POST actions. Submission of a complete saved draft, changes/rejected record or approved listing locks editing and immediately hides any live listing. Paused records cannot submit. Withdrawal returns pending to hidden draft and clears submission time. Current decision/history are shown from the server, with review timestamps explicitly UTC.
 
-The queue uses server `pending`, `approved` and combined changes/rejected tabs; search and ten-row paging operate on the returned array. Detail shows six saved field groups, public media, nullable decisions and recorded history. The five backend completeness hints omit rules such as age, size and shipping: they are neither certification nor a full completeness guarantee. Approve publishes pending content; reject/request-changes require trimmed reason (1–120), feedback (10–2000) and integer field group 1–6. Approved/paused takedown requires a trimmed 10–2000-character explanation; it hides the listing but does not cancel or refund orders. No decision-notification promise is invented. Submission does emit backend preference-controlled Admin notifications; inbox UI is not integrated.
+The queue uses server `pending`, `approved` and combined changes/rejected tabs; search and ten-row paging operate on the returned array. Detail shows six saved field groups, public media, nullable decisions and recorded history. The five backend completeness hints omit rules such as age, size and shipping: they are neither certification nor a full completeness guarantee. Approve publishes pending content; reject/request-changes require trimmed reason (1–120), feedback (10–2000) and integer field group 1–6. Approved/paused takedown requires a trimmed 10–2000-character explanation; it hides the listing but does not cancel or refund orders. No decision-notification promise is invented. Submission does emit backend preference-controlled Admin notifications; these now appear in the personal inbox described below.
 
 Mutations require explicit confirmation, guard duplicate clicks and validate returned ID/state/decision acknowledgements. Review detail is hidden and re-read after success because mutation replies lack completeness hints. Failed or uncertain decisions disable actions until Refresh reconciles the record; uncertain transport writes are not automatically replayed. Dirty decision text guards navigation/reload and can be discarded by confirmed Refresh. Reads are aborted and private display is bound to the current Admin session. The retained backend has no atomic status/version check for moderation: two concurrent decisions can both commit, the last update wins, and audit records can contain both. Refresh and frontend locks do not solve that race; backend concurrency hardening is separate scope.
 
@@ -91,6 +93,49 @@ Suspend/reactivate requires an explicit confirmation identifying the exact accou
 
 Private reads are aborted and session-bound, actions have duplicate locks and returned identity/status validation, and failed/uncertain writes require Refresh before another confirmation. No optimistic state or uncertain automatic replay. A suspended-account 403 or invalid refresh clears the current local session and rejects late private results; ordinary permission denial and older-session errors cannot clear a newer login. Expected status is not a version token and cannot detect an intervening suspend/reactivate cycle ending in the same state. Legacy Admin/Portal/demo account-management screens remain unmounted.
 
+### Own profile and notification preferences
+
+Exact `#account/profile` and `#account/settings` work for both active User and Admin accounts,
+with guest login-return and a Profile header link. Standalone `AccountDetails.tsx` uses `/me`
+and `/me/prefs`, never legacy Account/Settings or demo mutations. Email, role, status, joined
+and email-verification timestamps are read-only. Name must be nonblank (max 80); phone (max 32)
+and location (max 120) are optional, trimmed and cleared by saving blank strings. Profile is
+not the order delivery address. No password comparison/change, avatar or deactivation is offered.
+
+Preferences save actual booleans for status/system/reminders, with all three choices explicitly
+replaced. Backend partial merging is row-locked, but later full saves can overwrite another tab:
+no version-conflict check is implemented. Switches affect future matching notifications, not
+existing inbox history/read states; success/error/approval messages are not muted by them.
+
+Exact public projections, immutable identity and returned saved fields are runtime-validated.
+Accepted writes hide old details and authoritatively refetch before editing. Failed/uncertain
+writes require successful Refresh, with no automatic 401/network replay. Dirty navigation/reload
+and synchronous duplicate/cross-action guards protect local edits. Aborted reads, sequence guards
+and session-generation checks prevent stale profile publication. Publishing verified display data
+updates the header without replacing the access token or restoring a signed-out session.
+
+### Personal notification inbox
+
+Exact `#account/notifications` is available to both active User and Admin accounts, with guest
+login-return and a plain signed-in Notifications header link. The standalone screen uses personal
+`GET /me/notifications`, server read/type filters and 10/25/50/100-row paging. Filtered total is
+separate from unread total across the entire owner's inbox. History is not capped at 200 rows.
+Legacy Account/Portal/demo notification providers remain unmounted; failures cannot block catalog
+or order loaders.
+
+Known EN/VI title/body keys substitute escaped text and integer VND parameters; unknown keys or
+unsuitable/arbitrary nullable JSON params remain readable key/JSON fallback. Only mounted,
+role-appropriate canonical destinations are links; unsupported, external, batch and malformed
+routes remain recorded text. Opening a destination does not mark a notification read.
+
+Mark-read sends exact `{read:true}` and preserves an existing read timestamp. Mark-all requires an
+explicit confirmation naming the account and entire inbox, then sends a bodyless POST. It affects
+all owner unread history, not just filtered rows/page. Its returned count is not an unread-zero
+promise: new arrivals may remain unread. Both actions use synchronous cross-action locks, validate
+acknowledgements and refetch before another action. Failed/uncertain writes hide stale results and
+require Refresh; no automatic 401/network write replay. Private reads are aborted/session-bound.
+There is no deletion, mark-unread, bell, global badge, polling, cache or preference/generation change.
+
 ### Verified results and limits
 
 Checkpoint `38f0dd7` saved auth/catalog/cart/checkout/buyer orders/company fulfilment, `90c00a0` saved disputes/private evidence, and `3c333f1` saved shared company catalog editing/publication on `integration/team-baseline`. Nothing was pushed. The verification paragraphs below distinguish the earlier dispute pass from the catalog pass.
@@ -103,7 +148,7 @@ The dispute browser pass covered guest owner/Admin deep-link login, buyer creati
 
 Final database checks confirmed saved `ORD-10121`/`ORD-10122` and the previous four company fixtures were unchanged. New `ORD-10127` is completed/paid with a resolved case; `ORD-10128` is shipped/paid with a rejected case and retained attachment. Each has exactly one unchanged 1,000 ₫ payment, with no automatic refund. Only the inspected dispute fixture listing was soft-archived; stock remains two and public detail returns 404. Together with the four previously archived company fixture listings, all five test listings are hidden without deleting accounts, orders, payments, disputes or evidence. No database reset/reseed or migration replacement occurred.
 
-Normal click commands were unreliable, so snapshot-grounded control fallbacks invoked actual UI handlers and requests. This is not complete mouse/keyboard-only or visual acceptance. The browser does not support file selection/upload automation; actual save-to-disk download was not verified. Dispute-specific failure/Refresh interaction, status-filter interaction, foreign-owner UI denial and Vietnamese/mobile layout checks remain unexercised; helper/transport tests and retained backend tests cover relevant rules, not full component interaction. Automatic deadline expiry and concurrent transitions also retain backend coverage rather than complete browser claims. Reviews/messaging and the full marketplace acceptance gate remain outstanding; deployment stays deferred.
+Normal click commands were unreliable, so snapshot-grounded control fallbacks invoked actual UI handlers and requests. This is not complete mouse/keyboard-only or visual acceptance. The browser does not support file selection/upload automation; actual save-to-disk download was not verified. Dispute-specific failure/Refresh interaction, status-filter interaction, foreign-owner UI denial and Vietnamese/mobile layout checks remain unexercised; helper/transport tests and retained backend tests cover relevant rules, not full component interaction. Automatic deadline expiry and concurrent transitions also retain backend coverage rather than complete browser claims. Reviews and the full marketplace acceptance gate remain outstanding; deployment stays deferred.
 
 During wrap-up the existing browser tab could no longer restore for activation; the final browser discovery returned no controlled or user tabs. Its last verified state was signed in as the local test User on `ORD-10127`, so final sign-out/guest handoff was not verified. Node heap exhaustion, Windows process-allocation failures and a login 500 were observed earlier, while `/health` still returned 200/database up. Guarded database-only cleanup succeeded, and a later authenticated API verification passed: terminal-case duplicate guards, owner/Admin evidence byte equality, unauthenticated/role denials, private static 404 and canonical Admin status filters. No blind server/system restart was performed; later API success does not establish the cause of the earlier resource/browser failures.
 
@@ -131,7 +176,27 @@ The browser verified guest users deep-link login-return, unique server email sea
 
 A corrected setup/final localhost API verifier recorded **30 requests and 11 assertion-group executions**, excluding browser calls and an earlier incomplete attempt. It checked permissions/validation/conflicts, all old target sessions remaining revoked after reactivation, suspended login denial, fresh login success, exact successful audit and read-only original-row fingerprints. The final fresh fixture is active with four retained status actions and no unrevoked sessions. A first fresh fixture also remains active after its API cycle; that verifier stopped on parsing an empty logout response, so no blind mutation replay or cleanup deletion was used. Both accounts/history remain for inspection. All ten baseline User rows and original 18 listings, 18 drafts, 15 images, 54 listing-history rows, 13 orders/items, 15 payments and two uploads are unchanged. No original account was status-mutated, and no listing/order/payment/upload, reset/reseed, direct database write or deletion was introduced.
 
-Normal pointer and some keyboard/fill actions were unreliable; snapshot-grounded observed controls invoked actual handlers/HTTP after readback. No complete pointer/keyboard-only, component interaction suite or screenshot visual-layout acceptance is claimed. Keep-unchanged, failure/uncertainty with Refresh, an active User tab discovering suspension, User route denial, status-filter UI interaction, activity-to-users navigation and unusual-name rendering remain unexercised GUI journeys; automated/API checks are not substitutes. A pre-existing success notice retained its original English wording on language switch. Admin lifecycle/provisioning policy, profile/preferences, notifications, farming/compliance, analytics and sponsorship transactions/settlement remain separate. This and review/activity are uncommitted; no push/merge/deployment occurred.
+Normal pointer and some keyboard/fill actions were unreliable; snapshot-grounded observed controls invoked actual handlers/HTTP after readback. No complete pointer/keyboard-only, component interaction suite or screenshot visual-layout acceptance is claimed. Keep-unchanged, failure/uncertainty with Refresh, an active User tab discovering suspension, User route denial, status-filter UI interaction, activity-to-users navigation and unusual-name rendering remain unexercised GUI journeys; automated/API checks are not substitutes. A pre-existing success notice retained its original English wording on language switch. Admin lifecycle/provisioning policy, profile/preferences, notifications, farming/compliance, analytics and sponsorship transactions/settlement remain separate. This and review/activity are saved as `f2d1b37` on `integration/team-baseline`; no push/merge/deployment occurred.
+
+### Latest personal inbox verification — 2026-10-28
+
+All **426 frontend tests in seventeen files** passed, including **274 new notification helper/transport tests**; TypeScript/build passed and audit reported zero vulnerabilities. Backend **27 unit and 266 isolated e2e tests** passed, including 104 notification cases; TypeScript/build/lint passed with zero lint warnings/errors. The known `pg` concurrent-query warning remains. Deep JSON snapshot and unparsed-body validation regressions were fixed before these final runs. No schema, migration, dependency or generation/preference changes occurred.
+
+Real browser acceptance used two fresh local Users. Guest inbox login-return and independent welcomes worked; opening Marketplace did not mark read. Single read persisted across reload. Unread/ten-row filtering returned an empty result after reading. On the second account an Error filter showed zero rows but one owner-wide unread; Keep-unchanged plus Refresh preserved it, then explicit full-inbox confirmation updated one and refetched zero unread. Reload preserved the read timestamp. Vietnamese welcome/read/UTC labels and language-switch translation of the success notice worked. Width checks found no horizontal overflow at 390 × 844 and 1280 × 720; English/desktop were restored and both accounts signed out to guest Home.
+
+Separate local API continuation passed **175 requests/736 assertions**, MIME regression **6 requests/124 assertions**, and final database-only verification **97 assertions with zero HTTP requests**. All 755 original rows across 35 tables retain exact fingerprints, including original Admin notifications. Only the two exact GUI welcomes' `readAt` fields changed; three fresh test accounts/welcomes are retained. Historical verifier-only timezone and Docker-address assumptions were corrected without replaying registrations; the complete ledger preserves those failures. No reset/reseed, deletion, direct development DB write or original read-state mutation occurred.
+
+Limits: normal pointer/keyboard activation was unreliable; snapshot-grounded visible enabled controls invoked actual UI handlers after ineffective-action readback. This is not full pointer/keyboard-only acceptance. One welcome per fresh inbox did not exercise populated multi-page GUI history; Admin inbox behavior, arbitrary JSON/unsafe links, failure/uncertainty reconciliation and concurrent arrivals retain automated/API coverage, not full GUI claims. Mobile screenshot capture failed; a desktop screenshot was captured but image input could not be inspected, so no screenshot visual-layout acceptance is claimed. The complete marketplace gate and production moderation/upload hardening remain outstanding. Inbox changes remain uncommitted after `f2d1b37`; no push, merge or deployment occurred.
+
+### Latest own profile/preferences verification — 2026-10-28
+
+All **612 frontend tests in nineteen files** passed after the strict session-stamp/identity integration fix, including **180 new account helper/transport cases and six session-publication regressions**. TypeScript/build passed (87 modules), audit reported zero vulnerabilities and focused re-review found no remaining actionable issue. Backend **423 isolated e2e and 27 unit tests** passed, including 157 profile/preferences cases; TypeScript/build/lint passed. Known `pg` concurrent-query deprecation remains. No schema, migration, dependency or lockfile changes occurred.
+
+A fresh User's real browser journey covered guest profile gating/registration, readonly identity, blank-name blocking, trimmed saved name, cleared phone/location, authoritative header update and profile/session reload persistence. Settings saved actual system false and survived reload. Discard restored an unsaved preference to its saved value without a write. EN/VI labels, UTC dates and immediate translation of the save notice passed. Both screens had document width 375 at 390 × 844; desktop profile width was 1265 at 1280 × 720. English/desktop were restored and actual sign-out reached guest Home with the original four available listing IDs.
+
+Independent localhost API checks passed **760 assertions across 176 requests**, including **55 invalid profile/preferences PATCHes** with unchanged follow-up reads. Final combined read-only verification passed **56 assertions** and preserved complete fingerprints for **776 original rows across 35 tables**. Exactly two fresh Users/welcomes/sole Sessions/registration Activities remain; both Sessions are revoked, GUI welcome remains unread and unchanged, and no original account/read state was mutated. No direct development DB write, reset/reseed, deletion or new commerce/upload occurred.
+
+Normal pointer actions were unreliable; observed visible enabled control fallbacks invoked real handlers after readback. No full pointer/keyboard-only, component interaction suite or screenshot visual-layout acceptance is claimed. Admin account UI, dirty navigation/Back/Forward/reload confirmations, failure/uncertainty with Refresh, cross-tab saves and post-save notification generation remain unexercised browser journeys. Helper/API tests are not substitutes. Inbox/profile/preferences and chat-scope docs are saved in the local account/inbox checkpoint after `f2d1b37`; nothing was pushed, merged or deployed. Password change, avatars and self-deactivation stay outside this slice.
 
 Do not use exposed group-chat credentials for testing. Create a fresh local-only account instead. Any `devCode` shown in the auth screen comes from the non-production backend response, not a fixed client code.
 

@@ -1,0 +1,14 @@
+.account-details { max-width: 980px; }
+.account-details nav { margin-bottom: 1.5rem; }
+.account-details [aria-current="page"] { font-weight: 700; text-decoration: underline; }
+.account-details fieldset { border: 0; padding: 0; margin: 0; display: grid; gap: 1rem; min-width: 0; }
+.account-details label { display: grid; gap: .45rem; }
+.account-details input:not([type="checkbox"]) { width: 100%; min-width: 0; padding: .65rem; border: 1px solid #94a3b8; border-radius: .4rem; color: #0f172a; background: white; }
+.account-details .account-check { display: flex; align-items: center; gap: .7rem; }
+.account-details input[type="checkbox"] { width: 1.15rem; height: 1.15rem; flex-shrink: 0; }
+.account-details dl { display: grid; grid-template-columns: minmax(120px, 1fr) minmax(0, 3fr); gap: .7rem 1rem; }
+.account-details dt { font-weight: 600; }
+.account-details dd { margin: 0; overflow-wrap: anywhere; }
+.account-details button:disabled { opacity: .55; cursor: not-allowed; }
+.account-details a:focus-visible, .account-details button:focus-visible, .account-details input:focus-visible { outline: 3px solid #0369a1; outline-offset: 3px; }
+@media (max-width: 600px) { .account-details dl { grid-template-columns: 1fr; } .account-details dd { margin-bottom: .4rem; } }
