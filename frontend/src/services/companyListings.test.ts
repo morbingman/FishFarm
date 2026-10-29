@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { canPublish, canSubmitForReview, isCompanyListingRoute, listingForm, listingInput, listingRoute, parseCompanyListingRoute, publicationMissing, validateListingFile } from "./companyListings";
+import { canDelete, canEditCatalogRecord, canPause, canPublish, canResume, canSubmitForReview, isCompanyListingRoute, listingForm, listingInput, listingRoute, listingStatuses, parseCompanyListingRoute, publicationMissing, validateListingFile } from "./companyListings";
 
 describe("company catalog rules", () => {
   it("recognizes bounded company routes and encodes IDs", () => {
@@ -55,6 +55,22 @@ describe("company catalog rules", () => {
     for (const status of ["draft", "changes", "rejected", "approved"] as const) expect(canSubmitForReview(status)).toBe(true);
     expect(canSubmitForReview("paused")).toBe(false); expect(canSubmitForReview("pending")).toBe(false);
     expect(canPublish("approved")).toBe(false); expect(canPublish("paused")).toBe(true);
+  });
+  it.each(listingStatuses)("allows only supported lifecycle actions for %s", status => {
+    expect(canPause(status)).toBe(status === "approved");
+    expect(canResume(status)).toBe(status === "paused");
+    expect(canDelete(status)).toBe(["draft", "changes", "rejected"].includes(status));
+  });
+  it.each(["list", "new", "edit", "detail"] as const)("never edits confirmed-removed records on %s routes", mode => {
+    expect(canEditCatalogRecord(mode, false, true)).toBe(false);
+    expect(canEditCatalogRecord(mode, true, true)).toBe(false);
+  });
+  it("only a new route can edit without an existing saved record", () => {
+    expect(canEditCatalogRecord("new", false, false)).toBe(true);
+    expect(canEditCatalogRecord("edit", false, false)).toBe(false);
+    expect(canEditCatalogRecord("edit", true, false)).toBe(true);
+    expect(canEditCatalogRecord("detail", true, false)).toBe(false);
+    expect(canEditCatalogRecord("list", false, false)).toBe(false);
   });
   it("accepts only bounded public image files", () => {
     expect(() => validateListingFile(new File(["png"], "a.png", { type: "image/png" }), 7)).not.toThrow();

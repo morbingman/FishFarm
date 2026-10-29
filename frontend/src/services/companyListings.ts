@@ -20,6 +20,10 @@ export function parseCompanyListingRoute(route: string): CompanyListingRoute | n
 export const isCompanyListingRoute = (route: string) => parseCompanyListingRoute(route) !== null;
 export const canSubmitForReview = (status: CompanyListingStatus) => ["draft", "changes", "rejected", "approved"].includes(status);
 export const canPublish = (status: CompanyListingStatus) => ["draft", "changes", "rejected", "paused"].includes(status);
+export const canPause = (status: CompanyListingStatus) => status === "approved";
+export const canResume = (status: CompanyListingStatus) => status === "paused";
+export const canDelete = (status: CompanyListingStatus) => ["draft", "changes", "rejected"].includes(status);
+export const canEditCatalogRecord = (mode: CompanyListingRoute["mode"], hasListing: boolean, removed: boolean) => !removed && (mode === "new" || (mode === "edit" && hasListing));
 export function listingLabel(status: CompanyListingStatus, language: "en" | "vi") {
   const labels = { draft: ["Draft", "Bản nháp"], pending: ["Under review", "Đang xét duyệt"], approved: ["Live", "Đang hiển thị"], paused: ["Paused", "Tạm dừng"], changes: ["Changes requested", "Yêu cầu sửa"], rejected: ["Rejected", "Đã từ chối"] };
   return labels[status][language === "vi" ? 1 : 0];

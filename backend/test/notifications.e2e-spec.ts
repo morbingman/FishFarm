@@ -225,7 +225,11 @@ describe('Notifications (e2e)', () => {
     userIds.push(id);
     let token = response.body.accessToken as string;
     if (role === 'Admin') {
-      await prisma.user.update({ where: { id }, data: { role } });
+      // Parallel suites broadcast status notifications to all active Admins.
+      await prisma.user.update({
+        where: { id },
+        data: { role, prefs: { status: false, system: true, reminders: true } },
+      });
       const login = await request(app.getHttpServer())
         .post('/v1/auth/login')
         .send({ email, password: PASSWORD })

@@ -78,7 +78,7 @@ export default function App() {
   else if (listingReview) page = <ListingReview key={`${user?.email}:${route}`} {...listingReview} />;
   else if (activity) page = <AdminActivity key={user?.email} />;
   else if (adminUsers) page = <AdminUsers key={`${user?.email}:${user?.role}`} />;
-  else if (companyCatalog) page = <CompanyCatalog key={`${user?.email}:${route}`} {...companyCatalog} />;
+  else if (companyCatalog) page = <CompanyCatalog key={`${apiSessionStamp()?.generation}:${user?.email}:${route}`} {...companyCatalog} />;
   else if (companyOrders) page = <Orders key={`${user?.email}:${route}`} company orderId={route.split("/").length === 3 ? route.split("/")[2] : null} />;
   else if (TOP.has(top)) page = <main className="public-market"><h1>{language === "vi" ? "Chức năng chưa khả dụng" : "Not available in this integration slice"}</h1><p>{language === "vi" ? "Chức năng này đang được tích hợp. Không có dữ liệu hay giao dịch mô phỏng." : "This feature is still being integrated. No demo records or simulated transactions are used."}</p><a href="#marketplace">{language === "vi" ? "Xem chợ cá" : "Browse marketplace"}</a></main>;
   else page = <main className="public-market"><h1>{language === "vi" ? "Không tìm thấy trang" : "Page not found"}</h1><a href="#home">Home</a></main>;

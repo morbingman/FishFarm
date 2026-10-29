@@ -91,6 +91,63 @@ describe("company catalog transport", () => {
       fetch.mockImplementation(async () => response({ ...value, decision: bad })); await expect(companyListingsApi.detail("FM/1")).rejects.toMatchObject({ code: "listing.invalidResponse" });
     }
   });
+  it("uses exact bodyless pause, resume and soft-delete endpoints", async () => {
+    const fetch = vi.fn(async (url: string, _init: RequestInit) => response(url.endsWith("/pause") ? fixture("paused") : url.endsWith("/resume") ? fixture("approved") : { id: "FM/1", deleted: true }));
+    vi.stubGlobal("fetch", fetch); const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi.pause("FM/1")).resolves.toMatchObject({ status: "paused" });
+    await expect(companyListingsApi.resume("FM/1")).resolves.toMatchObject({ status: "approved" });
+    await expect(companyListingsApi.remove("FM/1")).resolves.toEqual({ id: "FM/1", deleted: true });
+    expect(fetch.mock.calls.map(([url, init]) => [url, init.method, init.body])).toEqual([
+      ["/v1/company/listings/FM%2F1/pause", "POST", undefined], ["/v1/company/listings/FM%2F1/resume", "POST", undefined], ["/v1/company/listings/FM%2F1", "DELETE", undefined]
+    ]);
+  });
+  it.each(["pause", "resume"] as const)("rejects wrong %s status or identity", async action => {
+    const fetch = vi.fn(async () => response(fixture())); vi.stubGlobal("fetch", fetch);
+    const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi[action]("FM/1")).rejects.toMatchObject({ code: "listing.invalidResponse" });
+    fetch.mockImplementation(async () => response({ ...fixture(action === "pause" ? "paused" : "approved"), id: "FM-other" }));
+    await expect(companyListingsApi[action]("FM/1")).rejects.toMatchObject({ code: "listing.invalidResponse" });
+  });
+  it.each([null, {}, [], { id: "FM/1" }, { id: "FM/1", deleted: false }, { id: "FM/1", deleted: "true" }, { id: "FM-other", deleted: true }, { id: "FM/1", deleted: true, status: "deleted" }, fixture()])("rejects malformed deletion acknowledgement %#", async value => {
+    vi.stubGlobal("fetch", vi.fn(async () => response(value))); const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi.remove("FM/1")).rejects.toMatchObject({ code: "listing.invalidResponse" });
+  });
+  it("resumes incomplete saved content without applying publication requirements", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response(fixture("approved")))); const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi.resume("FM/1")).resolves.toMatchObject({ status: "approved", draft: { description: "", images: [] } });
+  });
+  it.each(["pause", "resume", "remove"] as const)("does not refresh/replay %s on 401", async action => {
+    const fetch = vi.fn(async () => response({ code: "auth.unauthorized" }, 401)); vi.stubGlobal("fetch", fetch);
+    const { authApi } = await import("./api");
+    fetch.mockResolvedValueOnce(response({ accessToken: "memory-test-token", user: { id: "admin1", email: "admin@example.test", role: "Admin" } }));
+    await authApi.login("admin@example.test", "LOCAL TEST ONLY"); fetch.mockClear();
+    const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi[action]("FM/1")).rejects.toMatchObject({ status: 401 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it.each(["pause", "resume", "remove"] as const)("does not replay uncertain %s", async action => {
+    const fetch = vi.fn().mockRejectedValue(new TypeError("Lost response")); vi.stubGlobal("fetch", fetch);
+    const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi[action]("FM/1")).rejects.toThrow("Lost response"); expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("locks duplicate and cross-action lifecycle writes until body validation completes", async () => {
+    let finish: (value: unknown) => void = () => {};
+    const fetch = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: () => new Promise(resolve => { finish = resolve; }) }); vi.stubGlobal("fetch", fetch);
+    const { companyListingsApi } = await import("./companyListingsApi"); const pending = companyListingsApi.pause("FM/1");
+    for (const action of ["pause", "resume", "remove"] as const) await expect(companyListingsApi[action]("FM/1")).rejects.toMatchObject({ code: "listing.requestPending" });
+    expect(fetch).toHaveBeenCalledTimes(1); finish(fixture("paused")); await pending;
+    fetch.mockResolvedValueOnce(response(fixture("approved"))); await expect(companyListingsApi.resume("FM/1")).resolves.toMatchObject({ status: "approved" });
+  });
+  it("releases the lifecycle lock after a malformed acknowledgement", async () => {
+    const fetch = vi.fn().mockResolvedValueOnce(response({ id: "wrong", deleted: true })).mockResolvedValueOnce(response({ id: "FM/1", deleted: true })); vi.stubGlobal("fetch", fetch);
+    const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi.remove("FM/1")).rejects.toMatchObject({ code: "listing.invalidResponse" });
+    await expect(companyListingsApi.remove("FM/1")).resolves.toEqual({ id: "FM/1", deleted: true });
+  });
+  it("does not treat not-found as a deletion acknowledgement", async () => {
+    vi.stubGlobal("fetch", vi.fn(async () => response({ code: "listing.notFound" }, 404))); const { companyListingsApi } = await import("./companyListingsApi");
+    await expect(companyListingsApi.remove("FM/1")).rejects.toMatchObject({ status: 404, code: "listing.notFound" });
+  });
   it("propagates incomplete/locked server responses", async () => {
     vi.stubGlobal("fetch", vi.fn(async () => response({ code: "listing.incomplete", params: { field: "images" } }, 400))); const { companyListingsApi } = await import("./companyListingsApi");
     await expect(companyListingsApi.publish("FM/1")).rejects.toMatchObject({ code: "listing.incomplete", params: { field: "images" } });

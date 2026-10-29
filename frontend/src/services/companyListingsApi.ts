@@ -54,6 +54,14 @@ function saved(value: CompanyListing, input: CompanyListingInput) {
 function body(input: CompanyListingInput) {
   return JSON.stringify(Object.fromEntries(listingFields.filter(field => input[field] !== undefined).map(field => [field, field === "images" ? input.images?.map(image => ({ url: image.url, isMain: image.isMain, position: image.position })) : input[field]])));
 }
+// Pause, resume and removal share one synchronous lock, held through validation.
+// Existing draft, publication, review and upload writes remain independent.
+let pendingLifecycleWrite = false;
+async function lifecycleWrite<T>(action: () => Promise<T>): Promise<T> {
+  if (pendingLifecycleWrite) throw new ApiError(409, "listing.requestPending");
+  pendingLifecycleWrite = true;
+  try { return await action(); } finally { pendingLifecycleWrite = false; }
+}
 export const companyListingsApi = {
   list: async (status: CompanyListingFilter = "all", signal?: AbortSignal) => {
     const values = await api<unknown>(`${path()}${status === "all" ? "" : `?status=${encodeURIComponent(status)}`}`, { signal });
@@ -84,6 +92,22 @@ export const companyListingsApi = {
     if (value.status !== "draft" || value.decision !== null || value.submittedAt !== null) throw new ApiError(502, "listing.invalidResponse");
     return value;
   },
+  pause: async (id: string) => lifecycleWrite(async () => {
+    const value = validateCompanyListing(await api<unknown>(`${path(id)}/pause`, { method: "POST" }, false), id);
+    if (value.status !== "paused") throw new ApiError(502, "listing.invalidResponse");
+    return value;
+  }),
+  resume: async (id: string) => lifecycleWrite(async () => {
+    const value = validateCompanyListing(await api<unknown>(`${path(id)}/resume`, { method: "POST" }, false), id);
+    if (value.status !== "approved") throw new ApiError(502, "listing.invalidResponse");
+    return value;
+  }),
+  remove: async (id: string) => lifecycleWrite(async () => {
+    const value = await api<unknown>(path(id), { method: "DELETE" }, false);
+    if (!record(value) || Object.keys(value).length !== 2 || !Object.prototype.hasOwnProperty.call(value, "id")
+      || !Object.prototype.hasOwnProperty.call(value, "deleted") || value.id !== id || value.deleted !== true) throw new ApiError(502, "listing.invalidResponse");
+    return { id, deleted: true as const };
+  }),
   upload: async (file: File) => {
     const form = new FormData(); form.append("file", file); form.append("purpose", "listing_image");
     const value = await api<unknown>("/uploads", { method: "POST", body: form });
