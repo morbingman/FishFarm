@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Dispute, DisputeInput } from "./contracts";
-const fixture = (overrides: Partial<Dispute> = {}): Dispute => ({ id: "d1", order: { id: "ORD/1", status: "delivered" }, buyer: { id: "buyer", name: "Buyer", email: "buyer@example.test" }, reason: "other", description: "Actual detailed report", status: "open", resolution: null, attachments: [], createdAt: "2026-10-28T00:00:00Z", resolvedAt: null, ...overrides });
+const fixture = (overrides: Partial<Dispute> = {}): Dispute => ({ id: "d1", kind: "order", order: { id: "ORD/1", status: "delivered" }, sponsorship: null, buyer: { id: "buyer", name: "Buyer", email: "buyer@example.test" }, reason: "other", description: "Actual detailed report", status: "open", resolution: null, attachments: [], createdAt: "2026-10-28T00:00:00Z", resolvedAt: null, ...overrides });
+const sponsorshipFixture = (overrides: Partial<Dispute> = {}): Dispute => fixture({ kind: "sponsorship", order: null, sponsorship: { id: "sponsorship0001", shares: 4, status: "growing", batch: { code: "BATCH-1024", title: "Autumn catfish" } }, ...overrides });
 const response = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status, headers: { "Content-Type": "application/json" } });
 beforeEach(() => { vi.resetModules(); vi.stubGlobal("sessionStorage", { removeItem: vi.fn() }); });
 afterEach(() => { vi.unstubAllGlobals(); });
@@ -79,5 +80,28 @@ describe("dispute transport", () => {
     vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(response({ code: "dispute.alreadyExists" }, 409))));
     const { disputesApi } = await import("./disputesApi");
     await expect(disputesApi.create("ORD-1", { reason: "other", description: "Detailed issue report" })).rejects.toMatchObject({ code: "dispute.alreadyExists", status: 409 });
+  });
+  it("files a sponsorship dispute with the canonical body and validates the acknowledgement", async () => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(response(sponsorshipFixture({ description: "Detailed sponsorship issue", reason: "fish_unwell" })))); vi.stubGlobal("fetch", fetch);
+    const { disputesApi } = await import("./disputesApi");
+    const filed = await disputesApi.createSponsorship("sponsorship0001", { reason: "fish_unwell", description: "  Detailed sponsorship issue  ", uploadIds: ["u1"] });
+    expect(filed.kind).toBe("sponsorship"); expect(filed.sponsorship?.id).toBe("sponsorship0001"); expect(filed.order).toBeNull();
+    expect(fetch.mock.calls).toEqual([["/v1/sponsorships/sponsorship0001/dispute", expect.objectContaining({ method: "POST" })]]);
+    expect(JSON.parse(fetch.mock.calls[0][1].body as string)).toEqual({ reason: "fish_unwell", description: "Detailed sponsorship issue", uploadIds: ["u1"] });
+  });
+  it.each([null, {}, fixture(), fixture({ kind: "sponsorship", order: null }), sponsorshipFixture({ sponsorship: { id: "other", shares: 4, status: "growing", batch: { code: "BATCH-1024", title: "Autumn catfish" } } }), sponsorshipFixture({ status: "reviewing" }), sponsorshipFixture({ sponsorship: { id: "sponsorship0001", shares: 0, status: "growing", batch: { code: "BATCH-1024", title: "Autumn catfish" } } })])("rejects unusable or mismatched sponsorship filing responses %#", async value => {
+    const fetch = vi.fn().mockImplementation(() => Promise.resolve(response(value))); vi.stubGlobal("fetch", fetch);
+    const { disputesApi } = await import("./disputesApi");
+    await expect(disputesApi.createSponsorship("sponsorship0001", { reason: "fish_unwell", description: "Detailed sponsorship issue" })).rejects.toMatchObject({ code: "dispute.invalidResponse" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+  it("propagates sponsorship dispute conflicts and never replays an uncertain filing", async () => {
+    const fetch = vi.fn().mockRejectedValue(new TypeError("Lost response")); vi.stubGlobal("fetch", fetch);
+    const { disputesApi } = await import("./disputesApi");
+    await expect(disputesApi.createSponsorship("sponsorship0001", { reason: "other", description: "Detailed sponsorship issue" })).rejects.toThrow("Lost response");
+    expect(fetch).toHaveBeenCalledTimes(1);
+    vi.stubGlobal("fetch", vi.fn().mockImplementation(() => Promise.resolve(response({ code: "dispute.alreadyExists" }, 409))));
+    const fresh = await import("./disputesApi");
+    await expect(fresh.disputesApi.createSponsorship("sponsorship0001", { reason: "other", description: "Detailed sponsorship issue" })).rejects.toMatchObject({ code: "dispute.alreadyExists", status: 409 });
   });
 });

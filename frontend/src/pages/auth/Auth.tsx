@@ -13,6 +13,8 @@ import { isAdminUsersRoute } from "@/services/adminUsers";
 import { isNotificationsRoute } from "@/services/notifications";
 import { parseAccountRoute } from "@/services/account";
 import { parseBatchRoute } from "@/services/batches";
+import { parseBatchReviewRoute } from "@/services/batchReview";
+import { parseSponsorshipRoute } from "@/services/sponsorships";
 import { parseFacilityRoute } from "@/services/facilities";
 import type { Lang } from "@/hooks/useTranslation";
 
@@ -31,7 +33,7 @@ export default function Auth({ language }: { language: Lang; setLanguage: (l: La
     const back = sessionStorage.getItem("fishmarket-return");
     sessionStorage.removeItem("fishmarket-return");
     const route = back?.split("?")[0];
-    window.location.hash = back && (back.startsWith("marketplace/detail?") || isOrderRoute(route ?? "") || isCompanyOrderRoute(route ?? "") || isCompanyListingRoute(route ?? "") || parseBatchRoute(back ?? "")?.company || parseFacilityRoute(back ?? "") || isListingReviewRoute(route ?? "") || route === "admin/activity" || isAdminUsersRoute(route ?? "") || isNotificationsRoute(back ?? "") || parseAccountRoute(back ?? "") || isDisputeRoute(route ?? "") || ["marketplace/cart", "marketplace/checkout", "marketplace/confirmation"].includes(route ?? "")) ? back : "home";
+    window.location.hash = back && (back.startsWith("marketplace/detail?") || isOrderRoute(route ?? "") || isCompanyOrderRoute(route ?? "") || isCompanyListingRoute(route ?? "") || parseBatchRoute(back ?? "")?.company || parseBatchReviewRoute(back ?? "") || parseSponsorshipRoute(back ?? "") || parseFacilityRoute(back ?? "") || isListingReviewRoute(route ?? "") || route === "admin/activity" || isAdminUsersRoute(route ?? "") || isNotificationsRoute(back ?? "") || parseAccountRoute(back ?? "") || isDisputeRoute(route ?? "") || ["marketplace/cart", "marketplace/checkout", "marketplace/confirmation"].includes(route ?? "")) ? back : "home";
   };
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();

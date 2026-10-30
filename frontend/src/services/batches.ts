@@ -143,6 +143,8 @@ export function parseBatchRoute(route: string): BatchRoute | null {
   if (value === "farming") return { company: false, mode: "list", id: null };
   if (value === "company/batches") return { company: true, mode: "list", id: null };
   if (value === "company/batches/new") return { company: true, mode: "new", id: null };
+  const recordedReview = /^admin\/batches\/(BATCH-[1-9]\d*)$/.exec(value);
+  if (recordedReview && recordedReview[0] === value) return { company: true, mode: "detail", id: recordedReview[1] };
   const match = /^(farming|company\/batches)\/([^/?#]+)(\/edit)?$/.exec(value);
   if (!match || (match[3] && match[1] === "farming")) return null;
   try { const id = decodeURIComponent(match[2]); return validBatchIdentifier(id) && !(match[1] === "farming" && id === "booking") ? { company: match[1] !== "farming", mode: match[3] ? "edit" : "detail", id } : null; } catch { return null; }

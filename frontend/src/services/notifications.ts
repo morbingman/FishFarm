@@ -117,6 +117,7 @@ export function safeNotificationLink(link: string | null | undefined, role: "Use
   // Public detail has one exact supported query, never arbitrary hash/query URLs.
   if (/^#marketplace\/detail\?fish=(?:FM-\d+|c[a-z0-9]{24})$/.test(link)) return link;
   if (role === "Admin") {
+    if (/^#admin\/batches\/BATCH-[1-9]\d*$/.test(link)) return link;
     if (link === "#company/batches" || /^#company\/batches\/(?:BATCH-\d+|c[a-z0-9]{24})$/.test(link)) return link;
     if (link === "#company/facilities" || link === "#admin/facilities" || /^#(?:company\/facilities\/c[a-z0-9]{24}|admin\/facilities\/c[a-z0-9]{24}(?:\/review)?)$/.test(link)) return link;
     if (["#company/listings", "#company/orders", "#admin/queue", "#admin/activity", "#admin/disputes", "#admin/users"].includes(link)) return link;
@@ -176,11 +177,53 @@ const templates: Record<string, Template> = {
   "notifications.buyer.disputeRejected.title": { en: "Dispute for {code} rejected", vi: "Khiếu nại cho {code} bị từ chối", params: { code: "text" } },
   "notifications.buyer.disputeRejected.body": { en: "Your dispute has been rejected. Open it for details.", vi: "Khiếu nại đã bị từ chối. Mở để xem chi tiết." },
   "notifications.admin.batchSubmitted.title": { en: "Batch {code} submitted for review", vi: "Lô {code} gửi xét duyệt", params: { code: "text" } },
-  "notifications.admin.batchSubmitted.body": { en: "A company batch is awaiting review. Batch management is not integrated here.", vi: "Một lô của công ty đang chờ xét duyệt. Quản lý lô chưa được tích hợp tại đây." },
+  "notifications.admin.batchSubmitted.body": { en: "A company batch is awaiting review. Open its saved company detail; batch approval and rejection controls are not connected yet.", vi: "Một lô của công ty đang chờ xét duyệt. Mở chi tiết công ty đã lưu; thao tác phê duyệt và từ chối lô chưa được kết nối." },
   "notifications.admin.listingSubmitted.title": { en: "Listing submitted: {name}", vi: "Tin đăng gửi xét duyệt: {name}", params: { name: "text" } },
   "notifications.admin.listingSubmitted.body": { en: "{company} submitted {name} ({code}) for review.", vi: "{company} đã gửi {name} ({code}) để xét duyệt.", params: { company: "text", name: "text", code: "text" } },
   "notifications.admin.listingResubmitted.title": { en: "Listing resubmitted: {name}", vi: "Tin đăng gửi lại: {name}", params: { name: "text" } },
   "notifications.admin.listingResubmitted.body": { en: "{company} resubmitted {name} ({code}) for review.", vi: "{company} đã gửi lại {name} ({code}) để xét duyệt.", params: { company: "text", name: "text", code: "text" } },
+  "notifications.admin.sponsorshipReserved.title": { en: "{shares} shares reserved on {code}", vi: "{shares} phần được giữ trên lô {code}", params: { code: "text", shares: "integer" } },
+  "notifications.admin.sponsorshipReserved.body": { en: "{name} reserved {shares} share(s); the full package is not paid yet.", vi: "{name} đã giữ {shares} phần; chưa thanh toán trọn gói.", params: { name: "text", shares: "integer" } },
+  "notifications.buyer.sponsorshipReserved.title": { en: "Reserved {shares} share(s) of {code}", vi: "Đã giữ {shares} phần trên lô {code}", params: { code: "text", shares: "integer" } },
+  "notifications.buyer.sponsorshipReserved.body": { en: "Pay the full package of {total} to fund this sponsorship.", vi: "Thanh toán trọn gói {total} để bảo trợ lô này.", params: { shares: "integer", total: "money" } },
+  "notifications.admin.sponsorshipPaid.title": { en: "Sponsorship paid for {code}", vi: "Bảo trợ đã thanh toán cho lô {code}", params: { code: "text" } },
+  "notifications.admin.sponsorshipPaid.body": { en: "{name} paid the full package ({total}).", vi: "{name} đã thanh toán trọn gói ({total}).", params: { name: "text", total: "money" } },
+  "notifications.buyer.sponsorshipPaid.title": { en: "Sponsorship paid for {code}", vi: "Bảo trợ đã thanh toán cho lô {code}", params: { code: "text" } },
+  "notifications.buyer.sponsorshipPaid.body": { en: "Your {total} package payment is held in milestone escrow.", vi: "Khoản {total} của bạn được giữ trong quỹ thoả thuận theo cột mốc.", params: { total: "money" } },
+  "notifications.admin.sponsorshipCancelled.title": { en: "Unpaid reservation cancelled on {code}", vi: "Đơn giữ chỗ chưa trả bị hủy trên lô {code}", params: { code: "text" } },
+  "notifications.admin.sponsorshipCancelled.body": { en: "{name} cancelled an unpaid reservation; the shares returned to the pool.", vi: "{name} đã hủy đơn giữ chỗ chưa trả; số phần được trả lại còn dự trữ.", params: { name: "text" } },
+  "notifications.admin.sponsorshipRefunded.title": { en: "Sponsorship refunded on {code}", vi: "Bảo trợ đã hoàn tiền trên lô {code}", params: { code: "text" } },
+  "notifications.admin.sponsorshipRefunded.body": { en: "{name} cancelled a funded sponsorship; unreleased escrow was refunded.", vi: "{name} đã hủy bảo trợ đã thanh toán; phần quỹ chưa giải ngân được hoàn lại.", params: { name: "text" } },
+  "notifications.buyer.sponsorshipCancelled.title": { en: "Reservation cancelled on {code}", vi: "Đã hủy đơn giữ chỗ trên lô {code}", params: { code: "text" } },
+  "notifications.buyer.sponsorshipCancelled.body": { en: "Your unpaid reservation was cancelled and {shares} share(s) returned.", vi: "Đơn giữ chỗ chưa trả đã bị hủy và {shares} phần được trả lại.", params: { shares: "integer" } },
+  "notifications.buyer.sponsorshipRefunded.title": { en: "Sponsorship refunded on {code}", vi: "Bảo trợ đã hoàn tiền trên lô {code}", params: { code: "text" } },
+  "notifications.buyer.sponsorshipRefunded.body": { en: "Your {total} payment was refunded; held escrow was reversed.", vi: "Khoản {total} của bạn đã được hoàn; quỹ đang giữ đã được đảo ngược.", params: { total: "money" } },
+  "notifications.buyer.reservationExpired.title": { en: "Reservation expired on {code}", vi: "Đơn giữ chỗ trên lô {code} đã hết hạn", params: { code: "text" } },
+  "notifications.buyer.reservationExpired.body": { en: "Your unpaid reservation was not paid within 24 hours and {shares} share(s) returned to the pool.", vi: "Đơn giữ chỗ chưa trả của bạn không được thanh toán trong 24 giờ và {shares} phần được trả lại.", params: { shares: "integer" } },
+  "notifications.admin.reservationExpired.title": { en: "Unpaid reservation expired on {code}", vi: "Đơn giữ chỗ chưa trả trên lô {code} đã hết hạn", params: { code: "text" } },
+  "notifications.admin.reservationExpired.body": { en: "An unpaid reservation expired after 24 hours; {shares} share(s) returned to the pool.", vi: "Một đơn giữ chỗ chưa trả đã hết hạn sau 24 giờ; {shares} phần được trả lại còn dự trữ.", params: { shares: "integer" } },
+  "notifications.buyer.sponsorshipDeliveryFeePaid.title": { en: "Delivery fee paid for {code}", vi: "Đã thanh toán phí giao trên lô {code}", params: { code: "text" } },
+  "notifications.buyer.sponsorshipDeliveryFeePaid.body": { en: "Your delivery fee of {total} was paid; the sponsorship can be handed over once you confirm delivery.", vi: "Phí giao hàng {total} của bạn đã được thanh toán; bảo trợ có thể bàn giao khi bạn xác nhận nhận.", params: { total: "money" } },
+  "notifications.admin.sponsorshipDeliveryFeePaid.title": { en: "Delivery fee paid on {code}", vi: "Phí giao trên lô {code} đã được thanh toán", params: { code: "text" } },
+  "notifications.admin.sponsorshipDeliveryFeePaid.body": { en: "{name} paid the {total} delivery fee; the sponsorship is ready for handover.", vi: "{name} đã thanh toán phí giao {total}; bảo trợ sẵn sàng bàn giao.", params: { name: "text", total: "money" } },
+  "notifications.buyer.batchGrowing.title": { en: "Batch {code} is growing", vi: "Lô {code} đã vào giai đoạn nuôi", params: { code: "text" } },
+  "notifications.buyer.batchGrowing.body": { en: "Your {shares} sponsored share(s) are growing; the stocking escrow tranche was released.", vi: "{shares} phần bảo trợ của bạn đang được nuôi; khoản quỹ thả giống đã được giải ngân.", params: { shares: "integer" } },
+  "notifications.admin.batchGrowing.title": { en: "Batch {code} is growing", vi: "Lô {code} đã vào giai đoạn nuôi", params: { code: "text" } },
+  "notifications.admin.batchGrowing.body": { en: "Funded sponsorships entered growing and stocking escrow tranches were released.", vi: "Các bảo trợ đã thanh toán vào giai đoạn nuôi và khoản quỹ thả giống đã được giải ngân.", params: {} },
+  "notifications.buyer.batchHarvested.title": { en: "Batch {code} harvest published", vi: "Đã công bố thu hoạch lô {code}", params: { code: "text" } },
+  "notifications.buyer.batchHarvested.body": { en: "Your {shares} share(s) are ready for delivery; any shortfall refund was issued from escrow.", vi: "{shares} phần của bạn sẵn sàng giao; khoản hoàn do thiếu hụt (nếu có) đã được chi từ quỹ.", params: { shares: "integer" } },
+  "notifications.admin.batchHarvested.title": { en: "Batch {code} harvest published", vi: "Đã công bố thu hoạch lô {code}", params: { code: "text" } },
+  "notifications.admin.batchHarvested.body": { en: "Actual yield recorded for {actual} fish; sponsorships are ready for delivery.", vi: "Đã ghi nhận sản lượng thực tế {actual} con; các bảo trợ sẵn sàng giao.", params: { actual: "integer" } },
+  "notifications.buyer.shortfallRefund.title": { en: "Shortfall refund on {code}", vi: "Hoàn tiền thiếu hụt trên lô {code}", params: { code: "text" } },
+  "notifications.buyer.shortfallRefund.body": { en: "A pro-rata refund of {amount} was issued from escrow for the undelivered portion.", vi: "Khoản hoàn theo tỷ lệ {amount} đã được chi từ quỹ cho phần chưa giao.", params: { amount: "money" } },
+  "notifications.buyer.sponsorshipDelivered.title": { en: "Sponsorship delivered for {code}", vi: "Bảo trợ trên lô {code} đã giao", params: { code: "text" } },
+  "notifications.buyer.sponsorshipDelivered.body": { en: "You confirmed delivery of your {shares} share(s).", vi: "Bạn đã xác nhận nhận {shares} phần.", params: { shares: "integer" } },
+  "notifications.admin.sponsorshipDelivered.title": { en: "Sponsorship delivered on {code}", vi: "Bảo trợ trên lô {code} đã giao", params: { code: "text" } },
+  "notifications.admin.sponsorshipDelivered.body": { en: "{name} confirmed delivery of their sponsorship.", vi: "{name} đã xác nhận nhận bảo trợ.", params: { name: "text" } },
+  "notifications.buyer.batchSettled.title": { en: "Batch {code} settled", vi: "Lô {code} đã tất toán", params: { code: "text" } },
+  "notifications.buyer.batchSettled.body": { en: "Every sponsorship on this batch is delivered or refunded; the batch is closed.", vi: "Mọi bảo trợ trên lô này đã giao hoặc hoàn tiền; lô đã đóng.", params: {} },
+  "notifications.admin.batchSettled.title": { en: "Batch {code} settled", vi: "Lô {code} đã tất toán", params: { code: "text" } },
+  "notifications.admin.batchSettled.body": { en: "Every sponsorship is delivered or refunded; the batch is closed.", vi: "Mọi bảo trợ đã giao hoặc hoàn tiền; lô đã đóng.", params: {} },
 };
 export function notificationText(key: string, params: JsonValue, language: "en" | "vi"): string {
   const fallback = () => {

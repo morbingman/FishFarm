@@ -23,6 +23,17 @@ export class DisputesController {
     return this.disputes.create(user, orderId, dto);
   }
 
+  @Post('sponsorships/:sponsorshipId/dispute')
+  @RequirePermissions('dispute.create')
+  @ApiOperation({ summary: 'Open one dispute for an eligible owned sponsorship (§11)' })
+  createSponsorship(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('sponsorshipId') sponsorshipId: string,
+    @Body() dto: CreateDisputeDto,
+  ) {
+    return this.disputes.createSponsorshipDispute(user, sponsorshipId, dto);
+  }
+
   @Get('me/disputes')
   @RequirePermissions('dispute.create')
   list(@CurrentUser() user: AuthenticatedUser) {

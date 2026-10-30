@@ -9,13 +9,87 @@
 **Saved review/activity and User-management checkpoint:** `f2d1b37` — optional listing review, recorded activity and Admin account directory/status/session enforcement (2026-10-28; not pushed)
 **Saved account/inbox checkpoint:** `fb562af` — personal notifications, own profile/preferences and dropped chat scope (2026-10-29; not pushed)
 **Saved catalog-lifecycle checkpoint:** `86d2409` — catalog pause/resume/soft-delete and verification limits (local only; not pushed)
+**Saved batch/facility checkpoint:** `bb04b11` — public/company batches, facility compliance and unsponsored-batch cancellation (local only; not pushed)
 **Purpose:** decide what to keep, adapt, restore, build or defer for each component before changing application code.
 
 This is an implementation guide and decision register, not a claim that integration is complete. The user requested incremental integration and deferred deployment. Recommendations below are not all approved product decisions. No application changes, branch merges or deployment are performed by creating this document.
 
 **Scope decision — 2026-10-28:** chat/messaging is dropped from the project scope, not deferred to a later integration pass. Do not build conversation endpoints or mount chat widgets. Unmounted legacy code and existing schema/migration history are retained; no deletion or database migration is part of this decision. References to outstanding messaging in historical slice records below describe their earlier scope and are superseded by this decision. Notifications and reviews remain separate features.
 
-## Unsponsored-batch cancellation — current integration slice
+## Optional saved-draft batch submission — current integration slice
+
+This bounded frontend-only slice follows saved checkpoint `bb04b11`; its new changes remain
+uncommitted. Existing backend/source/schema/migrations/dependencies and lockfiles are unchanged.
+No push, merge, deployment or development-data mutation is included.
+
+### Connected contract and scope
+
+- Only saved Admin detail offers optional submission of a clean draft, separate from saving and
+  direct publication. Explicit confirmation binds saved code/name/status/updatedAt, local form,
+  observation/cancellation state, current full session, read sequence and exact hash. Submission
+  is not available on create/edit/list/public pages. All Admins share the company; no ownership
+  or maker-checker rule is invented.
+- One bodyless `POST /v1/company/batches/:id/submit` uses the retained permission and cross-action
+  lock, with no 401 or uncertain-write replay. The backend checks draft state and publication
+  prerequisites before and under batch/facility locks: exact costs, valid all-available shares,
+  an image and current approved non-none compliance backed by controlled documents. Browser hints
+  are neither approval nor an atomic version token; expiry remains server-authoritative.
+- Submission sets pending_review, submittedAt and reviewNote=null. Prior reviewedAt/reviewedBy,
+  inspection fields and observations remain. Company-only details show actual nullable metadata
+  as escaped text and UTC times; prior reviewer/time may describe an earlier review. Submission
+  does not publish, mark farm verification, create an order/payment/sponsorship or change finances.
+- Pending records are public-hidden and non-editable; direct publish and repeat submission are
+  unavailable. There is no withdrawal endpoint. Separately eligible unsponsored cancellation is
+  cancellation, not withdrawal, and is never automatically chained.
+- A valid acknowledgement is followed by authoritative company-detail reread checking pending
+  state, exact submittedAt, cleared review note and complete retained observation content before
+  controls return. Failed/lost/malformed/unreconciled results hide stale data and require Refresh;
+  no blind replay.
+- Backend-recorded canonical `#admin/batches/BATCH-code` links are bounded Admin-only aliases to
+  company detail through its existing endpoint. No Admin detail GET is invented. Notification
+  wording explicitly says approval/rejection controls are not connected. No batch review queue,
+  approval/rejection, hard deletion, multipart batch media or sponsorship/harvest/settlement is added.
+
+### Final automated verification and acceptance limits — 2026-10-30
+
+- Full frontend regression passed **914 tests in 24 files**, including **32 persisted Node
+  component-contract cases**. The batch helper/adapter and notification/activity files passed
+  366 cases in that run. TypeScript and production build passed (101 modules); npm audit found
+  zero vulnerabilities. Tracked and new-source whitespace checks passed.
+- The unchanged backend passed **423 isolated e2e tests in eleven suites and 27 unit tests**,
+  TypeScript, build and lint (zero warnings/errors). The e2e command included a file argument after
+  `--`, but ran all eleven suites; this is a full regression, not a seven-case targeted run.
+  The guarded separate test database was used. Known `pg` concurrent-query deprecation remains.
+- Transport tests cover the exact bodyless protected POST, invalid prerequisites/acknowledgements,
+  no browser-clock expiry veto or invented publication metadata, shared locking through decode,
+  no 401/network replay, and generation/ID/role changes including same-account fresh login.
+  Canonical recorded Admin aliases reject queue/decision/query/encoded/internal-ID expansions;
+  local review added exact-match/newline/carriage-return regressions.
+- The new Node harness executes actual transpiled component handlers with deterministic hooks
+  and mocked transport, session and navigation. It covers detail-only clean-draft confirmation,
+  stale/changed-back state and routes, duplicate writes, malformed/lost acknowledgements and
+  conflicting authoritative rereads, retained observation content, late session/unmount results,
+  and escaped company-only UTC review metadata. It uses no mounted DOM, real HTTP or database.
+  Full session ID transport coverage is separate from the harness's mocked generation/role state.
+- Focused local source/test review completed. Independent transport and UI reviewers each failed
+  on provider errors, including bounded retries, without returning conclusions. No independent
+  clean sign-off is claimed. No new browser/visual acceptance was attempted because the established
+  image-input prerequisite remains unavailable. Real Admin submission/Refresh, notification/activity
+  deep-link login-return, pointer/keyboard behavior, EN/VI interactions and mobile layout remain
+  GUI-unverified; automated component contracts are not mounted/browser acceptance.
+- New changes remain uncommitted after `bb04b11`. No push, merge, deployment, development login,
+  live submission/cancellation, upload, fixture creation, direct development database write,
+  reset/reseed, cleanup or service restart occurred. Existing data and the untracked acceptance
+  screenshot remain retained; no new development preservation-fingerprint run is claimed.
+  No backend production code, schema, migration, dependency or lockfile changed. Review decisions,
+  hard deletion, multipart batch media and sponsorship/financial actions remain separate.
+
+## Unsponsored-batch cancellation — saved preceding integration slice
+
+The batch, facility and cancellation slices below were committed together as `bb04b11` on
+`integration/team-baseline` after explicit authorization. Their then-uncommitted statements and
+then-outstanding feature lists remain historical records, superseded by the saved checkpoint and
+newer slice records. No push, merge or deployment occurred.
 
 This bounded frontend-only addition follows the uncommitted batch/facility work and saved
 catalog-lifecycle checkpoint `86d2409` on `integration/team-baseline`. No commit, push, merge,
@@ -901,7 +975,7 @@ Suggested responsibilities: backend owner defines DTOs, projections and missing 
 - **Action:** reuse presentation only. Create drafts under `/company/batches`; supply facility, dates, stock, share quantity/unit, cost lines, price and terms. Separate draft-save, publish and review. Add facility/compliance submission/inspection and protected-document UI. Keep sponsorship status operations disabled until implemented.
 - **Verify:** exact cost reconciliation, derived count/weight shares, partial edits, current compliance, private document authorization, two-Admin operation and no cancellation where sponsorship/refund constraints forbid it.
 
-### 4.24 Sponsorship booking, payments, harvest and handover — Decide / Build
+### 4.24 Sponsorship booking, payments, harvest and handover — Build (milestones 10–14 complete; owner ledger history not built)
 
 **Files:** `pages/farming/Booking.*`, `OrderList.*`, `OrderDetail.*`, `HandoverForm.tsx`, `FarmingOrders.*`, `data/farmingOrderData.ts`, `services/farmingStore.ts`; local Sponsorship/EscrowRelease/Harvest schema.
 
@@ -911,6 +985,77 @@ Suggested responsibilities: backend owner defines DTOs, projections and missing 
 - **Initial integration:** browsing and Admin management only; booking/payment/my-sponsorship/harvest controls stay unavailable.
 - **Later feature pass:** reservations and idempotent simulated package payment, owner history, ledger/releases, permitted cancellation/refunds, harvest/shortfall and delivery/settlement. Specify and test each stage before enabling its UI.
 - **Verify:** quantity/share contention, price/terms snapshot, no care balance top-up, ledger reconciliation, refunds capped to money paid, no invented growth/delivery data and no investment language.
+
+**Status update 2026-10-31 (uncommitted):** the locked "reserve with deposit / sponsor a batch"
+§11 model was built as milestone 10 — reservation with full prepaid payment (no deposit, no
+balance, no top-up), atomic advisory-locked share decrement, immutable terms snapshots, exactly
+reconciling 30/40/30 escrow tranches, idempotent payment replay, sponsor escrow view, my-sponsorships,
+permitted cancellation (simple release unpaid; full refund/reversal funded, capped at money paid)
+and Admin read views. The frontend connects reservation on public batch detail, a my-sponsorships
+screen with snapshot-bound pay/cancel and the notification dictionary entries; see the 2026-10-31
+slice record in §7 and the frontend README. Harvest publication, delivery confirmation, tranche
+release/settlement, disputes and owner ledger history remain deferred and unimplemented on both
+sides; the §Verify items above still apply to those stages before their UI is enabled.
+
+**Status update 2026-10-31, later (uncommitted):** milestone 11 core added the growing and
+settlement stages — `POST /v1/company/batches/:code/grow` (Admin, releases stocking tranches,
+30% floor), `POST /v1/company/batches/:code/harvest` (Admin, publishes mortality/yield, releases
+mid-growth tranches, pro-rata shortfall refund capped at the held harvest tranche as a refund
+Payment plus an applied `shortfall_refund` Adjustment, ready_for_delivery) and `POST
+/v1/sponsorships/:id/confirm-delivery` (Buyer; batch settles when every sponsorship is delivered
+or refunded, §11.3), all serialized under the batch-level advisory lock. The frontend connects
+Buyer confirm-delivery with the refunds/adjustments ledger table and Admin grow/harvest panels
+in the company batch detail. Disputes, unpaid-reservation expiry and delivery fees remain
+unimplemented; see the second 2026-10-31 slice record in §7.
+
+**Status update 2026-10-31, latest (uncommitted):** milestone 12 added sponsorship disputes per
+the §11 rule "Disputes use the marketplace dispute flow": the shared `Dispute` table gained a
+nullable `orderId` and a unique optional `sponsorshipId` (additive migration; exactly one side
+set, existing order disputes unchanged), `POST /v1/sponsorships/:id/dispute` (User-only,
+`dispute.create`) accepts growing/ready_for_delivery/delivered/settled records only, is
+serialized under the same batch-level advisory lock, rejects duplicates with 409 and reuses the
+existing reasons, 15–2000 description, up-to-three private `dispute_attachment` uploads, admin
+queue and open→reviewing→resolved/rejected transitions — with notifications and activity log
+carrying the batch code as the reference. The frontend gained the strict dual-kind dispute
+contract/validator, `disputesApi.createSponsorship` with the no-retry/session-stamp guards, a
+Buyer "Open a dispute" panel with optional evidence on the my-sponsorships detail (one dispute
+shown as a read-only record afterwards) and kind-aware list/detail rendering on the shared
+disputes screen; see the third 2026-10-31 slice record in §7. Unpaid-reservation expiry and
+delivery fees remain unimplemented.
+
+**Status update 2026-10-31, final (uncommitted):** milestone 13 closed the last §11.4 lifecycle
+gap: unpaid reservations (`pending_payment`) expire 24 hours after reservation. Expiry is lazy
+and advisory-lock serialized — inline inside the existing batch lock in reserve and grow, and in
+a per-batch locked transaction on the sponsor and company read paths (`mine`, `one`/`escrow`,
+`companyList`, `companySponsors`); `pay` refuses an expired record with 409
+`sponsorship.expired` before any write (an expiry write there would roll back with the throw).
+Expiry cancels the reservation, restores its shares to the pool, reopens a fully_sponsored batch,
+notifies buyer and Admin through the new `reservationExpired` template pairs and logs a System
+actor activity row. No schema or migration change — the deadline is derived from `createdAt` by
+both sides via the mirrored `RESERVATION_TTL_MS` constant. The frontend derives the pay-by
+deadline in the my-sponsorships list and detail and explains the expiry in the payment panel.
+
+**Status update 2026-10-31, closing (uncommitted):** milestone 14 implemented the last §11.4
+item — the optional delivery fee at harvest. `POST /v1/company/batches/:code/harvest` accepts an
+optional `deliveryFeePerShare` (integer VND ≥ 0); when set, every growing sponsorship is charged
+`perShare × shares` at once (int-overflow guarded for all rows before any write, so a mid-loop
+throw rolls back the whole harvest transaction) as `deliveryFee` with
+`totalAmount = packageAmount + fee`. The fee sits outside the milestone escrow — it reuses the
+existing `delivery_fee` Payment purpose with no migration. `POST
+/v1/sponsorships/:id/pay-delivery-fee` (Buyer, `batch.sponsor`, idempotent via a fixed
+`sponsorship:<id>:delivery-fee` key under the pay-level advisory lock) pays it once while the
+record is `ready_for_delivery`; `confirm-delivery` refuses with 409 `sponsorship.deliveryFeeDue`
+while the fee is unpaid, and the fee endpoint refuses 409 `sponsorship.deliveryFeeNothingDue`
+when nothing is charged. The frontend mirrors all of it: an optional harvest form field on the
+company batch detail, a Buyer "Pay the delivery fee" panel that gates the confirm-delivery
+button until the paid `delivery_fee` payment exists (strict transport validation requires
+exactly one paid fee payment matching `deliveryFee`), the four `sponsorshipDeliveryFeePaid`
+notification pairs, and a `deliveryFeeOutstanding` helper tested across all statuses. Full-suite
+verification also fixed a real cross-suite e2e race: role-scoped notifications fan out to every
+matching user in the shared `_test` database (`src/common/notifications.ts`), so parallel test
+files crossfired into the notifications suite's fixtures — e2e files now run serialized
+(`fileParallelism: false`). §11 is now fully implemented on both sides; owner ledger history
+remains the only §11 feature not built.
 
 ### 4.25 Upload transport, public assets and evidence downloads — Keep backend / Adapt frontend
 
@@ -1046,9 +1191,255 @@ pnpm --dir C:/Mythic/Works/Projects/FishFarm/backend lint
 git diff --check
 ```
 
-The frontend now has 844 automated tests in twenty-three files covering API/session behavior, account profile/preferences, commerce/dispute/catalog/batch/facility/review/activity/users/inbox transport and rules, catalog lifecycle and unsponsored-batch cancellation eligibility and acknowledgements, checkout recovery, buyer/company presentation and guarded hash navigation; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
+The frontend now has **944 automated tests in twenty-five files** covering API/session behavior, account profile/preferences, commerce/dispute/catalog/batch/facility/review/activity/users/inbox transport and rules, catalog lifecycle, unsponsored-batch cancellation, optional saved-draft submission eligibility and acknowledgements, and the Admin batch review queue with confirmed approval/rejection decisions, checkout recovery, buyer/company presentation and guarded hash navigation. This includes 32 persisted Node component-contract cases for submission and company-only review metadata, not a mounted DOM/browser suite; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
 
-Preserve all eleven backend end-to-end suites: app, auth, profile/preferences, listings, marketplace, uploads, orders, disputes, batches-facilities, Admin users and notifications. Preserve unit coverage for permissions, session issuance and notification fan-out. Add tests for new endpoints/adapters instead of weakening existing assertions to match remote behavior.
+### Batch review queue and decisions — 2026-10-30 (uncommitted)
+
+Connected the retained Admin review endpoints read-only from source: `GET /v1/admin/batches`
+(`batch.review` permission, pending-only, submitted-at ascending, companyView projection), bodyless
+`POST /v1/admin/batches/:id/approve` (server locks batch and facility, rechecks publishability and
+current controlled compliance, sets `open`, clears `reviewNote`, copies inspection metadata) and
+`POST /v1/admin/batches/:id/reject` (trimmed 1–1,000-note `BatchReviewDto`, returns to `draft`
+retaining `submittedAt`, observations and inspection fields). No backend code, schema, migration,
+dependency or lockfile changed; the backend's 423 e2e / 27 unit regression stands.
+
+New frontend files: `services/batchReview.ts` (route parsing/building with unsafe-identifier
+rejection, pending-only eligibility, note bounds, content-ordering-independent retained-observation
+comparison, acknowledgement/reread reconciliation) and `pages/company/BatchReview.tsx` (queue and
+detail modes behind an active-Admin session guard, snapshot-bound confirmations, one-decision
+dispatch, acknowledgement validation, authoritative company reread before adoption, Refresh-required
+block with no replay on failure or uncertainty). `batchesApi.ts` gained `reviewQueue`/`approve`/
+`reject` with full session stamps and the shared cross-action mutation lock; `App.tsx`, `Auth.tsx`
+login-return and the Admin header link route `#admin/batches[/BATCH-code/review]`. The screen has
+no withdrawal, deletion, sponsorship or financial action.
+
+Verification: 944/25 frontend, typecheck and production build with a dedicated lazy chunk, zero
+audit vulnerabilities, whitespace clean; 30 new helper/transport cases including nineteen malformed
+approval acknowledgements, 409 pass-through, no 401 replay/network retry, cross-action locking and
+late-result session-change rejection. Limits: no browser/visual acceptance (image-input
+prerequisite), no independent reviewer sign-off, no development login or live decision; real queue
+navigation, confirmations, EN/VI and mobile layout remain GUI-unverified. Uncommitted on
+`integration/team-baseline`; nothing pushed, merged or deployed.
+
+### Sponsorship reservation, payment, escrow and cancellation — 2026-10-31 (uncommitted)
+
+Built milestone 10 against the retained schema (no migration change): a new
+`backend/src/sponsorships/` module with `POST /v1/batches/:code/sponsorships` (User-only,
+`batch.sponsor`; advisory-locked recheck that the batch is `open` with enough
+`sharesAvailable`, exact package amount with a safe-integer guard, immutable `termsSnapshot`
+copy, atomic decrement, `fully_sponsored` transition at zero remaining, activity log and
+admin/buyer notifications), `POST /v1/sponsorships/:id/pay` (lock + `Payment.idempotencyKey`
+replay of the existing record; funded transition, one `sponsorship_package` payment, three
+`held` escrow tranches 30%/40% floor and harvest remainder so the sum equals the package
+exactly), `GET /v1/me/sponsorships`, `GET /v1/sponsorships/:id`, `GET
+/v1/sponsorships/:id/escrow` (state-summed held/released/reversed), `POST
+/v1/sponsorships/:id/cancel` (pending → `cancelled`; funded → `refunded` with refunded
+payments, reversed tranches and a refund `Adjustment`; shares always restored and
+`fully_sponsored` reopened), plus Admin-only `GET /v1/company/sponsorships` and `GET
+/v1/company/batches/:code/sponsors` (`batch.settle`). Ownership/role checks return 404 for
+missing and 403 for foreign records consistently. Eight notification key pairs
+(sponsorshipReserved/Paid/Cancelled/Refunded, admin and buyer) use text/integer/money params
+only — no booleans.
+
+New frontend: `sponsorshipContracts.ts`, `sponsorships.ts` helpers, `sponsorshipsApi.ts`
+transport with strict response validation (payment/escrow state invariants, total =
+package + delivery fee, snapshot code must match the batch, escrow sums must reconcile),
+`sponsorship.requestPending` cross-action lock, full session stamps with
+`auth.sessionChanged` on late results, `api(..., false)` writes with no 401 replay and no
+uncertain-network retry; `pages/marketplace/Sponsorships.tsx` (list/detail, snapshot-bound
+pay/cancel confirmations, authoritative reread before adoption, Refresh-required block on
+failure/uncertainty) and `pages/farming/SponsorPanel.tsx` (Buyer-only reservation form with
+two-step confirm on open public batches). Routing, login-return, Buyer header link and
+`#farming` detail wiring included; Admin accounts get explicit User-only copy.
+
+Verification: frontend **969 tests in 27 files** (25 new helper/transport cases), typecheck
+and production build with a dedicated lazy chunk, zero audit vulnerabilities, whitespace
+clean. Backend full regression with the new module: **430 isolated e2e tests in twelve
+suites** (seven new sponsorship cases: forbidden roles, invalid reservations leaving
+`sharesAvailable` untouched, reserved snapshot/decrement/activity/notification, idempotent
+payment with exact 60k/80k/60k escrow on a 200k package, cross-user 403s and Admin sponsor
+views, funded refund/reversal/adjustment/share-restore, fully-sponsored open/close cycling)
+and 27 unit tests, lint clean, `tsc`/build clean on the guarded `_test` database.
+
+Limits: no browser/visual acceptance (image-input prerequisite), no independent reviewer
+sign-off, no development login or live transaction; real flows, EN/VI and mobile layout are
+GUI-unverified. Harvest publication, delivery confirmation, tranche release/settlement,
+owner ledger history and sponsorship disputes are deliberately unimplemented on both sides.
+The backend module, its e2e suite and this frontend slice remain uncommitted on
+`integration/team-baseline`; nothing was pushed, merged or deployed. Chat remains dropped.
+
+### Growing, harvest, shortfall settlement and delivery — 2026-10-31 (uncommitted)
+
+Milestone 11 core (disputes excluded by design) on top of the uncommitted milestone-10 module,
+with no schema or migration change. Backend: `sponsorships.service.ts` gained `grow(admin, code)`
+(open/fully_sponsored → growing; funded sponsorships → growing with stocking tranches released;
+unpaid reservations untouched), `harvest(admin, code, dto)` (growing → harvested with a published
+`Harvest` row carrying `actualCount`, optional `actualWeightG` for weight shares, computed
+`mortalityRateBps` and `yieldPerShare`; growing sponsorships → ready_for_delivery with mid-growth
+tranches released; shortfall refund = min(held harvest tranche, floor(package × (promised−actual)/
+promised)) issued as a purpose-`refund` Payment with idempotency key `sponsorship:{id}:shortfall`
+plus an applied `shortfall_refund` Adjustment that reduces the harvest tranche, reversed when it
+covers it fully) and `confirmDelivery(user, id)` (ready_for_delivery on a harvested batch →
+delivered; when no pending/funded/growing/ready sponsorship remains the batch and all delivered
+sponsorships settle, §11.3). Grow, harvest and confirm-delivery all serialize on the batch-level
+advisory lock `sponsor:batch:${code}` so concurrent confirmations cannot race the settlement
+check. `pay` now accepts landing as `growing` with stocking already released when the batch began
+growing before payment. Five new sponsorship e2e cases (12 total in the module); controller
+routes `POST /v1/company/batches/:code/grow` (`batch.update`) and `.../harvest` (`batch.settle`)
+plus `POST /v1/sponsorships/:id/confirm-delivery` (`batch.sponsor`).
+
+Frontend: contracts gained `adjustments`, `BatchGrowResult`, `BatchHarvestResult`; escrow
+reconciliation is now tranche sum + applied shortfall refunds = package amount (shortfall lowers
+the tranche sum, never raises it); `sponsorshipsApi.ts` gained `confirmDelivery`, `companyGrow`,
+`companyHarvest` with strict ack validation, the shared mutation lock and session-stamp guards,
+plus growing→settled timestamp consistency checks; `notifications.ts` gained nine EN/VI template
+pairs (batchGrowing/batchHarvested/shortfallRefund/sponsorshipDelivered/batchSettled, admin and
+buyer); `marketplace/Sponsorships.tsx` gained Buyer confirm-delivery and a refunds-and-adjustments
+ledger table; `company/CompanyBatches.tsx` gained Admin grow (open/fully_sponsored) and harvest
+(growing) panels with harvest inputs (surviving count; whole-batch grams for weight shares),
+local bounds validation, snapshot-style one-shot confirmation and authoritative reread
+reconciliation, integrated with the page's existing confirmation/Refresh-required machinery.
+
+Verification: frontend **990 tests in 27 files** (21 new M11 cases incl. seven component-contract
+grow/harvest cases), typecheck/build/audit/whitespace clean. Backend full regression: **435
+isolated e2e tests in twelve suites** (five new: forbidden grow/harvest roles and states, stocking
+escrow release on grow, harvest publication with exact shortfall math and refund ledger, delivery
+confirmation through batch settlement, pay-while-growing) and 27 unit tests, lint clean on the
+guarded `_test` database.
+
+Limits: no browser/visual acceptance, no independent reviewer sign-off, no development login or
+live mutation. Disputes (`POST /sponsorships/:id/dispute`), unpaid-reservation expiry and delivery
+fees remain unimplemented on both sides. Everything remains uncommitted on
+`integration/team-baseline`; nothing was pushed, merged or deployed. Chat remains dropped.
+
+### Sponsorship disputes — 2026-10-31, later (uncommitted)
+
+Milestone 12 per REQUIREMENTS §11 ("Disputes use the marketplace dispute flow"). Backend: the
+`Dispute` table was made polymorphic by reference — migration `20261031000000_sponsorship_disputes`
+drops the `orderId` NOT NULL constraint and adds a unique nullable `sponsorshipId` FK
+(ON DELETE RESTRICT); exactly one of order/sponsorship backs each row and existing order disputes
+keep working unchanged. `DisputesService.createSponsorshipDispute(user, id, dto)` reuses
+`CreateDisputeDto` (reasons, 15–2000 description, ≤3 private `dispute_attachment` uploads with
+FOR UPDATE locks, owner check and `uploads.alreadyUsed` conflict), runs inside the same batch-level
+advisory lock `sponsor:batch:${code}` as every other sponsorship write, accepts only
+growing/ready_for_delivery/delivered/settled records (409 `dispute.sponsorshipNotEligible` —
+unpaid/funded use cancel, cancelled/refunded cannot be disputed), rejects duplicates with 409
+`dispute.alreadyExists`, notifies Admin `disputeOpened` with the batch code and logs "Opened
+sponsorship dispute". The shared admin queue and open→reviewing→resolved/rejected transitions
+work unchanged; notifications and activity entries now reference the batch code for sponsorship
+disputes via a polymorphic `reference()` helper. Route: `POST /v1/sponsorships/:id/dispute`
+(`dispute.create`, User-only). The dispute view gained `kind`, a nullable `order` and a
+`sponsorship { id, shares, status, batch { code, title } }` object.
+
+Frontend: the `Dispute` contract gained `kind`/nullable `order`/`sponsorship`; the transport
+validator now enforces exactly-one-side with per-kind shape checks, `disputes.ts` gained
+`sponsorshipDisputeEligible` and `disputeSubject`, and `disputesApi.createSponsorship` posts the
+canonical body with the no-401-replay flag and session-stamp/`auth.sessionChanged` guards.
+`marketplace/Sponsorships.tsx` gained a Buyer "Open a dispute" panel on eligible statuses (reason
+select, 15–2000 description, optional ≤3-file private evidence with the established
+upload-uncertainty handling, one-shot "File once" confirmation) plus a read-only dispute record
+panel fetched alongside the detail; the fallback copy no longer calls disputes future work.
+The shared disputes screen renders both kinds (batch code plus a sponsorship tag in lists; the
+order link only for order disputes) and its reconciliation check compares across kinds.
+
+Verification: backend **437 isolated e2e tests in twelve suites** (two new sponsorship-dispute
+cases: filing eligibility/permission/duplicate/owner-visibility and admin
+review→resolve/reject with buyer notifications and private-attachment access control) and 27
+unit tests, lint clean, build clean, on the guarded `_test` database; the one transient failure
+seen in an intermediate full run did not reproduce across two subsequent clean full runs.
+Frontend **1001 tests in 27 files** (7 new: eligibility gate, dual-kind subject summary, canonical
+sponsorship filing body/ack, 7-case malformed-response sweep, conflict/no-replay transport),
+typecheck and production build clean.
+
+Limits: no browser/visual acceptance, no independent reviewer sign-off, no development login or
+live mutation. Unpaid-reservation expiry and delivery fees remain unimplemented on both sides.
+Everything remains uncommitted on `integration/team-baseline`; nothing was pushed, merged or
+deployed. Chat remains dropped.
+
+### Unpaid-reservation expiry — 2026-10-31, final (uncommitted)
+
+Milestone 13, closing the §11.4 `pending_payment ──expires (unpaid)──▶` transition (the spec sets
+no window; 24 hours was chosen — precedent: pre-order balances give 7 days, an unpaid hold must be
+much shorter). Backend, no schema change: `SponsorshipsService` gained `RESERVATION_TTL_MS` and a
+lazy expiry mechanism — `expireBatchInTx(tx, code)` (caller must hold the batch advisory lock)
+cancels due `pending_payment` records with an idempotent conditional update, restores their shares
+to the pool, reopens a `fully_sponsored` batch, notifies buyer and Admin via new
+`notifications.{buyer,admin}.reservationExpired` template pairs and logs an activity row with a
+System actor. It is applied inline under the existing batch lock in `reserve` (before the
+availability check, so expired holds never block a new reservation) and in `grow` (before the
+batch leaves open), and via `expireDue(...)` in per-batch locked transactions on the sponsor
+(`mine`, `one`/`escrow`) and company (`companyList`, `companySponsors`) read paths. `pay` refuses
+a due reservation with 409 `sponsorship.expired` before any write — an expiry write there would
+roll back with the throw, so the record is cancelled lazily on the next read instead.
+
+Frontend, no response-shape change: `sponsorships.ts` mirrors the constant and derives the
+deadline — `reservationPayDeadline` (pay-by ISO time for `pending_payment` rows only) and
+`reservationExpired` (boundary: expires at exactly +24h). `marketplace/Sponsorships.tsx` shows
+"Pay by · UTC" in the list status cell and the detail header line and explains the expiry in the
+payment panel; `notifications.ts` gained the four EN/VI `reservationExpired` entries matching the
+backend params.
+
+Verification: backend **439 isolated e2e tests in twelve suites** (two new: pay-refusal with the
+dedicated error code, lazy expiry on `mine` restoring shares and reopening a fully_sponsored
+batch with the fresh non-due reservation untouched, both notification pairs, a System activity
+row and a successful re-reservation of the restored share; and expiry inline at `grow` with the
+batch landing growing with fully restored shares) and 27 unit tests, lint clean, build clean, on
+the guarded `_test` database. Frontend **1002 tests in 27 files** (one new deadline/expiry-boundary
+matrix case), typecheck and production build clean.
+
+Limits: no browser/visual acceptance, no independent reviewer sign-off, no development login or
+live mutation. Only the optional delivery fee at harvest remains unimplemented on both sides.
+Everything remains uncommitted on `integration/team-baseline`; nothing was pushed, merged or
+deployed. Chat remains dropped.
+
+### Optional delivery fee at harvest — 2026-10-31, closing (uncommitted)
+
+Milestone 14, closing the last §11.4 item (`──deliveryFee──▶` charged at harvest, paid before
+handover). Backend: `HarvestBatchDto` gained optional `deliveryFeePerShare` (integer VND, 0–1e9).
+`harvest` computes `perShare × shares` for every growing sponsorship and checks all rows for
+int-overflow (`totalAmount ≤ 2,147,483,647`) before writing any — a mid-loop throw rolls back
+the whole harvest transaction — then charges `deliveryFee` with
+`totalAmount = packageAmount + deliveryFee`. The fee sits outside the milestone escrow and
+reuses the existing `delivery_fee` Payment purpose, so no migration was needed. New `POST
+/v1/sponsorships/:id/pay-delivery-fee` (Buyer `batch.sponsor`): fixed idempotency key
+`sponsorship:<id>:delivery-fee` under the `sponsor:pay:<id>` advisory lock — replay returns the
+same record with still exactly one fee payment; 403 for a foreign sponsor, 409
+`sponsorship.deliveryFeeNothingDue` when no fee was charged or the record is not
+`ready_for_delivery`. `confirm-delivery` refuses with 409 `sponsorship.deliveryFeeDue` while a
+charged fee has no paid payment. Batch settlement is unchanged (ready_for_delivery records
+already block it until delivered/refunded), and shortfall refunds still come only from escrow.
+
+Frontend: `deliveryFeeOutstanding` helper (ready_for_delivery + fee > 0 + no paid
+`delivery_fee` payment); `payDeliveryFee` transport with the shared mutation lock, session-stamp
+guard and strict ack validation (exactly one paid fee payment matching `deliveryFee` plus the
+package payment); a Buyer "Pay the delivery fee" panel that appears only for outstanding fees
+and disables the confirm-delivery button with an explanatory line until paid; an optional
+integer harvest field on the company batch detail sent only when non-empty; the four
+`sponsorshipDeliveryFeePaid` EN/VI notification pairs; and stale M11 copy ("delivery fees and
+disputes are not connected yet") replaced with the current behavior.
+
+Verification: backend **441 isolated e2e tests in twelve suites** (two new: fee charged at
+harvest with confirm-delivery refusing 409 until the idempotent fee payment, replay returning
+one payment, delivery then settling with both notification pairs and the activity row; and
+nothing-due/late-pay refusals with a working zero-fee delivery) and 27 unit tests, lint clean,
+build clean, on the guarded `_test` database. Frontend **1005 tests in 27 files** (new
+outstanding-fee status matrix, fee transport validation and harvest-body cases, and a company
+harvest contract case), typecheck and production build clean.
+
+A real flake was diagnosed and fixed during this slice: the full e2e run failed the
+notifications inbox-isolation test twice but passed in isolation. Root cause — role-scoped
+`notify()` fans out to every matching user in the shared `_test` database
+(`src/common/notifications.ts`), so any suite running in parallel that triggers an Admin
+broadcast writes rows into the notifications suite's fixtures. All e2e files now run serialized
+(`fileParallelism: false` in `vitest.config.e2e.ts`); the full suite is green and
+deterministic.
+
+Limits: no browser/visual acceptance, no independent reviewer sign-off, no development login or
+live mutation. §11 is fully implemented; owner ledger history remains unbuilt by design.
+Everything remains uncommitted on `integration/team-baseline`; nothing was pushed, merged or
+deployed. Chat remains dropped.
+
+Preserve all twelve backend end-to-end suites: app, auth, profile/preferences, listings, marketplace, uploads, orders, disputes, batches-facilities, Admin users, notifications and sponsorships. Preserve unit coverage for permissions, session issuance and notification fan-out. Add tests for new endpoints/adapters instead of weakening existing assertions to match remote behavior.
 
 ## 8. Documentation and maintenance
 
@@ -1071,4 +1462,4 @@ Preserve all eleven backend end-to-end suites: app, auth, profile/preferences, l
 6. **Engagement order:** recommendation is notifications/Admin users/favorites before full reviews/analytics, after the purchase journey works.
 7. **Individual-fish sponsorship:** possible one-count-share batch, subject to deliberate approval; retain canonical full-prepaid care rather than prototype deposit/balance semantics.
 
-**Current outcome:** auth/public catalog, cart/atomic simulated checkout, buyer lifecycle and company fulfilment are saved in `38f0dd7`; disputes/private evidence in `90c00a0`; shared catalog in `3c333f1`; optional review/activity and Admin User management in `f2d1b37`; personal inbox/read operations, own profile/preferences and dropped chat scope in `fb562af`; catalog pause/resume/soft-delete and verification limits in `86d2409`. Current uncommitted work connects bounded company batch drafts/direct publication, public batch browsing and recorded observations, supported facility creation/compliance submission/review and controlled document downloads, plus confirmed cancellation of unsponsored batches. Facility scalar editing/deletion has no retained endpoint and remains unavailable; sponsorship transactions are not connected. Nothing was pushed, merged or deployed. Existing development records and migration history remain retained; no development login, upload or writes were used for the batch/facility slices. Chat is dropped, not deferred. Favorites, reviews/analytics, password/avatar/self-deactivation, owner sponsorship history and sponsorship transactions/settlement remain separate. Outstanding full GUI journeys, moderation/lifecycle concurrency and production private-upload hardening are not declared solved by passing helper/API tests. The full marketplace acceptance gate is not yet satisfied; deployment remains deferred.
+**Current outcome:** auth/public catalog, cart/atomic simulated checkout, buyer lifecycle and company fulfilment are saved in `38f0dd7`; disputes/private evidence in `90c00a0`; shared catalog in `3c333f1`; optional review/activity and Admin User management in `f2d1b37`; personal inbox/read operations, own profile/preferences and dropped chat scope in `fb562af`; catalog pause/resume/soft-delete and verification limits in `86d2409`; public/company batch drafts/direct publication and observations, facility compliance/private downloads and unsponsored-batch cancellation in `bb04b11`. Current uncommitted work adds optional saved-draft batch submission, bounded recorded Admin detail-link aliases, and the Admin batch review queue with snapshot-confirmed approval/rejection decisions reconciled against an authoritative reread; approval/rejection remain optional and reversible to draft only through the retained endpoints, with no sponsorship, withdrawal or deletion action connected. It also adds the milestone-10 sponsorship core as a new backend module plus frontend flow — User reservation with atomic share decrement and terms snapshots, one-shot idempotent full-package payment with 30/40/30 escrow tranches, sponsor escrow view, my-sponsorships with snapshot-bound pay/cancel, cancellation with funded refund/reversal, Admin sponsor read views and eight notification pairs — with harvest publication, delivery confirmation, tranche release/settlement and owner ledger history still unimplemented by design — and then the milestone-11 core on top of it: Admin growing transition with stocking-escrow release, Admin harvest publication with computed mortality/yield and pro-rata shortfall refunds capped at the held harvest tranche, Buyer confirm-delivery with whole-batch settlement under a batch-level advisory lock, and the matching Admin panels and Buyer ledger views — and then milestone 12: sponsorship disputes reusing the marketplace dispute flow through a polymorphic `Dispute` table (additive migration, one admin queue, existing order disputes unchanged) with Buyer filing from my-sponsorships and kind-aware dispute rendering — and then milestone 13: lazy advisory-lock-serialized unpaid-reservation expiry (24 hours) that cancels due holds, restores shares, reopens fully sponsored batches and refuses late payments with a dedicated conflict — and then milestone 14: the optional per-share delivery fee charged to every growing sponsorship at harvest outside the escrow, paid idempotently by the sponsor through a dedicated endpoint before delivery confirmation (which hard-blocks while it is unpaid), completing §11 on both sides with owner ledger history remaining unbuilt by design. Backend e2e suites run serialized (`fileParallelism: false`) because role-scoped notification fan-out in the shared test database crossfires between parallel files. Facility scalar editing/deletion has no retained endpoint and remains unavailable. Nothing was pushed, merged or deployed. Existing development records and migration history remain retained; no development login, upload or writes were used for the batch/facility/sponsorship slices. Chat is dropped, not deferred. Favorites, reviews/analytics, password/avatar/self-deactivation and owner sponsorship history remain separate. Outstanding full GUI journeys, moderation/lifecycle concurrency and production private-upload hardening are not declared solved by passing helper/API tests. The full marketplace acceptance gate is not yet satisfied; deployment remains deferred.

@@ -4,13 +4,16 @@ import { logActivity } from '../common/activity.js';
 import { AppException } from '../common/exceptions/app.exception.js';
 import { notify } from '../common/notifications.js';
 import type { Prisma } from '../generated/prisma/client.js';
-import { DisputeStatus, NotificationType, OrderStatus } from '../generated/prisma/enums.js';
+import { DisputeStatus, NotificationType, OrderStatus, SponsorshipStatus } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
 import { PrivateFilesService, privateUploadsFor } from '../uploads/private-files.service.js';
 import type { CreateDisputeDto } from './dto/dispute.dto.js';
 
 const INCLUDE = {
   order: { select: { id: true, code: true, status: true } },
+  sponsorship: {
+    select: { id: true, shares: true, status: true, batch: { select: { code: true, title: true } } },
+  },
   buyer: { select: { id: true, name: true, email: true } },
   attachments: {
     select: { id: true, uploadId: true, createdAt: true, upload: { select: { mimeType: true, sizeBytes: true } } },
@@ -74,6 +77,67 @@ export class DisputesService {
     return this.view(dispute);
   }
 
+  async createSponsorshipDispute(user: AuthenticatedUser, sponsorshipId: string, dto: CreateDisputeDto) {
+    const found = await this.prisma.sponsorship.findUnique({
+      where: { id: sponsorshipId },
+      select: { id: true, sponsorId: true, batch: { select: { code: true } } },
+    });
+    if (!found || found.sponsorId !== user.id) throw new AppException('dispute.notFound', HttpStatus.NOT_FOUND);
+
+    const dispute = await this.prisma.$transaction(async (tx) => {
+      // Same batch-level advisory lock as reserve/cancel/grow/harvest/confirm-delivery.
+      await tx.$queryRaw`SELECT 1::int AS "locked" FROM pg_advisory_xact_lock(hashtextextended(${`sponsor:batch:${found.batch.code}`}, 0))`;
+      const sponsorship = await tx.sponsorship.findUniqueOrThrow({
+        where: { id: sponsorshipId },
+        select: { id: true, sponsorId: true, status: true, batch: { select: { code: true } } },
+      });
+      if (sponsorship.sponsorId !== user.id) throw new AppException('dispute.notFound', HttpStatus.NOT_FOUND);
+      const eligible: SponsorshipStatus[] = [
+        SponsorshipStatus.growing,
+        SponsorshipStatus.ready_for_delivery,
+        SponsorshipStatus.delivered,
+        SponsorshipStatus.settled,
+      ];
+      // Unpaid or funded records use the cancellation/refund flow instead.
+      if (!eligible.includes(sponsorship.status)) {
+        throw new AppException('dispute.sponsorshipNotEligible', HttpStatus.CONFLICT);
+      }
+      if (await tx.dispute.findUnique({ where: { sponsorshipId: sponsorship.id }, select: { id: true } })) {
+        throw new AppException('dispute.alreadyExists', HttpStatus.CONFLICT);
+      }
+      const uploadIds = dto.uploadIds ?? [];
+      for (const uploadId of [...new Set(uploadIds)].sort()) {
+        await tx.$queryRaw<Array<{ id: string }>>`
+          SELECT "id" FROM "Upload" WHERE "id" = ${uploadId} FOR UPDATE
+        `;
+      }
+      const uploads = await privateUploadsFor(tx, uploadIds, 'dispute_attachment', user.id);
+      if (uploadIds.length) {
+        const used = await tx.disputeAttachment.count({ where: { uploadId: { in: uploadIds } } });
+        if (used) throw new AppException('uploads.alreadyUsed', HttpStatus.CONFLICT);
+      }
+      const created = await tx.dispute.create({
+        data: {
+          sponsorshipId: sponsorship.id,
+          buyerId: user.id,
+          reason: dto.reason,
+          description: dto.description,
+          attachments: { create: uploads.map((upload) => ({ uploadId: upload.id, url: upload.url })) },
+        },
+        include: INCLUDE,
+      });
+      await notify(tx, {
+        role: 'Admin', type: NotificationType.status,
+        titleKey: 'notifications.admin.disputeOpened.title', titleParams: { code: sponsorship.batch.code },
+        bodyKey: 'notifications.admin.disputeOpened.body', bodyParams: { name: user.name },
+        link: `#admin/disputes/${created.id}`,
+      });
+      await logActivity(tx, user, 'Opened sponsorship dispute', sponsorship.batch.code, `#admin/disputes/${created.id}`);
+      return created;
+    });
+    return this.view(dispute);
+  }
+
   async mine(userId: string) {
     return (await this.prisma.dispute.findMany({
       where: { buyerId: userId }, include: INCLUDE, orderBy: { createdAt: 'desc' },
@@ -120,6 +184,10 @@ export class DisputesService {
     return this.privateFiles.stream(attachment.upload);
   }
 
+  private reference(current: DisputeRecord): string {
+    return current.order?.code ?? current.sponsorship?.batch.code ?? current.sponsorship?.id ?? current.orderId ?? current.id;
+  }
+
   private async transition(
     admin: AuthenticatedUser,
     id: string,
@@ -132,10 +200,10 @@ export class DisputesService {
       await tx.dispute.update({ where: { id }, data: { status: to } });
       await notify(tx, {
         userId: current.buyerId, type: NotificationType.status,
-        titleKey: 'notifications.buyer.disputeReviewing.title', titleParams: { code: current.order.code },
+        titleKey: 'notifications.buyer.disputeReviewing.title', titleParams: { code: this.reference(current) },
         bodyKey: 'notifications.buyer.disputeReviewing.body', link: `#marketplace/disputes/${id}`,
       });
-      await logActivity(tx, admin, 'Started dispute review', current.order.code, `#admin/disputes/${id}`);
+      await logActivity(tx, admin, 'Started dispute review', this.reference(current), `#admin/disputes/${id}`);
       return this.findTx(tx, id);
     });
     return this.view(dispute);
@@ -159,11 +227,11 @@ export class DisputesService {
       await notify(tx, {
         userId: current.buyerId, type: NotificationType.status,
         titleKey: `notifications.buyer.dispute${status === DisputeStatus.resolved ? 'Resolved' : 'Rejected'}.title`,
-        titleParams: { code: current.order.code },
+        titleParams: { code: this.reference(current) },
         bodyKey: `notifications.buyer.dispute${status === DisputeStatus.resolved ? 'Resolved' : 'Rejected'}.body`,
         link: `#marketplace/disputes/${id}`,
       });
-      await logActivity(tx, admin, `${status === DisputeStatus.resolved ? 'Resolved' : 'Rejected'} dispute`, current.order.code, `#admin/disputes/${id}`);
+      await logActivity(tx, admin, `${status === DisputeStatus.resolved ? 'Resolved' : 'Rejected'} dispute`, this.reference(current), `#admin/disputes/${id}`);
       return this.findTx(tx, id);
     });
     return this.view(dispute);
@@ -205,7 +273,18 @@ export class DisputesService {
   private view(dispute: DisputeRecord) {
     return {
       id: dispute.id,
-      order: { id: dispute.order.code, status: dispute.order.status },
+      kind: dispute.sponsorshipId ? 'sponsorship' as const : 'order' as const,
+      order: dispute.order
+        ? { id: dispute.order.code, status: dispute.order.status }
+        : null,
+      sponsorship: dispute.sponsorship
+        ? {
+            id: dispute.sponsorship.id,
+            shares: dispute.sponsorship.shares,
+            status: dispute.sponsorship.status,
+            batch: { code: dispute.sponsorship.batch.code, title: dispute.sponsorship.batch.title },
+          }
+        : null,
       buyer: dispute.buyer,
       reason: dispute.reason,
       description: dispute.description,

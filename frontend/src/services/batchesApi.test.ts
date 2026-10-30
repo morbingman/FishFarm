@@ -35,7 +35,7 @@ describe("bounded batch transport", () => {
     const { batchesApi } = await import("./batchesApi"); await batchesApi.companyList("draft"); await batchesApi.companyDetail("BATCH-1024"); await batchesApi.facilities();
     expect(fetch.mock.calls.map(([url]) => url)).toEqual(["/v1/company/batches?status=draft", "/v1/company/batches/BATCH-1024", "/v1/company/facilities"]);
     for (const [, init] of fetch.mock.calls) { expect(init.credentials).toBe("include"); expect(init.body).toBeUndefined(); expect(init.method).toBeUndefined(); }
-    expect(Object.keys(batchesApi).sort()).toEqual(["addUpdate", "cancel", "companyDetail", "companyList", "create", "detail", "facilities", "list", "publish", "save", "updates"]);
+    expect(Object.keys(batchesApi).sort()).toEqual(["addUpdate", "approve", "cancel", "companyDetail", "companyList", "create", "detail", "facilities", "list", "publish", "reject", "reviewQueue", "save", "submit", "updates"]);
   });
   it("normalizes exact create and partial save bodies, with a separate bodyless publish", async () => {
     const fetch = vi.fn(async (url: string, init: RequestInit) => { const value = company(url.endsWith("publish") ? "open" : "draft"); if (init.method === "PATCH") value.title = "Changed"; return response(value); }); vi.stubGlobal("fetch", fetch);
@@ -110,6 +110,128 @@ describe("structural response safety and pagination", () => {
       const f = facility(); Object.assign(f.verification!.documents[0], patch); fetch.mockResolvedValueOnce(response([f])); await expect(batchesApi.facilities()).rejects.toMatchObject({ code: "batch.invalidResponse" });
     }
     fetch.mockResolvedValueOnce(response([facility(), facility()])); await expect(batchesApi.facilities()).rejects.toMatchObject({ code: "batch.invalidResponse" });
+  });
+});
+describe("optional saved-draft submission transport", () => {
+  const submitted = (): CompanyBatch => ({ ...company(), status: "pending_review", submittedAt: at, reviewedAt: "2026-10-27T00:00:00Z", reviewedBy: "Prior Admin", updates: [update()] });
+  it("sends exactly one protected bodyless POST without clearing retained review or observation fields", async () => {
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => response(submitted())); vi.stubGlobal("fetch", fetch);
+    const { authApi } = await import("./api"); fetch.mockResolvedValueOnce(response({ accessToken: "test-token", user: { id: "admin1", role: "Admin" } })); await authApi.login("admin@example.test", "LOCAL TEST ONLY"); fetch.mockClear();
+    const { batchesApi } = await import("./batchesApi"); await expect(batchesApi.submit("BATCH-1024")).resolves.toEqual(submitted());
+    expect(fetch).toHaveBeenCalledTimes(1); const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/v1/company/batches/BATCH-1024/submit"); expect(init.method).toBe("POST"); expect(init.body).toBeUndefined(); expect(init.credentials).toBe("include"); expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
+  });
+  it.each([
+    null, {}, { ...submitted(), id: "BATCH-9999" }, { ...submitted(), status: "draft" }, { ...submitted(), status: "open" }, { ...submitted(), submittedAt: null }, { ...submitted(), submittedAt: "2026-02-30T00:00:00Z" }, { ...submitted(), reviewNote: "Retained rejection" }, { ...submitted(), sharesAvailable: 9 }, { ...submitted(), shareQuantity: null }, { ...submitted(), images: [] }, { ...submitted(), costs: [{ ...company().costs[0], amount: 99 }] }, { ...submitted(), facility: null },
+    ...[{ status: "pending" }, { level: "none" }, { validUntil: null }, { documents: [] }, { documents: [{ id: "document1", type: "Registration", controlled: false }] }].map(patch => ({ ...submitted(), facility: { ...company().facility, verification: { ...company().facility!.verification, ...patch } } })),
+  ])("rejects malformed or inconsistent submission acknowledgement %#", async value => {
+    vi.stubGlobal("fetch", vi.fn(async () => response(value))); const { batchesApi } = await import("./batchesApi"); await expect(batchesApi.submit("BATCH-1024")).rejects.toMatchObject({ code: "batch.invalidResponse" });
+  });
+  it("does not reinterpret authoritative expiry using the client clock or require publication metadata", async () => {
+    const value = submitted(); value.facility!.verification!.validUntil = "2020-01-01T00:00:00Z";
+    vi.stubGlobal("fetch", vi.fn(async () => response(value))); const { batchesApi } = await import("./batchesApi"); await expect(batchesApi.submit("BATCH-1024")).resolves.toMatchObject({ farmVerified: false, inspectedAt: null, inspector: null, reviewedBy: "Prior Admin" });
+  });
+  it("rejects unsafe IDs before HTTP and passes server prerequisites/conflicts through", async () => {
+    const fetch = vi.fn(); vi.stubGlobal("fetch", fetch); const { batchesApi } = await import("./batchesApi");
+    await expect(batchesApi.submit("bad/id")).rejects.toMatchObject({ field: "id" }); expect(fetch).not.toHaveBeenCalled();
+    for (const [code, status] of [["batch.invalidTransition", 409], ["batch.complianceRequired", 409], ["batch.costMismatch", 400]] as const) {
+      fetch.mockResolvedValueOnce(response({ code, params: { from: "pending_review", action: "submit" } }, status)); await expect(batchesApi.submit("BATCH-1024")).rejects.toMatchObject({ code, status });
+    }
+    fetch.mockResolvedValueOnce(response({})); await expect(batchesApi.submit("BATCH-1024")).rejects.toMatchObject({ code: "batch.invalidResponse" });
+    fetch.mockResolvedValueOnce(response(submitted())); await expect(batchesApi.submit("BATCH-1024")).resolves.toMatchObject({ status: "pending_review" });
+  });
+  it("holds the shared cross-action lock through decode, including cancellation and reciprocal create", async () => {
+    let finish: (value: unknown) => void = () => {};
+    const fetch = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: () => new Promise(resolve => { finish = resolve; }) }); vi.stubGlobal("fetch", fetch); const { batchesApi } = await import("./batchesApi");
+    const pending = batchesApi.submit("BATCH-1024");
+    for (const promise of [batchesApi.submit("BATCH-1024"), batchesApi.cancel("BATCH-1024", "Reason"), batchesApi.create(input()), batchesApi.save("BATCH-1024", {}), batchesApi.publish("BATCH-1024"), batchesApi.addUpdate("BATCH-1024", { stage: "nursery" })]) await expect(promise).rejects.toMatchObject({ code: "batch.requestPending" });
+    expect(fetch).toHaveBeenCalledTimes(1); finish(submitted()); await pending;
+    fetch.mockResolvedValueOnce(response(company())); const creating = batchesApi.create(input()); await expect(batchesApi.submit("BATCH-1024")).rejects.toMatchObject({ code: "batch.requestPending" }); await creating;
+  });
+  it("never refreshes/replays a submission after 401 or uncertain network failure", async () => {
+    const fetch = vi.fn(async () => response({ code: "auth.unauthorized" }, 401)); vi.stubGlobal("fetch", fetch); const { batchesApi } = await import("./batchesApi");
+    await expect(batchesApi.submit("BATCH-1024")).rejects.toMatchObject({ status: 401 }); expect(fetch).toHaveBeenCalledTimes(1);
+    fetch.mockRejectedValue(new TypeError("Lost response")); await expect(batchesApi.submit("BATCH-1024")).rejects.toThrow("Lost response"); expect(fetch).toHaveBeenCalledTimes(2);
+  });
+  it.each(["same-account", "other-account", "logout", "role-change"] as const)("rejects late submission results after %s", async change => {
+    let finish: (value: unknown) => void = () => {};
+    const login = (id: string, role: string) => response({ accessToken: "test-token", user: { id, role } });
+    const fetch = vi.fn().mockResolvedValueOnce(login("admin1", "Admin")); vi.stubGlobal("fetch", fetch); const { authApi, clearApiSession } = await import("./api"); await authApi.login("admin@example.test", "LOCAL TEST ONLY");
+    fetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => new Promise(resolve => { finish = resolve; }) }); const { batchesApi } = await import("./batchesApi"); const pending = batchesApi.submit("BATCH-1024");
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    if (change === "logout") clearApiSession(); else { fetch.mockResolvedValueOnce(login(change === "other-account" ? "admin2" : "admin1", change === "role-change" ? "User" : "Admin")); await authApi.login("admin@example.test", "LOCAL TEST ONLY"); }
+    finish(submitted()); await expect(pending).rejects.toMatchObject({ code: "auth.sessionChanged" });
+  });
+  it("does not adopt a previously anonymous write into a newly logged-in session", async () => {
+    let finish: (value: unknown) => void = () => {};
+    const fetch = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: () => new Promise(resolve => { finish = resolve; }) }); vi.stubGlobal("fetch", fetch); const { batchesApi } = await import("./batchesApi"); const pending = batchesApi.submit("BATCH-1024");
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(1)); const { authApi } = await import("./api"); fetch.mockResolvedValueOnce(response({ accessToken: "test-token", user: { id: "admin1", role: "Admin" } })); await authApi.login("admin@example.test", "LOCAL TEST ONLY");
+    finish(submitted()); await expect(pending).rejects.toMatchObject({ code: "auth.sessionChanged" });
+  });
+});
+describe("batch review queue and decisions transport", () => {
+  const open = (): CompanyBatch => ({ ...company("open"), inspectedAt: null, inspector: null });
+  it("reads the pending-only Admin queue with a protected authenticated GET", async () => {
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => response([company("pending_review")])); vi.stubGlobal("fetch", fetch);
+    const { authApi } = await import("./api"); fetch.mockResolvedValueOnce(response({ accessToken: "test-token", user: { id: "admin1", role: "Admin" } })); await authApi.login("admin@example.test", "LOCAL TEST ONLY"); fetch.mockClear();
+    const { batchesApi } = await import("./batchesApi"); await expect(batchesApi.reviewQueue()).resolves.toEqual([company("pending_review")]);
+    expect(fetch).toHaveBeenCalledTimes(1); const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/v1/admin/batches"); expect(init.method).toBeUndefined(); expect(init.body).toBeUndefined(); expect(init.credentials).toBe("include"); expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
+    fetch.mockResolvedValueOnce(response([company("open")])); await expect(batchesApi.reviewQueue()).rejects.toMatchObject({ code: "batch.invalidResponse" });
+  });
+  it("sends the exact bodyless approve POST and validates the opened record", async () => {
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => response(open())); vi.stubGlobal("fetch", fetch);
+    const { authApi } = await import("./api"); fetch.mockResolvedValueOnce(response({ accessToken: "test-token", user: { id: "admin1", role: "Admin" } })); await authApi.login("admin@example.test", "LOCAL TEST ONLY"); fetch.mockClear();
+    const { batchesApi } = await import("./batchesApi"); await expect(batchesApi.approve("BATCH-1024")).resolves.toEqual(open());
+    expect(fetch).toHaveBeenCalledTimes(1); const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/v1/admin/batches/BATCH-1024/approve"); expect(init.method).toBe("POST"); expect(init.body).toBeUndefined(); expect(init.credentials).toBe("include"); expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
+  });
+  it.each([
+    { ...company("open"), id: "BATCH-9999" }, { ...company("open"), status: "pending_review" as const }, { ...company("open"), submittedAt: null }, { ...company("open"), reviewedAt: null }, { ...company("open"), reviewedBy: null }, { ...company("open"), reviewNote: "Uncleared" }, { ...company("open"), farmVerified: false }, { ...company("open"), images: [] }, { ...company("open"), costs: [{ ...company().costs[0], amount: 99 }] },
+    ...[{ status: "pending" }, { level: "none" }, { validUntil: null }, { documents: [] }, { documents: [{ id: "document1", type: "Registration", controlled: false }] }].map(patch => ({ ...company("open"), facility: { ...company().facility, verification: { ...company().facility!.verification, ...patch } } })),
+    { ...company("open"), inspectedAt: "2026-10-29T00:00:00.000Z" }, { ...company("open"), inspector: "Unexpected" },
+  ])("rejects malformed or inconsistent approval %#", async value => {
+    vi.stubGlobal("fetch", vi.fn(async () => response(value))); const { batchesApi } = await import("./batchesApi");
+    await expect(batchesApi.approve("BATCH-1024")).rejects.toMatchObject({ code: "batch.invalidResponse" });
+  });
+  it("sends the exact reject body and validates the returned draft metadata", async () => {
+    const rejected = (): CompanyBatch => ({ ...company("draft"), reviewedAt: at, reviewedBy: "Reviewer", reviewNote: "Fix the budget.", submittedAt: at });
+    const fetch = vi.fn(async (_url: string, init: RequestInit) => response(rejected())); vi.stubGlobal("fetch", fetch);
+    const { authApi } = await import("./api"); fetch.mockResolvedValueOnce(response({ accessToken: "test-token", user: { id: "admin1", role: "Admin" } })); await authApi.login("admin@example.test", "LOCAL TEST ONLY"); fetch.mockClear();
+    const { batchesApi } = await import("./batchesApi"); await expect(batchesApi.reject("BATCH-1024", "  Fix the budget.  ")).resolves.toEqual(rejected());
+    expect(fetch).toHaveBeenCalledTimes(1); const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/v1/admin/batches/BATCH-1024/reject"); expect(init.method).toBe("POST"); expect(init.body).toBe('{"note":"Fix the budget."}'); expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
+    for (const patch of [{ status: "open" as const }, { reviewedAt: null }, { reviewedBy: null }, { reviewNote: "Other" }]) {
+      fetch.mockResolvedValueOnce(response({ ...rejected(), ...patch })); await expect(batchesApi.reject("BATCH-1024", "Fix the budget.")).rejects.toMatchObject({ code: "batch.invalidResponse" });
+    }
+    const fetch2 = vi.fn(); vi.stubGlobal("fetch", fetch2);
+    for (const note of ["", " ", "x".repeat(1001), null, 7]) await expect(batchesApi.reject("BATCH-1024", note as string)).rejects.toMatchObject({ field: "note" });
+    await expect(batchesApi.reject("bad/id", "Note")).rejects.toMatchObject({ field: "id" }); expect(fetch2).not.toHaveBeenCalled();
+  });
+  it("passes server review conflicts through and never refreshes/replays a decision", async () => {
+    const fetch = vi.fn(async () => response({ code: "batch.invalidTransition", params: { from: "open", action: "approve" } }, 409)); vi.stubGlobal("fetch", fetch); const { batchesApi } = await import("./batchesApi");
+    await expect(batchesApi.approve("BATCH-1024")).rejects.toMatchObject({ code: "batch.invalidTransition", status: 409 });
+    await expect(batchesApi.reject("BATCH-1024", "Note")).rejects.toMatchObject({ code: "batch.invalidTransition", status: 409 });
+    fetch.mockResolvedValue(new Response(JSON.stringify({ code: "auth.unauthorized" }), { status: 401, headers: { "Content-Type": "application/json" } }));
+    await expect(batchesApi.approve("BATCH-1024")).rejects.toMatchObject({ status: 401 }); expect(fetch).toHaveBeenCalledTimes(3);
+    fetch.mockRejectedValue(new TypeError("Lost response")); await expect(batchesApi.reject("BATCH-1024", "Note")).rejects.toThrow("Lost response"); expect(fetch).toHaveBeenCalledTimes(4);
+  });
+  it("holds the shared cross-action lock through queue decisions and releases it after malformed acknowledgements", async () => {
+    let finish: (value: unknown) => void = () => {};
+    const fetch = vi.fn().mockResolvedValueOnce({ ok: true, status: 200, json: () => new Promise(resolve => { finish = resolve; }) }); vi.stubGlobal("fetch", fetch); const { batchesApi } = await import("./batchesApi");
+    const pending = batchesApi.approve("BATCH-1024");
+    for (const promise of [batchesApi.approve("BATCH-1024"), batchesApi.reject("BATCH-1024", "Note"), batchesApi.submit("BATCH-1024"), batchesApi.cancel("BATCH-1024", "Reason"), batchesApi.publish("BATCH-1024")]) await expect(promise).rejects.toMatchObject({ code: "batch.requestPending" });
+    expect(fetch).toHaveBeenCalledTimes(1); finish({}); await expect(pending).rejects.toMatchObject({ code: "batch.invalidResponse" });
+    fetch.mockResolvedValueOnce(response([company("pending_review")])); await expect(batchesApi.reviewQueue()).resolves.toHaveLength(1);
+  });
+  it.each(["same-account", "other-account", "logout", "role-change"] as const)("rejects late decision results after %s", async change => {
+    let finish: (value: unknown) => void = () => {};
+    const login = (id: string, role: string) => response({ accessToken: "test-token", user: { id, role } });
+    const fetch = vi.fn().mockResolvedValueOnce(login("admin1", "Admin")); vi.stubGlobal("fetch", fetch); const { authApi, clearApiSession } = await import("./api"); await authApi.login("admin@example.test", "LOCAL TEST ONLY");
+    fetch.mockResolvedValueOnce({ ok: true, status: 200, json: () => new Promise(resolve => { finish = resolve; }) }); const { batchesApi } = await import("./batchesApi"); const pending = batchesApi.approve("BATCH-1024");
+    await vi.waitFor(() => expect(fetch).toHaveBeenCalledTimes(2));
+    if (change === "logout") clearApiSession(); else { fetch.mockResolvedValueOnce(login(change === "other-account" ? "admin2" : "admin1", change === "role-change" ? "User" : "Admin")); await authApi.login("admin@example.test", "LOCAL TEST ONLY"); }
+    finish(company("open")); await expect(pending).rejects.toMatchObject({ code: "auth.sessionChanged" });
   });
 });
 describe("unsponsored cancellation transport", () => {

@@ -3,7 +3,7 @@ import { useTranslation } from "@/context/LanguageContext";
 import { errorMessage } from "@/services/api";
 import { commerceApi } from "@/services/commerceApi";
 import { disputesApi } from "@/services/disputesApi";
-import { disputeLabel, disputeLink, disputeStatuses, evidenceTypes, reasonsForOrder, validateEvidence } from "@/services/disputes";
+import { disputeLabel, disputeLink, disputeStatuses, disputeSubject, evidenceTypes, reasonsForOrder, validateEvidence } from "@/services/disputes";
 import type { Dispute, DisputeReason, DisputeStatus, Order } from "@/services/contracts";
 import "./PublicMarketplace.css";
 import "./Commerce.css";
@@ -47,7 +47,7 @@ export default function Disputes({ admin, disputeId, orderId }: { admin: boolean
         const history = await disputesApi.list(false, "all", controller.signal);
         if (controller.signal.aborted) return;
         setOrder(current);
-        setDetail(history.find(value => value.order.id === current.id) ?? null);
+        setDetail(history.find(value => value.order?.id === current.id) ?? null);
       } else if (disputeId) {
         const value = await disputesApi.detail(admin, disputeId, controller.signal);
         if (!controller.signal.aborted) setDetail(value);
@@ -75,7 +75,7 @@ export default function Disputes({ admin, disputeId, orderId }: { admin: boolean
         ? await disputesApi.create(order.id, { reason, description, uploadIds: uploads.map(value => value.id) })
         : confirm === "review" && detail ? await disputesApi.review(detail.id)
         : await disputesApi.finish(detail!.id, confirm as "resolve" | "reject", resolution);
-      if (updated.order.id !== (order?.id ?? detail?.order.id) || updated.buyer.id !== (order?.buyer.id ?? detail?.buyer.id)
+      if ((updated.order?.id ?? updated.sponsorship?.id) !== (order?.id ?? detail?.order?.id ?? detail?.sponsorship?.id) || updated.buyer.id !== (order?.buyer.id ?? detail?.buyer.id)
         || (confirm === "create" && updated.attachments.length !== uploads.length)) throw new Error("Unexpected dispute response");
       if (!alive.current) return;
       setDetail(updated); setConfirm(null); setResolution(""); setUploads([]);
@@ -116,7 +116,7 @@ export default function Disputes({ admin, disputeId, orderId }: { admin: boolean
   return <main className="public-market commerce orders">
     <a href={orderId ? `#marketplace/orders/${encodeURIComponent(orderId)}` : disputeId ? disputeLink(admin) : admin ? "#company/orders" : "#marketplace/orders"}>← {tr("Back", "Quay lại")}</a>
     <h1>{admin ? tr("Company dispute review", "Xét duyệt khiếu nại công ty") : orderId ? tr("Report an order issue", "Báo cáo vấn đề đơn hàng") : tr("Your disputes", "Khiếu nại của bạn")}</h1>
-    <p>{tr("One dispute per order. Decisions are recorded by the company; resolving a dispute does not automatically refund, replace or complete the order.", "Mỗi đơn chỉ có một khiếu nại. Công ty ghi nhận quyết định; giải quyết khiếu nại không tự động hoàn tiền, thay cá hoặc hoàn tất đơn.")}</p>
+    <p>{tr("One dispute per order or sponsorship. Decisions are recorded by the company; resolving a dispute does not automatically refund, replace or complete the order.", "Mỗi đơn hoặc bảo trợ chỉ có một khiếu nại. Công ty ghi nhận quyết định; giải quyết khiếu nại không tự động hoàn tiền, thay cá hoặc hoàn tất đơn.")}</p>
     <div className="commerce-actions">
       {admin && !disputeId && <label>{tr("Dispute status", "Trạng thái khiếu nại")}<select value={status} disabled={busy} onChange={event => setStatus(event.target.value as "all" | DisputeStatus)}><option value="all">{tr("All", "Tất cả")}</option>{disputeStatuses.map(value => <option key={value} value={value}>{disputeLabel(value, language)}</option>)}</select></label>}
       <button disabled={loading || busy} onClick={() => { setNotice(""); setReload(value => value + 1); }}>{tr("Refresh", "Làm mới")}</button>
@@ -125,9 +125,10 @@ export default function Disputes({ admin, disputeId, orderId }: { admin: boolean
     {needsRefresh && <p>{tr("Actions are disabled until Refresh reconciles the server record.", "Thao tác bị khóa đến khi làm mới bản ghi máy chủ.")}</p>}
     {loading && <p role="status">{tr("Loading…", "Đang tải…")}</p>}
     {!loading && !error && !orderId && !disputeId && !rows.length && <p>{tr("No disputes found.", "Không tìm thấy khiếu nại.")}</p>}
-    {!loading && rows.map(value => <article key={value.id} className="commerce-panel"><h2><a href={disputeLink(admin, value.id)}>{value.order.id}</a></h2><p>{disputeLabel(value.reason, language)} · {disputeLabel(value.status, language)} · {date(value.createdAt)}</p>{admin && <p>{value.buyer.name} · {value.buyer.email}</p>}<p>{value.description}</p><a href={disputeLink(admin, value.id)}>{tr("View dispute", "Xem khiếu nại")}</a></article>)}
-    {!loading && detail && <section className="commerce-panel"><h2>{detail.order.id} · {disputeLabel(detail.status, language)}</h2>
-      <a href={`#${admin ? "company" : "marketplace"}/orders/${encodeURIComponent(detail.order.id)}`}>{tr("View current order", "Xem đơn hiện tại")}</a>
+    {!loading && rows.map(value => <article key={value.id} className="commerce-panel"><h2><a href={disputeLink(admin, value.id)}>{disputeSubject(value)?.code ?? value.id}</a>{value.kind === "sponsorship" ? ` · ${tr("Sponsorship dispute", "Khiếu nại bảo trợ")}` : ""}</h2><p>{disputeLabel(value.reason, language)} · {disputeLabel(value.status, language)} · {date(value.createdAt)}</p>{admin && <p>{value.buyer.name} · {value.buyer.email}</p>}<p>{value.description}</p><a href={disputeLink(admin, value.id)}>{tr("View dispute", "Xem khiếu nại")}</a></article>)}
+    {!loading && detail && <section className="commerce-panel"><h2>{disputeSubject(detail)?.code ?? detail.id} · {disputeLabel(detail.status, language)}</h2>
+      {detail.kind === "order" && detail.order && <a href={`#${admin ? "company" : "marketplace"}/orders/${encodeURIComponent(detail.order.id)}`}>{tr("View current order", "Xem đơn hiện tại")}</a>}
+      {detail.kind === "sponsorship" && detail.sponsorship && <p>{tr("Sponsorship dispute", "Khiếu nại bảo trợ")} · {detail.sponsorship.shares} {tr("shares", "phần")} · {detail.sponsorship.status}</p>}
       {admin && <p>{detail.buyer.name} · {detail.buyer.email}</p>}<p>{disputeLabel(detail.reason, language)}</p><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{detail.description}</p><p>{tr("Opened", "Mở lúc")}: {date(detail.createdAt)}</p>
       {detail.resolution && <><h3>{tr("Company decision", "Quyết định công ty")}</h3><p style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{detail.resolution}</p></>}{detail.resolvedAt && <p>{tr("Finalized", "Kết thúc lúc")}: {date(detail.resolvedAt)}</p>}
       <h3>{tr("Private evidence", "Bằng chứng riêng tư")}</h3>

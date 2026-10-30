@@ -193,9 +193,17 @@ describe("safe role-aware mounted notification destinations", () => {
       expect(safeNotificationLink(link, "Admin")).toBe(link);
       for (const role of ["User", "Buyer"] as const) expect(safeNotificationLink(link, role)).toBeNull();
     }
-    for (const link of ["#farming/booking", "#farming/BATCH-1?x=1", "#farming/%42ATCH-1", "#farming/unknown", "#company/batches/new", "#company/batches/BATCH-1/edit", "#company/batches/BATCH-1?x=1", "#admin/batches/BATCH-1"]) {
+    for (const link of ["#farming/booking", "#farming/BATCH-1?x=1", "#farming/%42ATCH-1", "#farming/unknown", "#company/batches/new", "#company/batches/BATCH-1/edit", "#company/batches/BATCH-1?x=1", "#admin/batches/BATCH-1/reject"]) {
       for (const role of ["User", "Buyer", "Admin"] as const) expect(safeNotificationLink(link, role)).toBeNull();
     }
+  });
+  it("allows recorded batch submission detail links only for Admin, without queue or decision routes", async () => {
+    const { safeNotificationLink } = await import("./notifications");
+    for (const link of ["#admin/batches/BATCH-1", "#admin/batches/BATCH-1024"]) {
+      expect(safeNotificationLink(link, "Admin")).toBe(link);
+      for (const role of ["User", "Buyer"] as const) expect(safeNotificationLink(link, role)).toBeNull();
+    }
+    for (const link of ["#admin/batches", "#admin/batches/BATCH-0", "#admin/batches/BATCH-01", `#admin/batches/${databaseId}`, "#admin/batches/BATCH-1/approve", "#admin/batches/%42ATCH-1", "#admin/batches/BATCH-1?x=1"]) expect(safeNotificationLink(link, "Admin")).toBeNull();
   });
   it("allows facilities only for Admin and never links private content or submission routes", async () => {
     const { safeNotificationLink } = await import("./notifications");
@@ -261,7 +269,7 @@ const producerTemplates: [string, JsonValue, string, string][] = [
   ["buyer.disputeRejected.title", { code: "ORD-1" }, "Dispute for ORD-1 rejected", "Khiếu nại cho ORD-1 bị từ chối"],
   ["buyer.disputeRejected.body", null, "Your dispute has been rejected. Open it for details.", "Khiếu nại đã bị từ chối. Mở để xem chi tiết."],
   ["admin.batchSubmitted.title", { code: "BATCH-1024" }, "Batch BATCH-1024 submitted for review", "Lô BATCH-1024 gửi xét duyệt"],
-  ["admin.batchSubmitted.body", null, "A company batch is awaiting review. Batch management is not integrated here.", "Một lô của công ty đang chờ xét duyệt. Quản lý lô chưa được tích hợp tại đây."],
+  ["admin.batchSubmitted.body", null, "A company batch is awaiting review. Open its saved company detail; batch approval and rejection controls are not connected yet.", "Một lô của công ty đang chờ xét duyệt. Mở chi tiết công ty đã lưu; thao tác phê duyệt và từ chối lô chưa được kết nối."],
   ["admin.listingSubmitted.title", { name: "Koi" }, "Listing submitted: Koi", "Tin đăng gửi xét duyệt: Koi"],
   ["admin.listingSubmitted.body", { company: "FishFarm", name: "Koi", code: "FM-1" }, "FishFarm submitted Koi (FM-1) for review.", "FishFarm đã gửi Koi (FM-1) để xét duyệt."],
   ["admin.listingResubmitted.title", { name: "Koi" }, "Listing resubmitted: Koi", "Tin đăng gửi lại: Koi"],

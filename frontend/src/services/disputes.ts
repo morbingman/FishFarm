@@ -1,8 +1,19 @@
-import type { DisputeReason, DisputeStatus, OrderStatus } from "./contracts";
+import type { Dispute, DisputeReason, DisputeStatus, OrderStatus } from "./contracts";
+import type { SponsorshipStatus } from "./sponsorshipContracts";
 
 export const disputeReasons: DisputeReason[] = ["fish_unwell", "not_as_described", "damaged_packaging", "not_received", "other"];
 export const disputeStatuses: DisputeStatus[] = ["open", "reviewing", "resolved", "rejected"];
 export const reasonsForOrder = (status: OrderStatus) => status === "shipped" ? ["not_received" as const] : ["delivered", "completed"].includes(status) ? disputeReasons : [];
+// §11: unpaid or funded records use the cancellation/refund flow instead;
+// cancelled or refunded records cannot be disputed.
+export const sponsorshipDisputeStatuses: SponsorshipStatus[] = ["growing", "ready_for_delivery", "delivered", "settled"];
+export const sponsorshipDisputeEligible = (status: SponsorshipStatus) => sponsorshipDisputeStatuses.includes(status);
+export const disputeSubject = (dispute: Pick<Dispute, "kind" | "order" | "sponsorship">) =>
+  dispute.kind === "sponsorship" && dispute.sponsorship
+    ? { code: dispute.sponsorship.batch.code, title: dispute.sponsorship.batch.title, kind: "sponsorship" as const }
+    : dispute.order
+      ? { code: dispute.order.id, title: "", kind: "order" as const }
+      : null;
 export const disputeLink = (admin: boolean, id?: string) => `#${admin ? "admin" : "marketplace"}/disputes${id ? `/${encodeURIComponent(id)}` : ""}`;
 export function isDisputeRoute(route: string) {
   return /^(marketplace|admin)\/disputes(?:\/[^/]+)?$/.test(route) || /^marketplace\/orders\/[^/]+\/dispute$/.test(route);

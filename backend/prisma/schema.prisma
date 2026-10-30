@@ -541,17 +541,21 @@ enum DisputeStatus {
 }
 
 model Dispute {
-  id          String        @id @default(cuid())
-  orderId     String        @unique
-  order       Order         @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  buyerId     String
-  buyer       User          @relation(fields: [buyerId], references: [id], onDelete: Restrict)
-  reason      String
-  description String
-  status      DisputeStatus @default(open)
-  resolution  String?
-  createdAt   DateTime      @default(now())
-  resolvedAt  DateTime?
+  id            String        @id @default(cuid())
+  // Exactly one of order/sponsorship is set: marketplace order disputes (§3.8)
+  // and sponsorship disputes (§11) share one flow and one admin queue.
+  orderId       String?       @unique
+  order         Order?        @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  sponsorshipId String?       @unique
+  sponsorship   Sponsorship?  @relation(fields: [sponsorshipId], references: [id], onDelete: Restrict)
+  buyerId       String
+  buyer         User          @relation(fields: [buyerId], references: [id], onDelete: Restrict)
+  reason        String
+  description   String
+  status        DisputeStatus @default(open)
+  resolution    String?
+  createdAt     DateTime      @default(now())
+  resolvedAt    DateTime?
 
   attachments DisputeAttachment[]
 
@@ -772,6 +776,7 @@ model Sponsorship {
   escrowReleases EscrowRelease[]
   adjustments    Adjustment[]
   payments       Payment[]
+  disputes       Dispute[]
 
   @@index([batchId, status])
   @@index([sponsorId, createdAt])

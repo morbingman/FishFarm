@@ -1,3 +1,5 @@
+import type { SponsorshipStatus } from "./sponsorshipContracts";
+
 export type SaleMode = "in_stock" | "pre_order";
 export type CartLine = {
   listingId: string; code: string; name: string; species: string; breed: string;
@@ -40,7 +42,10 @@ export type Order = {
 export type DisputeStatus = "open" | "reviewing" | "resolved" | "rejected";
 export type DisputeReason = "fish_unwell" | "not_as_described" | "damaged_packaging" | "not_received" | "other";
 export type Dispute = {
-  id: string; order: { id: string; status: OrderStatus }; buyer: { id: string; name: string; email: string };
+  id: string; kind: "order" | "sponsorship";
+  order: { id: string; status: OrderStatus } | null;
+  sponsorship: { id: string; shares: number; status: SponsorshipStatus; batch: { code: string; title: string } } | null;
+  buyer: { id: string; name: string; email: string };
   reason: DisputeReason; description: string; status: DisputeStatus; resolution: string | null;
   attachments: { id: string; mimeType: string | null; sizeBytes: number | null; createdAt: string }[];
   createdAt: string; resolvedAt: string | null;

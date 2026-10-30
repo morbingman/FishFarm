@@ -1,4 +1,4 @@
-import { api, apiBlob, ApiError } from "./api";
+import { api, apiBlob, ApiError, apiSessionStamp, isApiSession } from "./api";
 import type { Dispute, DisputeInput, DisputeStatus, EvidenceUpload } from "./contracts";
 import { disputeReasons, disputeStatuses, evidenceTypes } from "./disputes";
 
@@ -7,9 +7,10 @@ const record = (value: unknown): value is Record<string, unknown> => !!value && 
 const text = (value: unknown): value is string => typeof value === "string" && value.trim().length > 0;
 const date = (value: unknown) => text(value) && Number.isFinite(Date.parse(value));
 const invalid = () => new ApiError(502, "dispute.invalidResponse");
-function dispute(value: unknown, expected: Partial<Pick<Dispute, "id" | "status" | "reason" | "description" | "resolution">> = {}, orderId?: string): Dispute {
-  if (!record(value) || !text(value.id) || !record(value.order) || !text(value.order.id)
-    || !["pending_payment", "paid", "ready", "shipped", "delivered", "completed", "cancelled", "refunded"].includes(value.order.status as string)
+const orderStatuses = ["pending_payment", "paid", "ready", "shipped", "delivered", "completed", "cancelled", "refunded"];
+const sponsorshipStatuses = ["pending_payment", "funded", "growing", "ready_for_delivery", "delivered", "settled", "cancelled", "refunded"];
+function dispute(value: unknown, expected: Partial<Pick<Dispute, "id" | "status" | "reason" | "description" | "resolution">> = {}, reference?: string): Dispute {
+  if (!record(value) || !text(value.id) || !(value.kind === "order" || value.kind === "sponsorship")
     || !record(value.buyer) || !text(value.buyer.id) || typeof value.buyer.name !== "string" || !text(value.buyer.email)
     || !disputeReasons.includes(value.reason as Dispute["reason"]) || !text(value.description)
     || !disputeStatuses.includes(value.status as DisputeStatus) || !(value.resolution === null || text(value.resolution))
@@ -17,9 +18,16 @@ function dispute(value: unknown, expected: Partial<Pick<Dispute, "id" | "status"
     || !Array.isArray(value.attachments) || value.attachments.length > 3
     || value.attachments.some(attachment => !record(attachment) || !text(attachment.id) || !(attachment.mimeType === null || text(attachment.mimeType))
       || !(attachment.sizeBytes === null || (Number.isInteger(attachment.sizeBytes) && Number(attachment.sizeBytes) > 0)) || !date(attachment.createdAt))) throw invalid();
+  // Exactly one of order/sponsorship backs every dispute; the other side is null.
+  if (value.kind === "order") {
+    if (!record(value.order) || !text(value.order.id) || !orderStatuses.includes(value.order.status as string) || value.sponsorship !== null) throw invalid();
+  } else if (value.order !== null || !record(value.sponsorship) || !text(value.sponsorship.id)
+    || !(typeof value.sponsorship.shares === "number" && Number.isInteger(value.sponsorship.shares) && value.sponsorship.shares > 0)
+    || !sponsorshipStatuses.includes(value.sponsorship.status as string)
+    || !record(value.sponsorship.batch) || !text(value.sponsorship.batch.code) || !text(value.sponsorship.batch.title)) throw invalid();
   const result = value as Dispute;
   if (Object.entries(expected).some(([key, expectedValue]) => result[key as keyof typeof expected] !== expectedValue)
-    || (orderId !== undefined && result.order.id !== orderId)
+    || (reference !== undefined && (result.order?.id ?? result.sponsorship?.id) !== reference)
     || new Set(result.attachments.map(attachment => attachment.id)).size !== result.attachments.length
     || (["resolved", "rejected"].includes(result.status) ? !result.resolution || !result.resolvedAt : result.resolution !== null || result.resolvedAt !== null)) throw invalid();
   return result;
@@ -34,6 +42,13 @@ export const disputesApi = {
   create: async (orderId: string, input: DisputeInput) => {
     const description = input.description.trim();
     return dispute(await api<unknown>(`/me/orders/${encodeURIComponent(orderId)}/dispute`, { method: "POST", body: JSON.stringify({ reason: input.reason, description, ...(input.uploadIds?.length ? { uploadIds: input.uploadIds } : {}) }) }), { status: "open", reason: input.reason, description }, orderId);
+  },
+  createSponsorship: async (sponsorshipId: string, input: DisputeInput) => {
+    const description = input.description.trim();
+    const stamp = apiSessionStamp();
+    const value = await api<unknown>(`/sponsorships/${encodeURIComponent(sponsorshipId)}/dispute`, { method: "POST", body: JSON.stringify({ reason: input.reason, description, ...(input.uploadIds?.length ? { uploadIds: input.uploadIds } : {}) }) }, false);
+    if (stamp !== null ? !isApiSession(stamp) : apiSessionStamp() !== null) throw new ApiError(401, "auth.sessionChanged");
+    return dispute(value, { status: "open", reason: input.reason, description }, sponsorshipId);
   },
   review: async (id: string) => dispute(await api<unknown>(`${path(true, id)}/start-review`, { method: "POST" }), { id, status: "reviewing" }),
   finish: async (id: string, action: "resolve" | "reject", resolution: string) => dispute(await api<unknown>(`${path(true, id)}/${action}`, { method: "POST", body: JSON.stringify({ resolution: resolution.trim() }) }), { id, status: action === "resolve" ? "resolved" : "rejected", resolution: resolution.trim() }),

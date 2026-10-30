@@ -4,6 +4,7 @@ import { apiSessionStamp, errorMessage, isApiSession } from "@/services/api";
 import { currentUser, useUser } from "@/services/session";
 import { replaceHashRoute, useHashTransitionGuard } from "@/services/hashNavigation";
 import { batchesApi } from "@/services/batchesApi";
+import { sponsorshipsApi } from "@/services/sponsorshipsApi";
 import { batchRoute, batchShareSummary, batchStageLabel, batchStatusLabel, batchStages, batchStatuses, BatchValidationError, canCancelBatch, canEditBatch, canPostBatchUpdate, costCategories, normalizeBatchCancellationNote, normalizeBatchInput, normalizeBatchUpdateInput } from "@/services/batches";
 import { facilityTextLength } from "@/services/facilities";
 import type { BatchCostInput, BatchFacility, BatchInput, BatchStage, BatchStatus, CompanyBatch } from "@/services/batchContracts";
@@ -20,7 +21,11 @@ type DraftForm = {
   riskDisclosure: string; termsVersion: string; facilityId: string; images: string[]; costs: CostForm[];
 };
 type UpdateForm = { stage: BatchStage; averageWeightG: string; countAlive: string; note: string; photoUrls: string };
-type Confirmation = "save" | "publish" | "update" | "cancel";
+type Confirmation = "save" | "publish" | "submit" | "update" | "cancel" | "grow" | "harvest";
+type SubmissionConfirmation = {
+  id: string; title: string; status: BatchStatus; updatedAt: string;
+  draft: string; observation: string; cancellation: string; read: number; hash: string; revision: number;
+};
 type CancellationConfirmation = {
   id: string; title: string; status: BatchStatus; sponsorshipCount: number; updatedAt: string;
   reason: string; rawReason: string; revision: number; draft: string; observation: string; read: number; hash: string;
@@ -81,8 +86,10 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
   const [form, setForm] = useState<DraftForm>(() => draftForm());
   const [baseline, setBaseline] = useState<DraftForm>(() => draftForm());
   const [update, setUpdate] = useState<UpdateForm>(emptyUpdate);
+  const [harvestForm, setHarvestForm] = useState({ actualCount: "", actualWeightG: "", deliveryFeePerShare: "" });
   const [cancellationNote, setCancellationNote] = useState("");
   const [cancellationConfirmation, setCancellationConfirmation] = useState<CancellationConfirmation | null>(null);
+  const [submissionConfirmation, setSubmissionConfirmation] = useState<SubmissionConfirmation | null>(null);
   const [status, setStatus] = useState<BatchStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
@@ -108,6 +115,8 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
   const opener = useRef<HTMLButtonElement | null>(null);
   const cancellationRevision = useRef(0);
   const cancellationAttempted = useRef(false);
+  const submissionAttempted = useRef(false);
+  const submissionRevision = useRef(0);
   const sameSession = () => isApiSession(stamp) && stamp?.role === "Admin" && user?.role === "Admin" && user.status === "active" && currentUser()?.email === user.email && currentUser()?.role === "Admin" && currentUser()?.status === "active";
   const draftDirty = JSON.stringify(form) !== JSON.stringify(baseline);
   const updateDirty = JSON.stringify(update) !== JSON.stringify(emptyUpdate());
@@ -120,6 +129,16 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
   const visible = !busy && !loading && !needsRefresh && sameSession() ? batch : null;
   const editable = mode === "new" ? !createdId && !createUncertain : mode === "edit" && !!batch && canEditBatch(batch.status);
   const cancellationEligible = mode === "detail" && !!visible && visible.id === batchId && canCancelBatch(visible.status, visible.sponsorshipCount);
+  const growEligible = mode === "detail" && !!visible && visible.id === batchId && (visible.status === "open" || visible.status === "fully_sponsored");
+  const harvestEligible = mode === "detail" && !!visible && visible.id === batchId && visible.status === "growing";
+  const submissionEligible = mode === "detail" && !!visible && visible.id === batchId && visible.status === "draft";
+  const cancellationState = () => JSON.stringify({ note: cancellationNote, revision: cancellationRevision.current, attempted: cancellationAttempted.current, confirmation: cancellationConfirmation });
+  const submissionConfirmationCurrent = !!submissionConfirmation && !!batch && submissionEligible && !blocked && !dirty && !submissionAttempted.current
+    && submissionConfirmation.id === batch.id && submissionConfirmation.title === batch.title && submissionConfirmation.status === batch.status
+    && submissionConfirmation.updatedAt === batch.updatedAt && submissionConfirmation.draft === JSON.stringify(form)
+    && submissionConfirmation.observation === JSON.stringify(update) && submissionConfirmation.cancellation === cancellationState()
+    && submissionConfirmation.read === sequence.current && submissionConfirmation.hash === window.location.hash
+    && submissionConfirmation.revision === submissionRevision.current;
   const cancellationConfirmationCurrent = !!cancellationConfirmation && !!batch && cancellationEligible && !blocked && !draftDirty && !updateDirty
     && cancellationConfirmation.id === batch.id && cancellationConfirmation.title === batch.title
     && cancellationConfirmation.status === batch.status && cancellationConfirmation.sponsorshipCount === batch.sponsorshipCount
@@ -127,7 +146,15 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
     && cancellationConfirmation.revision === cancellationRevision.current && cancellationConfirmation.draft === JSON.stringify(form)
     && cancellationConfirmation.observation === JSON.stringify(update) && cancellationConfirmation.read === sequence.current
     && cancellationConfirmation.hash === window.location.hash;
-  const set = <K extends keyof DraftForm>(key: K, value: DraftForm[K]) => setForm(current => ({ ...current, [key]: value }));
+  const invalidateSubmission = () => { ++submissionRevision.current; setSubmissionConfirmation(null); setConfirm(value => value === "submit" ? null : value); };
+  const set = <K extends keyof DraftForm>(key: K, value: DraftForm[K]) => {
+    if (locked.current || readPending.current || blocked) return;
+    invalidateSubmission(); setForm(current => ({ ...current, [key]: value }));
+  };
+  const changeUpdate = (patch: Partial<UpdateForm>) => {
+    if (locked.current || readPending.current || blocked) return;
+    invalidateSubmission(); setUpdate(current => ({ ...current, ...patch }));
+  };
   const categories: Record<string, string> = { equipment: tr("Equipment", "Thiết bị"), feed: tr("Feed", "Thức ăn"), labour: tr("Labour", "Nhân công"), health: tr("Health", "Sức khỏe"), transport: tr("Transport", "Vận chuyển"), platform_fee: tr("Platform fee", "Phí nền tảng"), contingency: tr("Contingency", "Dự phòng") };
   const labels: Record<string, string> = {
     title: tr("Batch title", "Tiêu đề lô"), species: tr("Species", "Loài"), breed: tr("Breed · optional, can be emptied", "Giống · tùy chọn, có thể để trống"), description: tr("Description · 20–4,000 characters", "Mô tả · 20–4.000 ký tự"),
@@ -138,13 +165,24 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
     averageWeightG: tr("Average weight · grams, optional", "Khối lượng trung bình · gam, tùy chọn"), countAlive: tr("Count alive · optional", "Số cá còn sống · tùy chọn"), note: tr("Note · optional", "Ghi chú · tùy chọn"), photoUrls: tr("Public update photo URLs", "URL ảnh cập nhật công khai"), stage: tr("Recorded stage", "Giai đoạn ghi nhận"),
   };
   const failureMessage = (failure: unknown) => failure instanceof BatchValidationError ? tr("Check field: ", "Kiểm tra trường: ") + (labels[failure.field] ?? (failure.field.startsWith("costs") ? labels.costs : failure.field)) : errorMessage(failure, language);
-  useHashTransitionGuard(() => !sameSession() || (!locked.current && (!dirty || window.confirm(tr("Leave without saving local draft, observation or cancellation reason changes?", "Rời trang mà không lưu thay đổi nháp, quan sát hoặc lý do hủy?")))));
+  useHashTransitionGuard(() => {
+    ++submissionRevision.current; setSubmissionConfirmation(null); if (confirm === "submit") setConfirm(null);
+    return !sameSession() || (!locked.current && (!dirty || window.confirm(tr("Leave without saving local draft, observation or cancellation reason changes?", "Rời trang mà không lưu thay đổi nháp, quan sát hoặc lý do hủy?"))));
+  });
   useEffect(() => { alive.current = true; return () => { alive.current = false; controllerRef.current?.abort(); }; }, []);
   useEffect(() => {
     const warn = (event: BeforeUnloadEvent) => { if (sameSession() && (dirty || locked.current)) { event.preventDefault(); event.returnValue = ""; } };
     window.addEventListener("beforeunload", warn); return () => window.removeEventListener("beforeunload", warn);
   }, [dirty, user, stamp]);
+  useEffect(() => {
+    const invalidate = () => { ++submissionRevision.current; setSubmissionConfirmation(null); setConfirm(value => value === "submit" ? null : value); };
+    window.addEventListener("hashchange", invalidate);
+    return () => window.removeEventListener("hashchange", invalidate);
+  }, []);
   useEffect(() => { if (confirm) confirmRef.current?.focus(); }, [confirm]);
+  useEffect(() => {
+    if (confirm === "submit" && !submissionConfirmationCurrent) { ++submissionRevision.current; setConfirm(null); setSubmissionConfirmation(null); }
+  }, [confirm, submissionConfirmationCurrent]);
   useEffect(() => {
     if (confirm === "cancel" && !cancellationConfirmationCurrent) { setConfirm(null); setCancellationConfirmation(null); }
   }, [confirm, cancellationConfirmationCurrent]);
@@ -156,7 +194,7 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
     const current = () => alive.current && !controller.signal.aborted && read === sequence.current && sameSession();
     const expectedHash = window.location.hash;
     readPending.current = true;
-    setLoading(true); setError(""); setConfirm(null); setCancellationConfirmation(null); setFacilityError(""); setRows([]); setBatch(null);
+    setLoading(true); setError(""); setConfirm(null); setCancellationConfirmation(null); setSubmissionConfirmation(null); ++submissionRevision.current; setFacilityError(""); setRows([]); setBatch(null);
     if (!sameSession()) { readPending.current = false; setLoading(false); return () => controller.abort(); }
     const id = confirmedCreatedId.current ?? batchId;
     const readBatch = mode === "list" ? batchesApi.companyList(status === "all" ? undefined : status, controller.signal).then(values => { if (current()) { setRows(values); setPage(1); setNeedsRefresh(false); } })
@@ -164,6 +202,7 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
         if (!current()) return;
         accept(value);
         cancellationAttempted.current = false;
+        submissionAttempted.current = false;
         if (value.id !== batchId || mode === "new") {
           const replaced = replaceHashRoute(batchRoute(mode === "detail" ? "detail" : "edit", value.id, true), expectedHash);
           if (!replaced) { setRouteMismatch(true); setNotice(tr("Canonical navigation was not accepted. Writes are locked on this route; open the confirmed record link.", "Chưa chấp nhận chuyển đến đường dẫn chuẩn. Thao tác ghi bị khóa trên trang này; mở liên kết bản ghi đã xác nhận.")); }
@@ -181,13 +220,31 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
     if (mode === "new" && !confirmedCreatedId.current && !createdId) {
       const next = draftForm(); setForm(next); setBaseline(next);
     }
-    readPending.current = true; controllerRef.current?.abort(); ++sequence.current; ++cancellationRevision.current;
-    setUpdate(emptyUpdate()); setCancellationNote(""); setCancellationConfirmation(null); setLoading(true); setConfirm(null); setReload(value => value + 1);
+    readPending.current = true; controllerRef.current?.abort(); ++sequence.current; ++cancellationRevision.current; ++submissionRevision.current;
+    setUpdate(emptyUpdate()); setHarvestForm({ actualCount: "", actualWeightG: "", deliveryFeePerShare: "" }); setCancellationNote(""); setCancellationConfirmation(null); setSubmissionConfirmation(null); setLoading(true); setConfirm(null); setReload(value => value + 1);
   }
-  function ask(action: Confirmation, button: HTMLButtonElement) { if (action !== "cancel" && !blocked && !locked.current && !readPending.current) { opener.current = button; setCancellationConfirmation(null); setConfirm(action); } }
+  function ask(action: Confirmation, button: HTMLButtonElement) {
+    if (!sameSession() || action === "cancel" || action === "submit" || blocked || locked.current || readPending.current || refreshRequired.current) return;
+    opener.current = button; setCancellationConfirmation(null); setSubmissionConfirmation(null); ++submissionRevision.current; setConfirm(action);
+  }
+  function askHarvest(button: HTMLButtonElement) {
+    if (!sameSession() || blocked || locked.current || readPending.current || refreshRequired.current || dirty || confirm || !harvestEligible || !batch) return;
+    try {
+      integer(harvestForm.actualCount, "actualCount", 1, 1000000000);
+      if (batch.shareUnitType === "weight") integer(harvestForm.actualWeightG, "actualWeightG", 1, 2000000000);
+      if (harvestForm.deliveryFeePerShare.trim() !== "") integer(harvestForm.deliveryFeePerShare, "deliveryFeePerShare", 0, 1000000000);
+    } catch (failure) { setError(failureMessage(failure)); return; }
+    setError(""); opener.current = button; setCancellationConfirmation(null); setSubmissionConfirmation(null); ++submissionRevision.current; setConfirm("harvest");
+  }
+  function askSubmission(button: HTMLButtonElement) {
+    if (!sameSession() || blocked || locked.current || readPending.current || refreshRequired.current || submissionAttempted.current || !submissionEligible || !batch || dirty || confirm) return;
+    opener.current = button; setError("");
+    setSubmissionConfirmation({ id: batch.id, title: batch.title, status: batch.status, updatedAt: batch.updatedAt, draft: JSON.stringify(form), observation: JSON.stringify(update), cancellation: cancellationState(), read: sequence.current, hash: window.location.hash, revision: submissionRevision.current });
+    setConfirm("submit");
+  }
   function changeCancellationNote(value: string) {
     if (locked.current || readPending.current || blocked) return;
-    ++cancellationRevision.current; setCancellationNote(value); setCancellationConfirmation(null); setConfirm(null);
+    ++cancellationRevision.current; ++submissionRevision.current; setCancellationNote(value); setCancellationConfirmation(null); setSubmissionConfirmation(null); setConfirm(null);
   }
   function askCancellation(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -198,41 +255,64 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
     opener.current = event.currentTarget.querySelector<HTMLButtonElement>('button[type="submit"]');
     setError("");
     setCancellationConfirmation({ id: batch.id, title: batch.title, status: batch.status, sponsorshipCount: batch.sponsorshipCount, updatedAt: batch.updatedAt, reason, rawReason: cancellationNote, revision: cancellationRevision.current, draft: JSON.stringify(form), observation: JSON.stringify(update), read: sequence.current, hash: window.location.hash });
-    setConfirm("cancel");
+    setSubmissionConfirmation(null); ++submissionRevision.current; setConfirm("cancel");
   }
-  function cancelConfirmation() { if (!locked.current) { setConfirm(null); setCancellationConfirmation(null); opener.current?.focus(); } }
+  function cancelConfirmation() { if (!locked.current) { ++submissionRevision.current; setConfirm(null); setCancellationConfirmation(null); setSubmissionConfirmation(null); opener.current?.focus(); } }
   async function act(action: Confirmation) {
     if (!sameSession() || locked.current || readPending.current || refreshRequired.current || blocked) return;
+    const submission = action === "submit" ? submissionConfirmation : null;
+    if (action === "submit" && (confirm !== "submit" || !submissionConfirmationCurrent || !submission || mode !== "detail" || !batch || batch.id !== batchId || batch.status !== "draft" || dirty || submissionAttempted.current || submission.revision !== submissionRevision.current || submission.read !== sequence.current || submission.hash !== window.location.hash || submission.draft !== JSON.stringify(form) || submission.observation !== JSON.stringify(update) || submission.cancellation !== cancellationState())) { setConfirm(null); setSubmissionConfirmation(null); return; }
     const cancellation = action === "cancel" ? cancellationConfirmation : null;
     if (action === "cancel" && (confirm !== "cancel" || !cancellationConfirmationCurrent || !cancellation || cancellationAttempted.current || cancellation.revision !== cancellationRevision.current || cancellation.read !== sequence.current || cancellation.hash !== window.location.hash)) { setConfirm(null); setCancellationConfirmation(null); return; }
     const creating = action === "save" && mode === "new";
     if (action === "save" && (!editable || (creating && confirmedCreatedId.current) || (!creating && (!batch || !draftDirty)))) return;
     if (action === "publish" && (!batch || !canEditBatch(batch.status) || dirty)) return;
     if (action === "update" && (!batch || !canPostBatchUpdate(batch.status) || draftDirty || cancellationDirty)) return;
+    if (action === "grow" && (!batch || (batch.status !== "open" && batch.status !== "fully_sponsored") || dirty)) return;
+    if (action === "harvest" && (!batch || batch.status !== "growing" || dirty)) return;
     let input: Partial<BatchInput> | undefined;
     let updateInput;
+    let harvestInput: { actualCount: number; actualWeightG?: number; deliveryFeePerShare?: number } | undefined;
     try {
       if (action === "cancel" && (!cancellation || normalizeBatchCancellationNote(cancellationNote) !== cancellation.reason)) throw new BatchValidationError("cancelReason");
       if (action === "save") { const full = inputFromForm(form, creating ? undefined : baseline); input = creating ? full : changedInput(full, form, baseline); }
       if (action === "update") updateInput = normalizeBatchUpdateInput({ stage: update.stage, ...(update.averageWeightG ? { averageWeightG: integer(update.averageWeightG, "averageWeightG") } : {}), ...(update.countAlive ? { countAlive: integer(update.countAlive, "countAlive", 0) } : {}), ...(update.note.trim() ? { note: update.note.trim() } : {}), photoUrls: update.photoUrls.split(/\r?\n/).map(value => value.trim()).filter(Boolean) });
+      if (action === "harvest") harvestInput = { actualCount: integer(harvestForm.actualCount, "actualCount", 1, 1000000000), ...(batch!.shareUnitType === "weight" ? { actualWeightG: integer(harvestForm.actualWeightG, "actualWeightG", 1, 2000000000) } : {}), ...(harvestForm.deliveryFeePerShare.trim() !== "" ? { deliveryFeePerShare: integer(harvestForm.deliveryFeePerShare, "deliveryFeePerShare", 0, 1000000000) } : {}) };
     } catch (failure) { setError(action === "cancel" ? cancellationValidationMessage : failureMessage(failure)); setConfirm(null); setCancellationConfirmation(null); return; }
     locked.current = true;
     if (action === "cancel") cancellationAttempted.current = true;
+    if (action === "submit") submissionAttempted.current = true;
     controllerRef.current?.abort(); const writeSequence = ++sequence.current;
     const expectedHash = window.location.hash;
     const current = () => alive.current && sameSession() && writeSequence === sequence.current;
-    setBusy(true); setError(""); setNotice(""); setConfirm(null); setCancellationConfirmation(null);
+    setBusy(true); setError(""); setNotice(""); setConfirm(null); setCancellationConfirmation(null); setSubmissionConfirmation(null); ++submissionRevision.current;
     let acknowledged = false;
     try {
       let id = batch?.id;
       let updateId: string | null = null;
       let cancellationAck: CompanyBatch | null = null;
-      if (action === "cancel") {
+      let submissionAck: CompanyBatch | null = null;
+      if (action === "submit") {
+        submissionAck = await batchesApi.submit(submission!.id);
+        if (submissionAck.id !== submission!.id || submissionAck.status !== "pending_review" || !submissionAck.submittedAt || submissionAck.reviewNote !== null) throw new Error("Unexpected submission acknowledgement");
+        id = submissionAck.id;
+      }
+      else if (action === "cancel") {
         cancellationAck = await batchesApi.cancel(cancellation!.id, cancellation!.reason);
         if (cancellationAck.id !== cancellation!.id || cancellationAck.status !== "cancelled" || cancellationAck.sponsorshipCount !== 0 || !cancellationAck.cancelledAt || cancellationAck.cancelReason !== cancellation!.reason) throw new Error("Unexpected cancellation acknowledgement");
         id = cancellationAck.id;
       }
       else if (action === "update") { const ack = await batchesApi.addUpdate(id!, updateInput!); updateId = ack.id; }
+      else if (action === "grow") {
+        const ack = await sponsorshipsApi.companyGrow(batch!.id);
+        if (ack.batch.id !== batch!.id || ack.batch.code !== batch!.id || ack.batch.status !== "growing") throw new Error("Unexpected growing acknowledgement");
+        id = ack.batch.id;
+      }
+      else if (action === "harvest") {
+        const ack = await sponsorshipsApi.companyHarvest(batch!.id, harvestInput!);
+        if (ack.batch.id !== batch!.id || ack.batch.code !== batch!.id || ack.batch.status !== "harvested" || ack.harvest.batchId !== batch!.id || ack.harvest.status !== "published" || !ack.harvest.publishedAt) throw new Error("Unexpected harvest acknowledgement");
+        id = ack.batch.id;
+      }
       else {
         const ack = action === "publish" ? await batchesApi.publish(id!) : creating ? await batchesApi.create(input as BatchInput) : await batchesApi.save(id!, input!);
         if (!creating && ack.id !== id) throw new Error("Unexpected batch acknowledgement");
@@ -245,12 +325,19 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
       const controller = new AbortController(); controllerRef.current = controller;
       const value = await batchesApi.companyDetail(id!, controller.signal);
       if (value.id !== id || (updateId && !value.updates.some(entry => entry.id === updateId))) throw new Error("Acknowledgement not found in authoritative record");
+      if (action === "grow" && value.status !== "growing") throw new Error("Growing acknowledgement not reconciled with authoritative record");
+      if (action === "harvest" && value.status !== "harvested") throw new Error("Harvest acknowledgement not reconciled with authoritative record");
+      if (submissionAck && (value.status !== "pending_review" || value.submittedAt !== submissionAck.submittedAt || value.reviewNote !== null || batch!.updates.some(entry => !value.updates.some(saved => JSON.stringify(saved) === JSON.stringify(entry))) || submissionAck.updates.some(entry => !value.updates.some(saved => JSON.stringify(saved) === JSON.stringify(entry))))) throw new Error("Submission acknowledgement not reconciled with retained observations");
       if (cancellationAck && (value.status !== "cancelled" || value.sponsorshipCount !== 0 || value.cancelReason !== cancellation!.reason || value.cancelledAt !== cancellationAck.cancelledAt || batch!.updates.some(entry => !value.updates.some(saved => saved.id === entry.id)) || cancellationAck.updates.some(entry => !value.updates.some(saved => saved.id === entry.id)))) throw new Error("Cancellation acknowledgement not reconciled with retained observations");
       if (!current() || controller.signal.aborted) return;
       accept(value);
       if (action === "update") setUpdate(emptyUpdate());
+      if (action === "harvest") setHarvestForm({ actualCount: "", actualWeightG: "", deliveryFeePerShare: "" });
       if (action === "cancel") { ++cancellationRevision.current; setCancellationNote(""); }
       setNotice(action === "cancel" ? tr("Cancellation acknowledged and the authoritative company record read again. The saved reason, UTC time and retained observations are shown below. No financial action, restoration or deletion was performed.", "Đã xác nhận hủy và đọc lại bản ghi công ty chính thức. Lý do đã lưu, thời điểm UTC và quan sát được giữ lại hiển thị bên dưới. Không thực hiện thao tác tài chính, khôi phục hoặc xóa.") : tr("Write acknowledged and authoritative company record read again. The displayed baseline is saved server data.", "Đã xác nhận ghi và đọc lại bản ghi công ty chính thức. Dữ liệu nền hiển thị là dữ liệu đã lưu trên máy chủ."));
+      if (action === "submit") setNotice(tr("Submission acknowledged and the authoritative company record read again: Under review, with the exact submitted UTC time, cleared review note and retained observations. This batch is not public and draft editing is locked. Review is optional; there is no withdrawal. Cancellation is a separate action when eligible. Review queue, approval and rejection controls are not connected yet.", "Đã xác nhận gửi và đọc lại bản ghi công ty chính thức: Đang xét duyệt, với đúng thời điểm gửi UTC, ghi chú xét duyệt đã xóa và quan sát được giữ lại. Lô không công khai và khóa sửa nháp. Xét duyệt là tùy chọn; không có rút yêu cầu. Hủy là thao tác riêng khi đủ điều kiện. Danh sách xét duyệt và thao tác phê duyệt/từ chối chưa được kết nối."));
+      if (action === "grow") setNotice(tr("Growing transition acknowledged and the authoritative company record read again. Funded sponsorships are now Growing and their stocking escrow tranche (30% of each package) is released; unpaid reservations were not released and sponsors were notified. Shortfall settlement and delivery confirmation happen later in the sponsorship records.", "Đã xác nhận chuyển sang nuôi và đọc lại bản ghi công ty chính thức. Các bảo trợ đã thanh toán chuyển sang Đang nuôi và khoản ký quỹ thả giống (30% mỗi gói) được nhả; đặt chỗ chưa thanh toán không được nhả và nhà tài trợ đã được thông báo. Tất toán thiếu hụt và xác nhận giao hàng diễn ra sau trong bản ghi bảo trợ."));
+      if (action === "harvest") setNotice(tr("Harvest publication acknowledged and the authoritative company record read again. Funded sponsorships are now Ready for delivery: the mid-growth escrow tranche was released and any computed shortfall was refunded from the held harvest tranche. When a delivery fee per share was entered, each growing sponsorship was charged it outside the escrow and sponsors must pay before confirming delivery. Buyers confirm delivery themselves in their sponsorship records and can file one dispute from growing onward.", "Đã xác nhận công bố thu hoạch và đọc lại bản ghi công ty chính thức. Các bảo trợ đã thanh toán chuyển sang Sẵn sàng giao: khoản ký quỹ giữa vụ được nhả và khoản thiếu hụt tính toán được hoàn từ khoản ký quỹ thu hoạch đang giữ. Khi có nhập phí giao theo phần, mỗi bảo trợ đang nuôi bị tính phí đó ngoài quỹ và nhà tài trợ phải trả trước khi xác nhận nhận hàng. Người mua tự xác nhận giao hàng trong bản ghi bảo trợ và có thể mở một khiếu nại từ giai đoạn nuôi."));
       if (creating && !replaceHashRoute(batchRoute("edit", value.id, true), expectedHash)) {
         setRouteMismatch(true); setNotice(tr("Creation and server reread were confirmed, but canonical navigation was not accepted. Creation is permanently disabled on this mounted route; open the confirmed record.", "Đã xác nhận tạo và đọc lại máy chủ, nhưng chưa chấp nhận chuyển đường dẫn chuẩn. Không thể tạo thêm trên trang đang mở; hãy mở bản ghi đã xác nhận."));
       }
@@ -260,6 +347,7 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
         if (creating && !confirmedCreatedId.current) setCreateUncertain(true);
         if (action === "update") setAppendUncertain(true);
         setError(failureMessage(failure) + " " + (action === "cancel" ? acknowledged ? tr("Cancellation was acknowledged but the saved record could not be reconciled. Use Refresh to inspect the actual record before any further action. The cancellation will not be replayed.", "Đã xác nhận hủy nhưng chưa đối chiếu được bản ghi đã lưu. Dùng Làm mới để kiểm tra bản ghi thực tế trước thao tác tiếp theo. Không gửi lại yêu cầu hủy.") : tr("Cancellation failed or its outcome is unconfirmed; the server may already have cancelled the batch. Use Refresh to inspect the actual record. No automatic retry or replay is sent; repeated cancellation is a conflict, not an idempotent action.", "Hủy thất bại hoặc chưa xác nhận kết quả; máy chủ có thể đã hủy lô. Dùng Làm mới để kiểm tra bản ghi thực tế. Không tự thử lại hoặc gửi lại; hủy lặp lại là xung đột, không phải thao tác có thể gửi lại an toàn.") : acknowledged ? tr("The write was acknowledged but the saved record could not be reconciled. Refresh before any further action.", "Đã xác nhận ghi nhưng chưa đối chiếu được bản ghi đã lưu. Làm mới trước thao tác tiếp theo.") : tr("Outcome is not confirmed; the server may already have written it. No automatic replay was sent. Inspect the company list or refresh the saved record.", "Chưa xác nhận kết quả; máy chủ có thể đã ghi. Không tự động gửi lại. Kiểm tra danh sách công ty hoặc làm mới bản ghi đã lưu.")));
+        if (action === "submit") setError(failureMessage(failure) + " " + (acknowledged ? tr("Submission was acknowledged but the saved record could not be reconciled. Use Refresh to inspect the actual status, submitted time and retained observations before any further action. Submission will not be replayed.", "Đã xác nhận gửi nhưng chưa đối chiếu được bản ghi đã lưu. Dùng Làm mới để kiểm tra trạng thái thực tế, thời điểm gửi và quan sát được giữ lại trước thao tác tiếp theo. Không gửi lại yêu cầu xét duyệt.") : tr("Submission failed or its outcome is unconfirmed; the server may already have moved this batch under review. Use Refresh to inspect the actual record before any further action. No automatic retry or replay is sent.", "Gửi xét duyệt thất bại hoặc chưa xác nhận kết quả; máy chủ có thể đã chuyển lô sang đang xét duyệt. Dùng Làm mới để kiểm tra bản ghi thực tế trước thao tác tiếp theo. Không tự thử lại hoặc gửi lại.")));
       }
     } finally { locked.current = false; if (current()) setBusy(false); }
   }
@@ -283,7 +371,7 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
   }
   if (!sameSession()) return <main className="public-market company-batches"><h1>{tr("Company batches", "Lô công ty")}</h1><p role="alert">{tr("An active Admin session is required. Private records and controls are hidden.", "Cần phiên quản trị viên đang hoạt động. Dữ liệu riêng tư và thao tác đã được ẩn.")}</p></main>;
   return <main className="public-market company-batches">
-    <div className="public-market-heading"><div><a href="#company/batches">{tr("Shared company batches", "Lô công ty dùng chung")}</a><h1>{mode === "list" ? tr("Company batches", "Lô công ty") : mode === "new" ? tr("Create complete batch draft", "Tạo bản nháp lô đầy đủ") : mode === "edit" ? tr("Edit batch draft", "Sửa bản nháp lô") : tr("Company batch detail", "Chi tiết lô công ty")}</h1><p>{tr("All Admins manage the same company batches. Creator identity is attribution, not ownership. This screen does not manage sponsoring, payments, harvest or the ledger.", "Mọi quản trị viên quản lý chung lô công ty. Người tạo là thông tin ghi nhận, không phải sở hữu. Trang này không quản lý tài trợ, thanh toán, thu hoạch hay sổ cái.")}</p></div></div>
+    <div className="public-market-heading"><div><a href="#company/batches">{tr("Shared company batches", "Lô công ty dùng chung")}</a><h1>{mode === "list" ? tr("Company batches", "Lô công ty") : mode === "new" ? tr("Create complete batch draft", "Tạo bản nháp lô đầy đủ") : mode === "edit" ? tr("Edit batch draft", "Sửa bản nháp lô") : tr("Company batch detail", "Chi tiết lô công ty")}</h1><p>{tr("All Admins manage the same company batches. Creator identity is attribution, not ownership. This screen manages batch lifecycle including growing and harvest publication; sponsoring, payments and delivery confirmation live in the sponsorship records.", "Mọi quản trị viên quản lý chung lô công ty. Người tạo là thông tin ghi nhận, không phải sở hữu. Trang này quản lý vòng đời lô gồm chuyển sang nuôi và công bố thu hoạch; tài trợ, thanh toán và xác nhận giao hàng nằm trong bản ghi bảo trợ.")}</p></div></div>
     {error && <p role="alert" className="batch-notice">{error}</p>}{notice && <p role="status" className="batch-notice">{notice}</p>}{loading && <p role="status">{tr("Reading server records…", "Đang đọc bản ghi máy chủ…")}</p>}{busy && <p role="status">{tr("Sending one write and reconciling its server record…", "Đang gửi một thao tác ghi và đối chiếu bản ghi máy chủ…")}</p>}
     <div className="batch-actions">{mode === "list" && <a href="#company/batches/new">{tr("Create draft", "Tạo bản nháp")}</a>}<button disabled={loading || busy} onClick={refresh}>{tr("Refresh server data", "Làm mới dữ liệu máy chủ")}</button></div>
     {needsRefresh && <p className="batch-notice">{tr("Private data and writes are hidden or blocked until a successful authoritative reread. Refresh discards local changes.", "Dữ liệu riêng tư và thao tác ghi bị ẩn hoặc khóa đến khi đọc lại bản ghi chính thức thành công. Làm mới sẽ bỏ thay đổi cục bộ.")}</p>}
@@ -304,6 +392,15 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
     </form>}
     {facilityError && <p role="alert" className="batch-notice">{tr("The read-only facility directory could not be loaded. Draft writes are disabled; retry server read. No fabricated facility is used.", "Không tải được danh mục cơ sở chỉ đọc. Khóa ghi nháp; thử đọc lại máy chủ. Không dùng cơ sở giả.")} {facilityError}</p>}{editable && !loading && !facilities.length && !facilityError && <p className="batch-notice">{tr("No existing facilities were returned. Draft creation/save requires an existing facility; there is no facility editor in this slice.", "Máy chủ không trả cơ sở hiện có. Tạo/lưu nháp cần cơ sở hiện có; phần này không có trình sửa cơ sở.")}</p>}
     {visible && canEditBatch(visible.status) && <section className="batch-panel"><h2>{tr("Publish saved draft separately", "Xuất bản riêng bản nháp đã lưu")}</h2><p>{tr("Save first, then publish only a clean reread server record. These are hints, not approval: the backend authoritatively checks exact costs, valid shares, at least one image and current controlled facility compliance at publication.", "Lưu trước, rồi chỉ xuất bản bản ghi đã đọc lại không còn sửa cục bộ. Đây là gợi ý, không phải phê duyệt: máy chủ kiểm tra chính xác chi phí, phần hợp lệ, ít nhất một ảnh và tuân thủ cơ sở hiện hành với hồ sơ được kiểm soát khi xuất bản.")}</p><ul><li>{savedBudget?.matches ? tr("Saved costs match package budget.", "Chi phí đã lưu khớp ngân sách gói.") : tr("Saved costs do not match package budget.", "Chi phí đã lưu chưa khớp ngân sách gói.")}</li><li>{visible.images.length ? tr("Saved image references are present.", "Đã có tham chiếu ảnh đã lưu.") : tr("At least one saved image is required.", "Cần ít nhất một ảnh đã lưu.")}</li><li>{complianceReady ? tr("Saved facility summary indicates current approval and controlled documents.", "Tóm tắt cơ sở đã lưu cho thấy phê duyệt còn hiệu lực và hồ sơ được kiểm soát.") : tr("Current approval and controlled documents need attention.", "Cần kiểm tra phê duyệt còn hiệu lực và hồ sơ được kiểm soát.")}</li></ul><button disabled={blocked || dirty || !!confirm} onClick={event => ask("publish", event.currentTarget)}>{tr("Confirm publication of saved draft", "Xác nhận xuất bản nháp đã lưu")}</button>{dirty && <p>{tr("Save or discard local changes before publication.", "Lưu hoặc bỏ thay đổi cục bộ trước khi xuất bản.")}</p>}</section>}
+    {visible && mode === "detail" && (visible.status === "draft" || visible.status === "pending_review") && <section className="batch-panel" aria-labelledby="batch-submission-title">
+      <h2 id="batch-submission-title">{tr("Optional review of a saved draft", "Xét duyệt tùy chọn bản nháp đã lưu")}</h2>
+      <p>{tr("Review is optional and separate from saving or direct publication. Submission moves only a saved Draft to Under review; it does not publish the batch, and draft editing is locked while under review. There is no withdrawal control. Cancellation remains a separate action only when eligible. Review queue, approval and rejection controls are not connected yet.", "Xét duyệt là tùy chọn và tách khỏi lưu hoặc xuất bản trực tiếp. Chỉ gửi Bản nháp đã lưu sang Đang xét duyệt; không xuất bản lô và khóa sửa nháp trong khi xét duyệt. Không có thao tác rút yêu cầu. Hủy vẫn là thao tác riêng chỉ khi đủ điều kiện. Danh sách xét duyệt và thao tác phê duyệt/từ chối chưa được kết nối.")}</p>
+      {visible.status === "draft" ? <>
+        <p>{tr("Use a clean authoritative reread first. The server rechecks exact costs, valid shares, saved images and current approved facility compliance backed by controlled documents. This browser does not decide compliance expiry; submission is not approval.", "Trước tiên dùng bản ghi chính thức đã đọc lại không có thay đổi cục bộ. Máy chủ kiểm tra lại chi phí khớp chính xác, phần hợp lệ, ảnh đã lưu và tuân thủ cơ sở được phê duyệt hiện hành với hồ sơ được kiểm soát. Trình duyệt không quyết định hết hạn tuân thủ; gửi xét duyệt không phải phê duyệt.")}</p>
+        <button disabled={blocked || dirty || !!confirm || submissionAttempted.current} onClick={event => askSubmission(event.currentTarget)}>{tr("Review submission of this saved draft", "Kiểm tra trước khi gửi bản nháp đã lưu này")}</button>
+        {dirty && <p>{tr("Save or discard local draft, observation or cancellation reason changes before submission. Refresh discards local changes and reads the saved record.", "Lưu hoặc bỏ thay đổi nháp, quan sát hoặc lý do hủy cục bộ trước khi gửi. Làm mới bỏ thay đổi cục bộ và đọc bản ghi đã lưu.")}</p>}
+      </> : <p>{tr("This saved batch is already under review, not public, and cannot be submitted again or edited as a draft. Read the company-only review metadata below; prior review attribution can remain from an earlier review.", "Lô đã lưu đang xét duyệt, không công khai, không thể gửi lại hoặc sửa như bản nháp. Xem dữ liệu xét duyệt chỉ dành cho công ty bên dưới; thông tin người xét duyệt trước có thể được giữ từ lần xét duyệt cũ.")}</p>}
+    </section>}
     {visible && mode === "detail" && <section className="batch-panel batch-cancellation" aria-labelledby="batch-cancellation-title">
       <h2 id="batch-cancellation-title">{tr("Cancel an unsponsored saved batch", "Hủy lô đã lưu chưa có bảo trợ")}</h2>
       {visible.status === "cancelled" ? <p>{tr("This saved batch is already cancelled. Cancellation reason and UTC time are shown in its saved details below; recorded observations are retained. It cannot be cancelled again or restored here.", "Lô đã lưu này đã bị hủy. Lý do và thời điểm hủy UTC hiển thị trong chi tiết đã lưu bên dưới; các quan sát đã ghi được giữ lại. Không thể hủy lại hoặc khôi phục tại đây.")}</p> : <>
@@ -325,9 +422,27 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
         </form> : <p>{tr("Cancellation is unavailable for this saved status or sponsorship count. No cancellation request can be sent from this record.", "Không thể hủy với trạng thái hoặc số bản ghi bảo trợ đã lưu này. Không thể gửi yêu cầu hủy từ bản ghi này.")}</p>}
       </>}
     </section>}
-    {visible && <BatchDetails batch={visible} />}
+    {visible && mode === "detail" && growEligible && <section className="batch-panel" aria-labelledby="batch-grow-title">
+      <h2 id="batch-grow-title">{tr("Start growing this batch", "Bắt đầu nuôi lô này")}</h2>
+      <p>{tr("Moving an Open or Fully sponsored batch to Growing releases each funded sponsorship's stocking escrow tranche (30% of its package) to the company and notifies sponsors. Unpaid reservations are not released. The server rechecks every status under a batch lock; there is no undo here. From growing onward sponsors can file one dispute per sponsorship in their own records.", "Chuyển lô Đang mở hoặc Đủ bảo trợ sang Đang nuôi sẽ nhả khoản ký quỹ thả giống (30% mỗi gói) của mỗi bảo trợ đã thanh toán cho công ty và thông báo cho nhà tài trợ. Đặt chỗ chưa thanh toán không được nhả. Máy chủ kiểm tra lại mọi trạng thái dưới khóa lô; không có hoàn tác tại đây. Từ giai đoạn nuôi, nhà tài trợ có thể mở một khiếu nại cho mỗi bảo trợ trong bản ghi của họ.")}</p>
+      <button disabled={blocked || dirty || !!confirm} onClick={event => ask("grow", event.currentTarget)}>{tr("Review growing transition", "Kiểm tra trước khi chuyển sang nuôi")}</button>
+    </section>}
+    {visible && mode === "detail" && harvestEligible && <section className="batch-panel" aria-labelledby="batch-harvest-title">
+      <h2 id="batch-harvest-title">{tr("Publish the harvest", "Công bố thu hoạch")}</h2>
+      <p>{tr("Publishing the harvest moves this Growing batch to Harvested and every funded sponsorship to Ready for delivery. The server releases the mid-growth escrow tranche, computes mortality and per-share yield, and refunds any shortfall from the held harvest tranche (30% of each package); a shortfall refund never exceeds that held tranche. An optional delivery fee per share (§11.4) is charged to every growing sponsorship at harvest, outside the escrow; sponsors pay it themselves before confirming delivery. Buyers confirm delivery themselves in their sponsorship records and can file one dispute from growing onward.", "Công bố thu hoạch chuyển lô Đang nuôi sang Đã thu hoạch và mỗi bảo trợ đã thanh toán sang Sẵn sàng giao. Máy chủ nhả khoản ký quỹ giữa vụ, tính tỷ lệ chết và sản lượng mỗi phần, và hoàn khoản thiếu hụt từ khoản ký quỹ thu hoạch đang giữ (30% mỗi gói); hoàn tiền thiếu hụt không vượt khoản đang giữ. Phí giao hàng theo phần (tùy chọn, §11.4) được tính cho mọi bảo trợ đang nuôi khi thu hoạch, ngoài quỹ; nhà tài trợ tự trả trước khi xác nhận nhận hàng. Người mua tự xác nhận giao hàng trong bản ghi bảo trợ và có thể mở một khiếu nại từ giai đoạn nuôi.")}</p>
+      <fieldset disabled={blocked || dirty || !!confirm}><legend>{tr("Actual harvest result", "Kết quả thu hoạch thực tế")}</legend>
+        <div className="batch-form-grid">
+          <div className="batch-field"><label htmlFor="batch-harvest-count">{tr("Surviving fish count · integer", "Số cá còn sống · số nguyên")}</label><input id="batch-harvest-count" type="number" required min={1} max={1000000000} step={1} value={harvestForm.actualCount} onChange={event => setHarvestForm(value => ({ ...value, actualCount: event.target.value }))} /></div>
+          {visible.shareUnitType === "weight" && <div className="batch-field"><label htmlFor="batch-harvest-weight">{tr("Actual whole-batch biomass · grams, integer", "Sinh khối thực tế toàn lô · gam, số nguyên")}</label><input id="batch-harvest-weight" type="number" required min={1} max={2000000000} step={1} value={harvestForm.actualWeightG} onChange={event => setHarvestForm(value => ({ ...value, actualWeightG: event.target.value }))} /></div>}
+          <div className="batch-field"><label htmlFor="batch-harvest-fee">{tr("Delivery fee per share · optional, integer VND", "Phí giao mỗi phần · tùy chọn, số nguyên VND")}</label><input id="batch-harvest-fee" type="number" min={0} max={1000000000} step={1} value={harvestForm.deliveryFeePerShare} onChange={event => setHarvestForm(value => ({ ...value, deliveryFeePerShare: event.target.value }))} /></div>
+        </div>
+        <p>{tr("Weight-share batches require the whole-batch biomass in grams; count-share batches use the surviving fish count only. Leave the delivery fee empty or 0 to charge nothing; a fee is charged once to every growing sponsorship and is not part of the escrow. This publication is a single write with no automatic retry; a failed or uncertain outcome requires Refresh, never replay.", "Phần khối lượng bắt buộc nhập sinh khối toàn lô theo gam; phần số con chỉ dùng số cá còn sống. Để trống hoặc 0 để không tính phí giao hàng; phí được tính một lần cho mọi bảo trợ đang nuôi và không thuộc quỹ ký quỹ. Đây là một thao tác ghi duy nhất, không tự gửi lại; kết quả thất bại hoặc chưa rõ cần Làm mới, không bao giờ gửi lại.")}</p>
+        <button disabled={blocked || dirty || !!confirm} onClick={event => askHarvest(event.currentTarget)}>{tr("Review harvest publication", "Kiểm tra trước khi công bố thu hoạch")}</button>
+      </fieldset>
+    </section>}
+    {visible && <BatchDetails batch={visible} includeCompanyReview />}
     {appendUncertain && <section className="batch-notice"><h2>{tr("Inspect before another append", "Kiểm tra trước khi ghi thêm")}</h2><p>{tr("The previous append may already exist, and there is no idempotency key. Refresh and inspect the actual feed before deciding; this control never retries the old request. Enter only a genuinely new observation after confirming inspection.", "Lần ghi thêm trước có thể đã tồn tại và không có khóa chống trùng. Làm mới và kiểm tra cập nhật thực tế trước khi quyết định; nút này không gửi lại yêu cầu cũ. Chỉ nhập quan sát thực sự mới sau khi xác nhận đã kiểm tra.")}</p><button disabled={busy || loading || needsRefresh || !visible} onClick={() => { if (locked.current || !visible || needsRefresh) return; setAppendUncertain(false); setUpdate(emptyUpdate()); setNotice(tr("Feed inspection confirmed. The unconfirmed append was not replayed; enter a new observation only.", "Đã xác nhận kiểm tra cập nhật. Không gửi lại lần ghi chưa xác nhận; chỉ nhập quan sát mới.")); }}>{tr("I inspected the refreshed feed; clear local append without replay", "Tôi đã kiểm tra cập nhật mới tải; bỏ nhập cục bộ, không gửi lại")}</button></section>}
-    {visible && canPostBatchUpdate(visible.status) && <form className="batch-panel" onSubmit={event => { event.preventDefault(); if (!blocked && !locked.current && !readPending.current && !refreshRequired.current && !cancellationDirty) setConfirm("update"); }}><fieldset disabled={blocked || draftDirty || cancellationDirty || !!confirm}><legend>{tr("Append a recorded growth observation", "Ghi thêm quan sát tăng trưởng")}</legend><p>{tr("Append-only; no edit or deletion. Posting an observation does not advance the batch status. Empty optional measurements are not recorded, not zero. A real count of zero is allowed.", "Chỉ ghi thêm; không sửa hoặc xóa. Ghi quan sát không chuyển trạng thái lô. Đo lường tùy chọn để trống là chưa ghi nhận, không phải số không. Cho phép số cá thực tế bằng không.")}</p><div className="batch-form-grid"><div className="batch-field"><label htmlFor="batch-update-stage">{labels.stage}</label><select id="batch-update-stage" value={update.stage} onChange={event => setUpdate(value => ({ ...value, stage: event.target.value as BatchStage }))}>{batchStages.map(stage => <option key={stage} value={stage}>{batchStageLabel(stage, language)}</option>)}</select></div>{(["averageWeightG", "countAlive", "note", "photoUrls"] as const).map(key => <div className={`batch-field ${key === "note" || key === "photoUrls" ? "batch-wide" : ""}`} key={key}><label htmlFor={`batch-update-${key}`}>{labels[key]}{key === "photoUrls" && tr(" · one per line, maximum 10", " · mỗi dòng một URL, tối đa 10")}</label>{key === "note" || key === "photoUrls" ? <textarea id={`batch-update-${key}`} rows={3} maxLength={key === "note" ? 2000 : undefined} value={update[key]} onChange={event => setUpdate(value => ({ ...value, [key]: event.target.value }))} /> : <input id={`batch-update-${key}`} type="number" min={key === "countAlive" ? 0 : 1} max={2147483647} step={1} value={update[key]} onChange={event => setUpdate(value => ({ ...value, [key]: event.target.value }))} />}</div>)}</div><div className="batch-actions"><button type="submit">{tr("Confirm append once", "Xác nhận ghi thêm một lần")}</button><button type="button" onClick={() => { if (window.confirm(tr("Discard this local observation?", "Bỏ quan sát nhập cục bộ?"))) setUpdate(emptyUpdate()); }}>{tr("Discard local observation", "Bỏ quan sát cục bộ")}</button></div></fieldset></form>}
+    {visible && canPostBatchUpdate(visible.status) && <form className="batch-panel" onSubmit={event => { event.preventDefault(); if (!blocked && !locked.current && !readPending.current && !refreshRequired.current && !cancellationDirty) setConfirm("update"); }}><fieldset disabled={blocked || draftDirty || cancellationDirty || !!confirm}><legend>{tr("Append a recorded growth observation", "Ghi thêm quan sát tăng trưởng")}</legend><p>{tr("Append-only; no edit or deletion. Posting an observation does not advance the batch status. Empty optional measurements are not recorded, not zero. A real count of zero is allowed.", "Chỉ ghi thêm; không sửa hoặc xóa. Ghi quan sát không chuyển trạng thái lô. Đo lường tùy chọn để trống là chưa ghi nhận, không phải số không. Cho phép số cá thực tế bằng không.")}</p><div className="batch-form-grid"><div className="batch-field"><label htmlFor="batch-update-stage">{labels.stage}</label><select id="batch-update-stage" value={update.stage} onChange={event => changeUpdate({ stage: event.target.value as BatchStage })}>{batchStages.map(stage => <option key={stage} value={stage}>{batchStageLabel(stage, language)}</option>)}</select></div>{(["averageWeightG", "countAlive", "note", "photoUrls"] as const).map(key => <div className={`batch-field ${key === "note" || key === "photoUrls" ? "batch-wide" : ""}`} key={key}><label htmlFor={`batch-update-${key}`}>{labels[key]}{key === "photoUrls" && tr(" · one per line, maximum 10", " · mỗi dòng một URL, tối đa 10")}</label>{key === "note" || key === "photoUrls" ? <textarea id={`batch-update-${key}`} rows={3} maxLength={key === "note" ? 2000 : undefined} value={update[key]} onChange={event => changeUpdate({ [key]: event.target.value })} /> : <input id={`batch-update-${key}`} type="number" min={key === "countAlive" ? 0 : 1} max={2147483647} step={1} value={update[key]} onChange={event => changeUpdate({ [key]: event.target.value })} />}</div>)}</div><div className="batch-actions"><button type="submit">{tr("Confirm append once", "Xác nhận ghi thêm một lần")}</button><button type="button" onClick={() => { if (window.confirm(tr("Discard this local observation?", "Bỏ quan sát nhập cục bộ?"))) setUpdate(emptyUpdate()); }}>{tr("Discard local observation", "Bỏ quan sát cục bộ")}</button></div></fieldset></form>}
     {visible && canPostBatchUpdate(visible.status) && cancellationDirty && <p>{tr("Discard the local cancellation reason with Refresh before entering or posting an observation.", "Bỏ lý do hủy cục bộ bằng Làm mới trước khi nhập hoặc ghi quan sát.")}</p>}
     {visible && !canPostBatchUpdate(visible.status) && <p>{tr("Appending growth observations is unavailable in this batch status.", "Không thể ghi thêm quan sát tăng trưởng ở trạng thái lô này.")}</p>}
     {confirm === "cancel" && cancellationConfirmation && cancellationConfirmationCurrent && <section ref={confirmRef} tabIndex={-1} role="group" aria-labelledby="batch-cancel-confirm-title" className="batch-notice batch-cancellation-confirmation">
@@ -336,6 +451,14 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
       <p>{tr("Send exactly one cancellation for this code, saved status and reason? The server rechecks eligibility. This retains the batch and recorded observations, performs no refund/payment/order change, deletes nothing and provides no restoration. Repeated cancellation conflicts. After acknowledgement, the authoritative company detail must be read again before any actions; a failed or uncertain request requires Refresh, never automatic replay.", "Gửi đúng một yêu cầu hủy cho mã lô, trạng thái đã lưu và lý do này? Máy chủ kiểm tra lại điều kiện. Lô và quan sát đã ghi được giữ lại, không hoàn tiền/thanh toán/thay đổi đơn hàng, không xóa dữ liệu và không có khôi phục. Hủy lặp lại gây xung đột. Sau khi xác nhận, phải đọc lại chi tiết công ty chính thức trước mọi thao tác; yêu cầu thất bại hoặc chưa rõ kết quả cần Làm mới, không tự gửi lại.")}</p>
       <div className="batch-actions"><button className="batch-cancellation-submit" disabled={blocked || !cancellationConfirmationCurrent || cancellationAttempted.current} onClick={() => void act("cancel")}>{tr("Cancel this batch once", "Hủy lô này một lần")}</button><button onClick={cancelConfirmation}>{tr("Keep batch unchanged", "Giữ nguyên lô")}</button></div>
     </section>}
-    {confirm && confirm !== "cancel" && !busy && !loading && !needsRefresh && <section ref={confirmRef} tabIndex={-1} role="group" aria-labelledby="batch-confirm-title" className="batch-notice"><h2 id="batch-confirm-title">{confirm === "publish" ? tr("Confirm public visibility", "Xác nhận hiển thị công khai") : confirm === "update" ? tr("Confirm append-only observation", "Xác nhận quan sát chỉ ghi thêm") : tr("Confirm draft save", "Xác nhận lưu nháp")}</h2><p><strong>{batch?.id ?? tr("New draft · no code assigned yet", "Nháp mới · chưa cấp mã")} · {confirm === "save" ? form.title : batch?.title}</strong></p>{confirm === "publish" && batch && <><p>{batch.totalShares} {tr("shares", "phần")} · {batch.shareQuantity} {batch.shareUnitType === "weight" ? tr("grams/share", "gam/phần") : tr("fish/share", "con/phần")} · {batch.packagePricePerShare.toLocaleString()} ₫ {tr("per share", "mỗi phần")} · {tr("Allocated cost / package total", "Tổng chi phí / tổng gói")}: {savedBudget?.totalCost.toLocaleString()} / {savedBudget?.packageTotal.toLocaleString()} ₫</p><p>{tr("Publish this saved draft as open? It is publicly visible only while shares are available and the facility has current approved compliance backed by controlled documents. Publication is separate from saving and creates no order, payment, refund or harvest promise.", "Xuất bản nháp đã lưu sang trạng thái mở? Lô chỉ công khai khi còn phần và cơ sở có tuân thủ phê duyệt còn hiệu lực với hồ sơ được kiểm soát. Xuất bản tách khỏi lưu và không tạo cam kết đơn hàng, thanh toán, hoàn tiền hay thu hoạch.")}</p></>}{confirm === "save" && <p>{tr("Save this complete draft content only? No publication is performed. Only changed fields are sent for an existing draft; a changed array replaces that entire array.", "Chỉ lưu nội dung nháp đầy đủ này? Không xuất bản. Nháp hiện có chỉ gửi trường đã đổi; mảng đã đổi sẽ thay toàn bộ mảng.")}</p>}{confirm === "update" && <p>{batchStageLabel(update.stage, language)} · {tr("This observation is recorded once with a server UTC timestamp. There is no edit/delete or automatic retry, and it does not advance batch status.", "Quan sát ghi một lần với thời điểm UTC máy chủ. Không sửa/xóa hoặc tự gửi lại và không chuyển trạng thái lô.")}</p>}<div className="batch-actions"><button disabled={blocked} onClick={() => void act(confirm)}>{tr("Confirm once", "Xác nhận một lần")}</button><button onClick={cancelConfirmation}>{tr("Keep unchanged", "Giữ nguyên")}</button></div></section>}
+    {confirm === "submit" && submissionConfirmation && submissionConfirmationCurrent && <section ref={confirmRef} tabIndex={-1} role="group" aria-labelledby="batch-submit-confirm-title" className="batch-notice">
+      <h2 id="batch-submit-confirm-title">{tr("Confirm optional review submission", "Xác nhận gửi xét duyệt tùy chọn")}</h2>
+      <dl className="batch-facts"><div><dt>{tr("Saved name", "Tên đã lưu")}</dt><dd>{submissionConfirmation.title}</dd></div><div><dt>{tr("Batch code", "Mã lô")}</dt><dd>{submissionConfirmation.id}</dd></div><div><dt>{tr("Saved status", "Trạng thái đã lưu")}</dt><dd>{batchStatusLabel(submissionConfirmation.status, language)}</dd></div><div><dt>{tr("Saved record updated · UTC", "Bản ghi đã lưu cập nhật · UTC")}</dt><dd>{batchUtc(submissionConfirmation.updatedAt, tr("Not recorded", "Chưa ghi nhận"))}</dd></div></dl>
+      <p>{tr("Send exactly one submission for this clean saved draft, without saving local content or publishing? It becomes Under review, not public, with draft editing locked. The server clears the review note but may retain a prior reviewer/time, farm verification, inspection data and recorded observations. No withdrawal is available; cancellation is separate when eligible. Review queue, approval and rejection controls are not connected yet. After acknowledgement, the company detail must be reread and reconciled; any failed, lost or malformed outcome requires Refresh, with no replay.", "Gửi đúng một yêu cầu cho bản nháp đã lưu không có thay đổi cục bộ, không lưu nội dung cục bộ hay xuất bản? Lô chuyển sang Đang xét duyệt, không công khai và khóa sửa nháp. Máy chủ xóa ghi chú xét duyệt nhưng có thể giữ người/thời điểm xét duyệt trước, xác minh trang trại, dữ liệu kiểm tra và quan sát đã ghi. Không có rút yêu cầu; hủy tách riêng khi đủ điều kiện. Danh sách xét duyệt và thao tác phê duyệt/từ chối chưa kết nối. Sau khi xác nhận, phải đọc lại và đối chiếu chi tiết công ty; kết quả thất bại, mất hoặc sai cấu trúc cần Làm mới, không gửi lại.")}</p>
+      <div className="batch-actions"><button disabled={blocked || !submissionConfirmationCurrent || submissionAttempted.current} onClick={() => void act("submit")}>{tr("Submit this saved draft once", "Gửi bản nháp đã lưu này một lần")}</button><button onClick={cancelConfirmation}>{tr("Keep draft unchanged", "Giữ nguyên bản nháp")}</button></div>
+    </section>}
+    {confirm && confirm !== "cancel" && confirm !== "submit" && !busy && !loading && !needsRefresh && <section ref={confirmRef} tabIndex={-1} role="group" aria-labelledby="batch-confirm-title" className="batch-notice"><h2 id="batch-confirm-title">{confirm === "publish" ? tr("Confirm public visibility", "Xác nhận hiển thị công khai") : confirm === "update" ? tr("Confirm append-only observation", "Xác nhận quan sát chỉ ghi thêm") : confirm === "grow" ? tr("Confirm start of growing", "Xác nhận chuyển sang nuôi") : confirm === "harvest" ? tr("Confirm harvest publication", "Xác nhận công bố thu hoạch") : tr("Confirm draft save", "Xác nhận lưu nháp")}</h2><p><strong>{batch?.id ?? tr("New draft · no code assigned yet", "Nháp mới · chưa cấp mã")} · {confirm === "save" ? form.title : batch?.title}</strong></p>{confirm === "publish" && batch && <><p>{batch.totalShares} {tr("shares", "phần")} · {batch.shareQuantity} {batch.shareUnitType === "weight" ? tr("grams/share", "gam/phần") : tr("fish/share", "con/phần")} · {batch.packagePricePerShare.toLocaleString()} ₫ {tr("per share", "mỗi phần")} · {tr("Allocated cost / package total", "Tổng chi phí / tổng gói")}: {savedBudget?.totalCost.toLocaleString()} / {savedBudget?.packageTotal.toLocaleString()} ₫</p><p>{tr("Publish this saved draft as open? It is publicly visible only while shares are available and the facility has current approved compliance backed by controlled documents. Publication is separate from saving and creates no order, payment, refund or harvest promise.", "Xuất bản nháp đã lưu sang trạng thái mở? Lô chỉ công khai khi còn phần và cơ sở có tuân thủ phê duyệt còn hiệu lực với hồ sơ được kiểm soát. Xuất bản tách khỏi lưu và không tạo cam kết đơn hàng, thanh toán, hoàn tiền hay thu hoạch.")}</p></>}{confirm === "save" && <p>{tr("Save this complete draft content only? No publication is performed. Only changed fields are sent for an existing draft; a changed array replaces that entire array.", "Chỉ lưu nội dung nháp đầy đủ này? Không xuất bản. Nháp hiện có chỉ gửi trường đã đổi; mảng đã đổi sẽ thay toàn bộ mảng.")}</p>}{confirm === "update" && <p>{batchStageLabel(update.stage, language)} · {tr("This observation is recorded once with a server UTC timestamp. There is no edit/delete or automatic retry, and it does not advance batch status.", "Quan sát ghi một lần với thời điểm UTC máy chủ. Không sửa/xóa hoặc tự gửi lại và không chuyển trạng thái lô.")}</p>}
+      {confirm === "grow" && <p>{tr("Send exactly one growing transition for this batch? Funded sponsorships become Growing and their stocking escrow tranche (30% of each package) is released to the company; unpaid reservations stay untouched. This is a financial action with no undo and no automatic retry; a failed or uncertain outcome requires Refresh.", "Gửi đúng một yêu cầu chuyển sang nuôi cho lô này? Các bảo trợ đã thanh toán chuyển sang Đang nuôi và khoản ký quỹ thả giống (30% mỗi gói) được nhả cho công ty; đặt chỗ chưa thanh toán giữ nguyên. Đây là thao tác tài chính không hoàn tác và không tự gửi lại; kết quả thất bại hoặc chưa rõ cần Làm mới.")}</p>}
+      {confirm === "harvest" && <p>{tr("Surviving fish count", "Số cá còn sống")}: {harvestForm.actualCount}{batch?.shareUnitType === "weight" && <> · {tr("Actual biomass", "Sinh khối thực tế")}: {harvestForm.actualWeightG} g</>}{harvestForm.deliveryFeePerShare.trim() !== "" && harvestForm.deliveryFeePerShare.trim() !== "0" && <> · {tr("Delivery fee per share", "Phí giao mỗi phần")}: {Number(harvestForm.deliveryFeePerShare).toLocaleString(language === "vi" ? "vi-VN" : "en-US")} ₫</>}</p>}{confirm === "harvest" && <p>{tr("Publish this one harvest for the whole batch? The server computes mortality and per-share yield, releases the mid-growth escrow tranche, refunds any shortfall from the held harvest tranche and marks funded sponsorships Ready for delivery. A delivery fee per share, when entered, is charged once to every growing sponsorship outside the escrow. Repeating harvest conflicts. A failed or uncertain outcome requires Refresh, never replay.", "Công bố đúng một lần thu hoạch cho toàn lô? Máy chủ tính tỷ lệ chết và sản lượng mỗi phần, nhả khoản ký quỹ giữa vụ, hoàn khoản thiếu hụt từ khoản ký quỹ đang giữ và chuyển các bảo trợ đã thanh toán sang Sẵn sàng giao. Phí giao theo phần (nếu nhập) được tính một lần cho mọi bảo trợ đang nuôi ngoài quỹ. Công bố lặp lại gây xung đột. Kết quả thất bại hoặc chưa rõ cần Làm mới, không bao giờ gửi lại.")}</p>}<div className="batch-actions"><button disabled={blocked} onClick={() => void act(confirm)}>{tr("Confirm once", "Xác nhận một lần")}</button><button onClick={cancelConfirmation}>{tr("Keep unchanged", "Giữ nguyên")}</button></div></section>}
   </main>;
 }

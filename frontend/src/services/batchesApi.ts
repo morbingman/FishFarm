@@ -163,6 +163,37 @@ export const batchesApi = {
     if (value.status !== "open" || value.sharesAvailable !== value.totalShares || value.shareQuantity === null || !value.images.length || !value.farmVerified || value.submittedAt === null || value.reviewedAt === null || !verification || verification.status !== "approved" || verification.level === "none" || verification.validUntil === null || !verification.documents.length || verification.documents.some(d => !d.controlled)) fail();
     try { if (!batchShareSummary(value as unknown as BatchInput).matches) fail(); } catch { fail(); } return value;
   }),
+  submit: (id: string): Promise<CompanyBatch> => mutation(async () => {
+    const path = `${companyPath(id)}/submit`, stamp = apiSessionStamp();
+    const response = await api<unknown>(path, { method: "POST" }, false);
+    if (stamp !== null ? !isApiSession(stamp) : apiSessionStamp() !== null) throw new ApiError(401, "auth.sessionChanged");
+    const value = validateCompanyBatch(response, id), verification = value.facility?.verification;
+    if (value.status !== "pending_review" || value.submittedAt === null || value.reviewNote !== null || value.sharesAvailable !== value.totalShares || value.shareQuantity === null || !value.images.length || !verification || verification.status !== "approved" || verification.level === "none" || verification.validUntil === null || !verification.documents.length || verification.documents.some(doc => !doc.controlled)) fail();
+    try { if (!batchShareSummary(value as unknown as BatchInput).matches) fail(); } catch { fail(); }
+    return value;
+  }),
+  reviewQueue: async (signal?: AbortSignal) => {
+    const rows = unique(array(await api<unknown>("/admin/batches", { signal })).map(value => validateCompanyBatch(value)));
+    if (rows.some(row => row.status !== "pending_review")) fail();
+    return rows;
+  },
+  approve: (id: string): Promise<CompanyBatch> => mutation(async () => {
+    const path = `/admin/batches/${requestedId(id)}/approve`, stamp = apiSessionStamp();
+    const response = await api<unknown>(path, { method: "POST" }, false);
+    if (stamp !== null ? !isApiSession(stamp) : apiSessionStamp() !== null) throw new ApiError(401, "auth.sessionChanged");
+    const value = validateCompanyBatch(response, id), verification = value.facility?.verification;
+    if (value.status !== "open" || value.submittedAt === null || value.reviewedAt === null || value.reviewedBy === null || value.reviewNote !== null || !value.farmVerified || value.sharesAvailable !== value.totalShares || value.shareQuantity === null || !value.images.length || !verification || verification.status !== "approved" || verification.level === "none" || verification.validUntil === null || !verification.documents.length || verification.documents.some(doc => !doc.controlled) || value.inspectedAt !== verification.inspectedAt || value.inspector !== verification.inspector) fail();
+    try { if (!batchShareSummary(value as unknown as BatchInput).matches) fail(); } catch { fail(); }
+    return value;
+  }),
+  reject: (id: string, note: string): Promise<CompanyBatch> => mutation(async () => {
+    const normalized = normalizeBatchCancellationNote(note), path = `/admin/batches/${requestedId(id)}/reject`, stamp = apiSessionStamp();
+    const response = await api<unknown>(path, { method: "POST", body: JSON.stringify({ note: normalized }) }, false);
+    if (stamp !== null ? !isApiSession(stamp) : apiSessionStamp() !== null) throw new ApiError(401, "auth.sessionChanged");
+    const value = validateCompanyBatch(response, id);
+    if (value.status !== "draft" || value.reviewedAt === null || value.reviewedBy === null || value.reviewNote !== normalized) fail();
+    return value;
+  }),
   cancel: (id: string, note: string): Promise<CompanyBatch> => mutation(async () => {
     const normalized = normalizeBatchCancellationNote(note), path = `/admin/batches/${requestedId(id)}/cancel`, stamp = apiSessionStamp();
     const response = await api<unknown>(path, { method: "POST", body: JSON.stringify({ note: normalized }) }, false);

@@ -49,6 +49,7 @@ export function takedownReason(reason: string) {
 export function safeActivityLink(link: string | null | undefined): string | null {
   if (!link || /[\u0000-\u0020\u007f]/.test(link)) return null;
   if (["#company/listings", "#company/orders", "#admin/queue", "#admin/activity", "#admin/disputes", "#admin/users"].includes(link)) return link;
+  if (/^#admin\/batches\/BATCH-[1-9]\d*$/.test(link)) return link;
   if (link === "#company/batches" || /^#company\/batches\/(?:BATCH-\d+|c[a-z0-9]{24})$/.test(link)) return link;
   if (link === "#company/facilities" || link === "#admin/facilities" || /^#(?:company\/facilities\/c[a-z0-9]{24}|admin\/facilities\/c[a-z0-9]{24}(?:\/review)?)$/.test(link)) return link;
   const match = /^#(?:company\/(?:listing|orders)|admin\/(?:review|disputes|orders))\/([^/?#]+)$/.exec(link);

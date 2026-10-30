@@ -24,7 +24,7 @@ export function BatchUpdateFeed({ updates }: { updates: RecordedBatchUpdate[] })
   </section>;
 }
 
-export default function BatchDetails({ batch, includeFeed = true }: { batch: Batch; includeFeed?: boolean }) {
+export default function BatchDetails({ batch, includeFeed = true, includeCompanyReview = false }: { batch: Batch; includeFeed?: boolean; includeCompanyReview?: boolean }) {
   const { language } = useTranslation();
   const tr = (en: string, vi: string) => language === "vi" ? vi : en;
   const missing = tr("Not recorded", "Chưa ghi nhận");
@@ -57,6 +57,11 @@ export default function BatchDetails({ batch, includeFeed = true }: { batch: Bat
       <div className="batch-media">{batch.images.map((image, index) => <img loading="lazy" key={image.id} src={image.url} alt={`${batch.title} · ${tr("image", "ảnh")} ${index + 1}`} />)}</div>
       <h3>{tr("Risk disclosure", "Công bố rủi ro")}</h3><p className="batch-copy">{batch.riskDisclosure}</p>
     </article>
+    {includeCompanyReview && !("compliance" in batch) && "submittedAt" in batch && <section className="batch-panel" aria-labelledby="batch-company-review-title">
+      <h2 id="batch-company-review-title">{tr("Company-only saved review record", "Bản ghi xét duyệt đã lưu chỉ dành cho công ty")}</h2>
+      <dl className="batch-facts"><div><dt>{tr("Submitted for review · UTC", "Gửi xét duyệt · UTC")}</dt><dd>{batch.submittedAt ? <time dateTime={batch.submittedAt}>{batchUtc(batch.submittedAt, missing)}</time> : missing}</dd></div><div><dt>{tr("Review recorded · UTC", "Ghi nhận xét duyệt · UTC")}</dt><dd>{batch.reviewedAt ? <time dateTime={batch.reviewedAt}>{batchUtc(batch.reviewedAt, missing)}</time> : missing}</dd></div><div><dt>{tr("Recorded reviewer", "Người xét duyệt đã ghi nhận")}</dt><dd>{batch.reviewedBy ?? missing}</dd></div><div><dt>{tr("Saved review note", "Ghi chú xét duyệt đã lưu")}</dt><dd className="batch-copy">{batch.reviewNote ?? missing}</dd></div></dl>
+      <p>{tr("On resubmission, the server clears the review note but can retain the prior reviewer and review time, farm verification and inspection data. A retained reviewer or time is not approval of the current submission. Review queue, approval and rejection controls are not connected here yet.", "Khi gửi lại, máy chủ xóa ghi chú xét duyệt nhưng có thể giữ người và thời điểm xét duyệt trước, xác minh trang trại và dữ liệu kiểm tra. Người hoặc thời điểm được giữ lại không có nghĩa lần gửi hiện tại đã được phê duyệt. Danh sách xét duyệt và thao tác phê duyệt/từ chối chưa được kết nối tại đây.")}</p>
+    </section>}
     {"cancelReason" in batch && (batch.status === "cancelled" || batch.cancelReason !== null || batch.cancelledAt !== null) && <section className="batch-panel" aria-labelledby="batch-saved-cancellation-title">
       <h2 id="batch-saved-cancellation-title">{tr("Saved cancellation record", "Bản ghi hủy đã lưu")}</h2>
       <dl className="batch-facts"><div><dt>{tr("Cancellation recorded · UTC", "Thời điểm ghi nhận hủy · UTC")}</dt><dd>{batch.cancelledAt ? <time dateTime={batch.cancelledAt}>{batchUtc(batch.cancelledAt, missing)}</time> : missing}</dd></div><div><dt>{tr("Saved cancellation reason", "Lý do hủy đã lưu")}</dt><dd className="batch-copy">{batch.cancelReason ?? missing}</dd></div></dl>

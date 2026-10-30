@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { disputeLabel, disputeLink, isDisputeRoute, reasonsForOrder, validateEvidence } from "./disputes";
+import { disputeLabel, disputeLink, disputeSubject, isDisputeRoute, reasonsForOrder, sponsorshipDisputeEligible, validateEvidence } from "./disputes";
 
 describe("dispute presentation rules", () => {
   it("allows only not-received while shipped and all reasons after delivery", () => {
@@ -25,5 +25,14 @@ describe("dispute presentation rules", () => {
   it("labels canonical reasons and statuses in both languages", () => {
     expect(disputeLabel("not_received", "en")).toBe("Order not received");
     expect(disputeLabel("reviewing", "vi")).toBe("Đang xét duyệt");
+  });
+  it("gates sponsorship disputes on growing and later records only", () => {
+    for (const status of ["growing", "ready_for_delivery", "delivered", "settled"] as const) expect(sponsorshipDisputeEligible(status)).toBe(true);
+    for (const status of ["pending_payment", "funded", "cancelled", "refunded"] as const) expect(sponsorshipDisputeEligible(status)).toBe(false);
+  });
+  it("summarizes the disputed subject from either dispute kind", () => {
+    expect(disputeSubject({ kind: "order", order: { id: "ORD/1", status: "delivered" }, sponsorship: null })).toEqual({ code: "ORD/1", title: "", kind: "order" });
+    expect(disputeSubject({ kind: "sponsorship", order: null, sponsorship: { id: "s1", shares: 4, status: "growing", batch: { code: "BATCH-1024", title: "Autumn catfish" } } })).toEqual({ code: "BATCH-1024", title: "Autumn catfish", kind: "sponsorship" });
+    expect(disputeSubject({ kind: "order", order: null, sponsorship: null })).toBeNull();
   });
 });

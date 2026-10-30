@@ -15,6 +15,8 @@ import { parseListingReviewRoute } from "@/services/listingReview";
 import { isAdminUsersRoute } from "@/services/adminUsers";
 import { isNotificationsRoute } from "@/services/notifications";
 import { parseBatchRoute } from "@/services/batches";
+import { parseBatchReviewRoute } from "@/services/batchReview";
+import { parseSponsorshipRoute } from "@/services/sponsorships";
 import { parseFacilityRoute } from "@/services/facilities";
 export const Auth = lazy(() => import("@/pages/auth/Auth"));
 const PublicMarketplace = lazy(() => import("@/pages/marketplace/PublicMarketplace"));
@@ -29,6 +31,8 @@ const NotificationInbox = lazy(() => import("@/pages/account/NotificationInbox")
 const AccountDetails = lazy(() => import("@/pages/account/AccountDetails"));
 const PublicBatches = lazy(() => import("@/pages/farming/PublicBatches"));
 const CompanyBatches = lazy(() => import("@/pages/company/CompanyBatches"));
+const BatchReview = lazy(() => import("@/pages/company/BatchReview"));
+const Sponsorships = lazy(() => import("@/pages/marketplace/Sponsorships"));
 const CompanyFacilities = lazy(() => import("@/pages/company/CompanyFacilities"));
 export const topOf = (hash: string) => hash.replace(/^#/, "").split(/[/?]/)[0];
 export const TOP = new Set(["", "home", "login", "marketplace", "company", "admin", "account", "farming", "expired"]);
@@ -59,6 +63,8 @@ export default function App() {
   const batchRoute = parseBatchRoute(hash);
   const companyBatches = batchRoute?.company ? batchRoute : null;
   const publicBatches = batchRoute && !batchRoute.company && (batchRoute.mode === "list" || batchRoute.mode === "detail") ? batchRoute : null;
+  const batchReview = parseBatchReviewRoute(hash);
+  const sponsorships = parseSponsorshipRoute(hash);
   const facilityRoute = parseFacilityRoute(hash);
   const listingReview = parseListingReviewRoute(route);
   const activity = route === "admin/activity";
@@ -68,11 +74,11 @@ export default function App() {
   const disputes = isDisputeRoute(route);
   const buyerDisputes = disputes && top === "marketplace";
   const commerce = ["marketplace/cart", "marketplace/checkout", "marketplace/confirmation"].includes(route);
-  const privateCommerce = commerce || orders || buyerDisputes;
+  const privateCommerce = commerce || orders || buyerDisputes || !!sponsorships;
   const gated = (["admin", "account", "company"].includes(top) || privateCommerce) && !user;
   useEffect(() => {
-    if ((privateCommerce || companyOrders || companyCatalog || companyBatches || facilityRoute || listingReview || activity || adminUsers || notifications || account || disputes) && !user) sessionStorage.setItem("fishmarket-return", route + (hash.includes("?") ? `?${hash.split("?")[1]}` : ""));
-  }, [privateCommerce, companyOrders, companyCatalog, companyBatches, facilityRoute, listingReview, activity, adminUsers, notifications, account, disputes, user, hash, route]);
+    if ((privateCommerce || companyOrders || companyCatalog || companyBatches || batchReview || sponsorships || facilityRoute || listingReview || activity || adminUsers || notifications || account || disputes) && !user) sessionStorage.setItem("fishmarket-return", route + (hash.includes("?") ? `?${hash.split("?")[1]}` : ""));
+  }, [privateCommerce, companyOrders, companyCatalog, companyBatches, batchReview, sponsorships, facilityRoute, listingReview, activity, adminUsers, notifications, account, disputes, user, hash, route]);
   let page;
   if (top === "" || top === "home") page = <AppContent />;
   else if (catalog) page = <PublicMarketplace />;
@@ -88,6 +94,8 @@ export default function App() {
   else if (listingReview) page = <ListingReview key={`${user?.email}:${route}`} {...listingReview} />;
   else if (activity) page = <AdminActivity key={user?.email} />;
   else if (adminUsers) page = <AdminUsers key={`${user?.email}:${user?.role}`} />;
+  else if (batchReview) page = <BatchReview key={`${apiSessionStamp()?.generation}:${user?.email}:${route}`} batchId={batchReview.batchId} />;
+  else if (sponsorships) page = <Sponsorships key={`${user?.email}:${route}`} sponsorshipId={sponsorships.sponsorshipId} />;
   else if (facilityRoute) page = <CompanyFacilities key={`${apiSessionStamp()?.generation}:${user?.email}:${route}`} mode={facilityRoute.mode} facilityId={facilityRoute.id} />;
   else if (companyBatches) page = <CompanyBatches key={`${apiSessionStamp()?.generation}:${user?.email}:${route}`} mode={companyBatches.mode} batchId={companyBatches.id} />;
   else if (companyCatalog) page = <CompanyCatalog key={`${apiSessionStamp()?.generation}:${user?.email}:${route}`} {...companyCatalog} />;

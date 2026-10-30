@@ -11,7 +11,10 @@ describe("batch routes and lifecycle helpers", () => {
     }
     expect(parseBatchRoute("company/batches/BATCH%2D1024/edit")?.id).toBe("BATCH-1024");
   });
-  it.each(["", "#", "farming/", "farming//", "farming/%", "farming/%20", "farming/%00", "farming/BATCH-1/edit", "farming/BATCH-1/booking", "farming/BATCH-1?shares=2", "farming/BATCH-1#x", "company/batches/new/", "company/batches/new/edit", "company/batches/edit", "company/batches/BATCH-1/edit/extra", "company/batches/BATCH%2F1", "company/batches/%252F", "batches", "admin/batches/BATCH-1", "sponsor/BATCH-1", "company/batch/BATCH-1", "##farming"])('rejects malformed/legacy/booking route %s', route => expect(parseBatchRoute(route)).toBeNull());
+  it.each(["", "#", "farming/", "farming//", "farming/%", "farming/%20", "farming/%00", "farming/BATCH-1/edit", "farming/BATCH-1/booking", "farming/BATCH-1?shares=2", "farming/BATCH-1#x", "company/batches/new/", "company/batches/new/edit", "company/batches/edit", "company/batches/BATCH-1/edit/extra", "company/batches/BATCH%2F1", "company/batches/%252F", "batches", "admin/batches", "admin/batches/BATCH-0", "admin/batches/BATCH-01", "admin/batches/BATCH-1/edit", "admin/batches/BATCH-1?tab=pending", "admin/batches/%42ATCH-1", "admin/batches/internal1", "admin/batches/BATCH-1\n", "admin/batches/BATCH-1\r", "sponsor/BATCH-1", "company/batch/BATCH-1", "##farming"])('rejects malformed/legacy/booking route %s', route => expect(parseBatchRoute(route)).toBeNull());
+  it("maps recorded canonical Admin batch links to saved company detail only", () => {
+    for (const route of ["admin/batches/BATCH-1", "#admin/batches/BATCH-1024"]) expect(parseBatchRoute(route)).toEqual({ company: true, mode: "detail", id: route.split("/")[2] });
+  });
   it("excludes public booking destinations without restricting adapter identifiers", () => {
     for (const route of ["#farming/booking", "#farming/%62ooking", "#farming/booking?shares=1", "#farming/%62ooking?shares=1"]) expect(parseBatchRoute(route)).toBeNull();
     expect(() => batchRoute("detail", "booking")).toThrow();

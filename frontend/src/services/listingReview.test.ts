@@ -38,9 +38,9 @@ describe("bounded internal listing review helpers", () => {
     for (const link of ["#company/listings", "#company/orders", "#admin/queue", "#admin/activity", "#admin/disputes", "#admin/users", "#company/listing/FM-1", "#admin/review/FM-1", "#company/orders/ORD%2F1", "#admin/orders/ORD-1", "#admin/disputes/d%2F1"]) expect(safeActivityLink(link)).toBe(link);
     for (const link of [null, undefined, "", "javascript:alert(1)", "https://example.test", "//example.test", "#marketplace/orders/ORD-1", "#admin/batches/B-1", "#company/facilities/f1", "#admin/users/", "#admin/users/u1", "#admin/users?next=https://example.test", "#admin/users%00", "#admin/review/", "#admin/review/a/extra", "#admin/review/%", "#admin/review/%0A", "#admin/review/%20", "#admin/review/a?next=https://example.test", " #company/orders", "#company/orders\n"]) expect(safeActivityLink(link)).toBeNull();
   });
-  it("allows canonical company batch destinations but not unmounted batch decisions", () => {
-    for (const link of ["#company/batches", "#company/batches/BATCH-1", `#company/batches/c${"a".repeat(24)}`]) expect(safeActivityLink(link)).toBe(link);
-    for (const link of ["#admin/batches", "#admin/batches/BATCH-1", "#company/batches/new", "#company/batches/BATCH-1/edit", "#company/batches/BATCH-1?x=1", "#company/batches/%42ATCH-1", "#company/batches/unknown", "#company/batches/"]) expect(safeActivityLink(link)).toBeNull();
+  it("allows company detail and recorded Admin batch detail aliases but no queue or decisions", () => {
+    for (const link of ["#company/batches", "#company/batches/BATCH-1", `#company/batches/c${"a".repeat(24)}`, "#admin/batches/BATCH-1"]) expect(safeActivityLink(link)).toBe(link);
+    for (const link of ["#admin/batches", "#admin/batches/BATCH-0", "#admin/batches/BATCH-01", "#admin/batches/BATCH-1/reject", "#admin/batches/BATCH-1?x=1", "#admin/batches/%42ATCH-1", "#company/batches/new", "#company/batches/BATCH-1/edit", "#company/batches/BATCH-1?x=1", "#company/batches/%42ATCH-1", "#company/batches/unknown", "#company/batches/"]) expect(safeActivityLink(link)).toBeNull();
   });
   it("allows canonical facility workspaces but never private content or submission links", () => {
     const id = `c${"a".repeat(24)}`;

@@ -14,6 +14,7 @@ import { MarketplaceModule } from './marketplace/marketplace.module.js';
 import { NotificationsModule } from './notifications/notifications.module.js';
 import { OrdersModule } from './orders/orders.module.js';
 import { PrismaModule } from './prisma/prisma.module.js';
+import { SponsorshipsModule } from './sponsorships/sponsorships.module.js';
 import { UploadsModule } from './uploads/uploads.module.js';
 import { UsersModule } from './users/users.module.js';
 
@@ -31,6 +32,7 @@ import { UsersModule } from './users/users.module.js';
     DisputesModule,
     FacilitiesModule,
     BatchesModule,
+    SponsorshipsModule,
     UploadsModule,
     HealthModule,
   ],
