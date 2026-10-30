@@ -1,0 +1,18 @@
+.public-batches { line-height: 1.5; }
+.public-batches button, .company-batches button { cursor: pointer; padding: 10px 16px; border: 1px solid #b9d7e7; border-radius: 9px; background: #f6fbfe; color: #003152; font: inherit; }
+.public-batches button:disabled, .company-batches button:disabled { opacity: .5; cursor: not-allowed; }
+.public-batches :focus-visible, .company-batches :focus-visible { outline: 3px solid #008bc5; outline-offset: 3px; }
+.batch-notice { padding: 18px; border: 1px solid #b9d7e7; border-radius: 12px; background: #f6fbfe; margin: 18px 0; line-height: 1.7; overflow-wrap: anywhere; }
+.batch-filter-form { margin: 24px 0; }
+.batch-filter-form fieldset, .company-batches fieldset { border: 1px solid #d4e9f3; border-radius: 14px; padding: 20px; min-width: 0; }
+.batch-filter-form legend, .company-batches legend { padding: 0 6px; font-weight: 700; }
+.batch-form-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 20px; }
+.batch-form-grid > div { min-width: 0; }
+.batch-form-grid label, .company-batches .batch-field label { display: block; font-weight: 700; margin-bottom: 8px; }
+.batch-form-grid input, .batch-form-grid select, .company-batches .batch-field input, .company-batches .batch-field select, .company-batches .batch-field textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #b9d7e7; border-radius: 8px; background: #fff; color: #003152; font: inherit; box-sizing: border-box; }
+.batch-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 18px 0; }
+.batch-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.batch-card { border: 1px solid #d4e9f3; border-radius: 16px; padding: 20px; overflow-wrap: anywhere; }
+.batch-card > img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }
+.batch-card h2 { font-size: 23px; margin: 12px 0; }
+@media (max-width: 650px) { .batch-form-grid { grid-template-columns: minmax(0, 1fr); } .batch-filter-form fieldset { padding: 16px; } }

@@ -113,10 +113,12 @@ export function notificationsSearchParams(input: NotificationsQuery = {}) {
 
 export function safeNotificationLink(link: string | null | undefined, role: "User" | "Buyer" | "Admin"): string | null {
   if (!link || /[\u0000-\u0020\u007f]/.test(link)) return null;
-  if (link === "#marketplace") return link;
+  if (link === "#marketplace" || link === "#farming" || /^#farming\/(?:BATCH-\d+|c[a-z0-9]{24})$/.test(link)) return link;
   // Public detail has one exact supported query, never arbitrary hash/query URLs.
   if (/^#marketplace\/detail\?fish=(?:FM-\d+|c[a-z0-9]{24})$/.test(link)) return link;
   if (role === "Admin") {
+    if (link === "#company/batches" || /^#company\/batches\/(?:BATCH-\d+|c[a-z0-9]{24})$/.test(link)) return link;
+    if (link === "#company/facilities" || link === "#admin/facilities" || /^#(?:company\/facilities\/c[a-z0-9]{24}|admin\/facilities\/c[a-z0-9]{24}(?:\/review)?)$/.test(link)) return link;
     if (["#company/listings", "#company/orders", "#admin/queue", "#admin/activity", "#admin/disputes", "#admin/users"].includes(link)) return link;
     return /^#(?:company\/listing\/(?:FM-\d+|c[a-z0-9]{24})|(?:company|admin)\/orders\/ORD-\d+|admin\/review\/(?:FM-\d+|c[a-z0-9]{24})|admin\/disputes\/c[a-z0-9]{24})$/.test(link) ? link : null;
   }

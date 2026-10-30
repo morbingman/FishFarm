@@ -16,7 +16,7 @@ Open http://localhost:5173. Vite proxies `/v1` and `/uploads` to `http://127.0.0
 ## Verification
 
 ```bash
-npm run test       # Session, account, commerce, disputes, catalog, review/activity, users, inbox and navigation tests
+npm run test       # Session, account, commerce, disputes, catalog, batches, facilities, review/activity, users, inbox and navigation tests
 npm run check      # TypeScript and production build
 npm audit
 ```
@@ -29,7 +29,7 @@ Vitest is pinned to 4.1.12. `--legacy-peer-deps` is used because npm 11.4.0's or
 
 The active app connects Home, the public marketplace/listing details, and login/registration/email verification/password reset to the retained backend. Access tokens and identity stay in memory; page reload bootstraps from the backend's httpOnly refresh cookie. Public signup creates a `User` only. The temporary adapter maps `User` to the legacy customer UI type `Buyer`, never to `Admin`.
 
-The company order queue is integrated through the active order screen's Admin mode. Shared company catalog, optional review/activity, the bounded Admin account directory and own profile/preferences are standalone integrations. The broad legacy Admin, Account and farming workspaces and legacy BuyerContext/payment screens remain unmounted. Their source remains for later integration; its presence does not imply a working feature. Unsupported legacy API methods reject with `integration.unavailable`, and unfinished routes show unavailable/access-denied states rather than demo records or fake transaction success. Google sign-in is not enabled.
+The company order queue is integrated through the active order screen's Admin mode. Shared company catalog, batch browsing/management, facility/compliance management, optional review/activity, the bounded Admin account directory and own profile/preferences are standalone integrations. The broad legacy Admin, Account and farming workspaces and legacy BuyerContext/payment screens remain unmounted. Their source remains for later integration; its presence does not imply a working feature. Unsupported legacy API methods reject with `integration.unavailable`, and unfinished routes show unavailable/access-denied states rather than demo records or fake transaction success. Google sign-in is not enabled.
 
 ### Cart and checkout
 
@@ -76,6 +76,125 @@ Public multipart uploads use `purpose=listing_image`, JPEG/PNG/WebP/GIF, up to e
 Saved detail/edit screens offer Pause only for approved records, Resume only for paused records, and Remove from catalog only for draft/changes/rejected records. Each confirmation identifies the saved code, name and status; unsaved edits must be saved or discarded first. Pause hides public browsing. Resume restores saved content without publication completeness validation or clearing review metadata; it is not a second Publish action. Removal is a soft-delete, not file/history deletion, and has no restore control. None of these actions cancels/refunds orders or payments. Pending/live/paused records cannot be removed, and no withdrawal/takedown/removal chain is automated.
 
 Bodyless pause/resume POSTs and DELETE disable automatic 401 replay as well as uncertain transport replay. Pause/resume validate the returned code and expected status, then hide old detail and authoritatively refetch before another action. DELETE requires exact `{id,deleted:true}` rather than a listing projection, then replaces the route with the shared catalog. If history restoration refuses that redirect, the confirmed-deleted record stays permanently non-writable with an explicit catalog link; a missing edit record never becomes a create form. Failed or uncertain writes disable actions until Refresh succeeds; a detail 404 is not a deletion acknowledgement. Session-generation, abort and read-sequence guards reject old display, including fresh same-account logins. Page locks serialize its writes; the new adapter lock covers the three lifecycle actions only. The backend still has no atomic status/version check for concurrent Admin lifecycle writes.
+
+### Batch browsing, company drafts and recorded observations
+
+Public `#farming` and `#farming/:id` mount standalone `PublicBatches.tsx`, independently of
+legacy sponsorship loaders. List filters are `q`, species, region, harvest-before and maximum
+integer VND package price, with server `page`/`limit` pagination. An empty result has zero
+available pages; no demo batch replaces it. Detail and its independent update-feed request
+use credential-free public reads. The backend returns public data only for open batches
+with available shares and current approved controlled facility compliance. A hidden or expired
+batch returns not-found, including its feed. This is not permanent owner sponsorship tracking.
+
+Admin-only `#company/batches`, `/new`, `/:id` and `/:id/edit` mount standalone
+`CompanyBatches.tsx`. All Admins share records; creator identity is attribution. Status filtering
+is server-side; search and ten-row paging are local to the loaded company array. Creation requires
+a full draft, not a name-only listing. Only drafts are editable. Saves send changed fields only;
+changed image/cost arrays replace the full collection. The read-only real facility directory
+supplies choices, with no fictional IDs or facility-writing fallback. Nullable dates/measurements
+are displayed as not recorded, not invented zero. Existing optional date/biomass clearing is
+unsupported and must not be represented as a successful clear, except that switching to count
+shares explicitly clears biomass in backend persistence.
+
+Count shares use stocked fish divided by fish per share; weight shares use expected whole-batch
+harvest biomass in grams divided by grams per share, rounded down. Allocated whole-batch cost
+is the sum of batch-total lines plus per-share lines multiplied by total shares, and must exactly
+match package price multiplied by total shares before publication. Contingency percentage is
+metadata, not an automatic extra charge. Saving and direct publication are separate confirmed
+writes. Publication is authoritative on the backend and additionally requires an image and
+current approved facility compliance backed by controlled documents; frontend hints are not approval.
+
+Recorded growth observations are append-only with a stage, optional integer average grams,
+optional alive count (including real zero), note and public photos. Timestamps are server UTC
+recording times, not measurement dates. Appending does not advance batch status and offers no
+edit/delete, fabricated growth chart or harvest promise. Company detail is authoritatively
+refetched after every accepted write before further actions. Session-generation, abort, sequence,
+dirty-navigation/reload and synchronous duplicate guards protect private pages. Mutations disable
+automatic 401 and uncertain transport replay. Unknown creation remains blocked in that mounted
+screen; inspect the shared list before creating again, including after leaving/reload. An uncertain
+append requires refreshed-feed inspection and explicit clearing of local input, not request replay.
+Confirmed creation stays non-creatable even if canonical route replacement is refused.
+
+Frontend draft numeric controls use the PostgreSQL Int storage ceiling (2,147,483,647),
+not a promise that wider safe JavaScript integers can be persisted. Dates are entered/sent as UTC.
+
+Media uses existing registered purpose-matched `/uploads/...` or external HTTP(S) URLs.
+Listing images are not interchangeable with `batch_image` or `batch_update`. The backend does
+not fetch/verify external images. No multipart batch upload is mounted. Facility/compliance
+writing is a separate connected slice below. Sponsorship booking/payment/owner history,
+ledger/releases, harvest/delivery/settlement, generic batch status changes and optional
+submit/review/delete remain outside this slice; unsponsored cancellation is connected below.
+Chat remains dropped. Backend
+source/schema/migrations/dependencies and lockfiles are unchanged; batch work is not
+automatically committed or deployed.
+
+### Unsponsored-batch cancellation
+
+Saved Admin company detail `#company/batches/:id` offers cancellation only for draft,
+pending-review or open batches with zero sponsorship records. A nonblank reason of 1–1,000
+backend-counted characters is required, with explicit confirmation of the saved code/name/status
+and reason. No cancellation control is mounted on create/edit/list or public pages. The reason
+participates in dirty-navigation/reload protection and can be discarded by confirmed Refresh.
+
+Cancellation sends one `POST /v1/admin/batches/:id/cancel` with only `{note}`. The backend
+rechecks status and **every** sponsorship record under its row lock; unpaid/cancelled sponsorship
+records still forbid it. Cancellation sets cancelled status/time/reason, hides public availability,
+and retains the batch, recorded observations and review metadata. It does not delete, restore,
+refund, reverse escrow, settle sponsorships or change marketplace orders/payments. Repeating a
+completed cancellation is a conflict, not idempotent success.
+
+The page and adapter share cross-action locks within their respective scopes, bind the write to
+the current full Admin session, disable 401/transport replay and validate the returned code,
+cancelled status, timestamp, exact reason and zero sponsorship count. The company record is
+then reread before any further action. Failed/uncertain requests require Refresh; a lost reply
+never triggers a blind retry. This slice adds no review queue, batch submission/approval/rejection,
+hard deletion, new backend endpoint or sponsorship transaction.
+
+### Facilities and controlled compliance documents
+
+Admin-only `#company/facilities`, `/new`, `/:id` and `/:id/verification` connect the shared
+facility list, creation, read-only detail and compliance submission/resubmission. There is no
+facility edit/delete endpoint, and no such control is offered. `#admin/facilities` locally
+filters the real company directory by its embedded verification status; it is not a server
+review queue. `#admin/facilities/:id/review` supports explicit approval, rejection and
+revocation; the backend-recorded `#admin/facilities/:id` alias resolves to the same review.
+All Admins share these permissions, including self-review. User access remains denied.
+
+Submission sends 1–20 unique confirmed `farm_document` upload references, replaces the complete
+document collection and sets verification to pending from any previous status. Saved document
+IDs are not upload IDs; saved responses expose neither reusable upload IDs nor private URLs.
+After reload, resubmission therefore requires replacement upload references. Removing a local
+reference does not delete the stored file. Omitted submission dates become null; omitted
+inspector/notes retain existing values. Explicit inclusion controls allow empty text to clear
+inspector/notes. Review omissions retain saved fields. Dates are entered/transmitted as UTC.
+
+Approval requires an explicitly supplied future expiry, an effective non-none level and
+controlled documents. Rejection/revocation have no invented mandatory reason or prior-status
+restriction. Current compliance is derived from approval, level, future expiry and controlled
+documents; expiry is not a new stored status. Resubmission, revocation or expiry can hide
+otherwise-public batches without changing their stored status or cancelling/refunding
+orders/sponsorships. No payment, batch progression or settlement action is coupled to review.
+
+Uploads accept JPEG/PNG/WebP/GIF/PDF up to the server's default 10 MiB; there is no capability
+endpoint for configured limits. Returned private storage URLs are validated then discarded.
+Documents are fetched only from the authorized facility/document content endpoint, validated
+against protected MIME/byte metadata, and offered through temporary Blob download URLs, never
+inline previews or static/new-tab private links. Legacy uncontrolled documents cannot use
+controlled downloads. Temporary URLs are revoked when replaced or the view/session is invalidated.
+The retained declared-MIME and transient-upload-exposure limitations described above are not
+fixed by this frontend integration; metadata cannot guarantee a file still exists on disk.
+
+Page and adapter locks serialize local writes. Full session stamps, abort/sequence guards and
+private-display invalidation protect accepted results. Every POST/upload disables automatic
+401 replay and uncertain transport retry. Accepted writes are followed by authoritative reads
+before another action; failures require Refresh/reconciliation. Unknown uploads require an
+explicit acknowledgement to continue without that file, not replay. Unknown creation stays
+blocked in that mounted page, including after Refresh; inspect the shared list before creating
+again after leaving/reload. A confirmed created ID prevents duplicate creation even if route
+replacement is refused. Submission/review preflight snapshots validate retained fields and
+document changes, but separate GET/POST requests are not an atomic version check; concurrent
+Admin writes may conservatively fail acknowledgement validation and require reconciliation.
 
 ### Optional internal listing review and recorded activity
 
@@ -129,7 +248,8 @@ or order loaders.
 
 Known EN/VI title/body keys substitute escaped text and integer VND parameters; unknown keys or
 unsuitable/arbitrary nullable JSON params remain readable key/JSON fallback. Only mounted,
-role-appropriate canonical destinations are links; unsupported, external, batch and malformed
+role-appropriate canonical destinations are links, including public batch list/detail for both
+roles and shared company batch list/detail for Admin. Unsupported, external and malformed
 routes remain recorded text. Opening a destination does not mark a notification read.
 
 Mark-read sends exact `{read:true}` and preserves an existing read timestamp. Mark-all requires an
@@ -217,6 +337,100 @@ The final exact verifier session logged out and was verified revoked. An earlier
 Current browser checks covered guest Home, the real login page and guest company-catalog gating only. Admin lifecycle actions/confirmations, dirty navigation and post-delete restoration, uncertain failure/Refresh, EN/VI lifecycle interaction, mobile layout and screenshot visual acceptance remain unexercised. The helper/transport/API passes and static review are not complete component/browser acceptance.
 
 The pre-checkpoint regression reran on 2026-10-30 with the same **645 frontend / 423 backend e2e / 27 backend unit** tests passing, both typechecks/builds passing, lint clean, zero frontend audit vulnerabilities and `git diff --check` clean. A strict GUI/visual acceptance attempt then stopped at its image-input prerequisite: the runtime captured a screenshot, but both emitting and reading it reported that the selected model cannot receive image input. No screenshot was visually inspected, so this is a **blocked acceptance attempt**, not a browser pass or an application failure. No credential read, login, new fixture, lifecycle mutation, injected interaction or service restart occurred. Admin controls, dirty/delete/failure journeys, Vietnamese interactions and mobile visual layout remain unverified; the previous fixture/session disposition is unchanged.
+
+### Latest batch integration verification
+
+The complete frontend regression passed **785 tests in 21 files**, including **138 batch
+helper/transport tests** and two new role-safe batch-link cases. TypeScript and production build
+passed (95 modules), audit reported zero vulnerabilities, and whitespace checks passed.
+The unchanged backend passed **423 isolated e2e tests in eleven suites and 27 unit tests**,
+TypeScript/build and lint (zero warnings/errors). The known `pg` concurrent-query deprecation
+warning remains. The e2e suite used the guarded separate test database, not development data.
+
+Independent review found and repaired tied-position image acknowledgement ordering, public
+detail remaining visible after a visibility-denying feed 404, and new-draft Refresh not discarding
+local form values. Image validation now preserves complete tuple multiplicity and the actual cover
+without requiring a backend-unspecified tie order. Feed 404 hides detail and requires a full reread;
+ordinary feed errors remain independently retryable. Confirmed new-draft discard clears form/baseline
+without clearing uncertain-create or confirmed-created recovery locks. Optional measurement and
+budget displays retain nullable fields and exact BigInt totals.
+
+Read-only local requests returned an empty public list (`total=0`, `pages=0`) and anonymous
+company batch/facility 401 gates. No authenticated development write, login, upload, fixture
+creation, reset/reseed, direct database write, cleanup or service restart occurred in this slice.
+No new preservation-fingerprint run is claimed. Batch changes remain uncommitted on
+`integration/team-baseline`; no push/merge/deployment occurred.
+
+No batch GUI/visual acceptance was attempted because the established image-input prerequisite
+remains unavailable. These helper/transport tests and retained backend tests are not a mounted
+component suite or browser acceptance. Admin form/save/publish/update, failure/uncertainty recovery,
+canonical-navigation refusal, dirty Back/Forward/reload, EN/VI interactions and mobile visual layout
+remain browser-unverified.
+
+### Latest facility integration verification
+
+Final frontend regression passed **819 tests in 23 files**, including **31 facility helper/transport
+tests** (11 helpers, 20 adapter), two facility-safe-link cases and a shared upload-error wording
+regression. TypeScript/build passed (101 modules), audit reported zero vulnerabilities and tracked/
+new-source whitespace checks passed. Retained backend TypeScript/build/lint, **27 unit tests and
+423 isolated e2e tests** passed; the known `pg` concurrent-query deprecation warning remains.
+Backend production code, schema, migrations, dependencies and lockfiles are unchanged.
+
+Independent review repaired and re-reviewed two P2 issues. Text normalization/projections/form
+counters now match the retained validator's supplementary-character/presentation-selector length
+semantics; native UTF-16 maxlength barriers no longer reject valid input. Targeted re-review passed
+all 31 facility tests. Document cleanup no longer aborts downloads merely because same-session
+refresh/profile publication replaces the display-user object. An actual-component in-memory harness
+with mocked transport passed fourteen targeted refresh/profile/revocation/reconciliation cases,
+including no late download URLs after real session invalidation and URL revocation. No remaining
+scoped P1/P2 findings were reported; this is not a persisted component suite or browser acceptance.
+
+### Cancellation automated regression and acceptance limits
+
+The cancellation helper/adapter and shared error-message additions contribute 25 tests
+(three helpers, twenty-one adapter cases and one wording regression). The full frontend suite
+passed **844 tests in 23 files**; focused batch/shared transport tests passed 189 cases.
+TypeScript and production build passed (101 modules); audit reported zero vulnerabilities.
+The retained backend passed **27 unit tests and 423 isolated e2e tests**, including sponsorship
+refusal and concurrent cancellation yielding one success and one conflict. Backend TypeScript,
+build and lint passed; its known `pg` concurrent-query deprecation warning remains. No
+backend/schema/migration/dependency changes were made.
+
+Independent transport review repaired and re-reviewed a P2: a backend-valid retained Unicode
+review note made cancellation acknowledgement and later Refresh fail the company decoder.
+The review-note bound now matches retained validator semantics; maximum/+1 supplementary and
+presentation-selector regressions cover cancellation and authoritative rereads.
+
+Independent UI recovery review also found a stale-handler session boundary: the final
+confirmation used render-captured eligibility rather than checking the live session before dispatch.
+Opening cancellation confirmation and sending any page action now synchronously check the current
+full session before locking or sending. Actual-browser reachability of the pre-rerender window
+was not established; this closes the reproducible handler-level boundary, not a claimed live exploit.
+Narrow re-review passed nine actual-transpiled-component cases: eight stale opening/final handlers
+under generation/identity/role/logout changes sent nothing; a valid current-session duplicate-click
+flow sent one cancellation and one authoritative reread. Both findings are resolved with no remaining
+scoped P1/P2 reports. This in-memory mocked-hook harness is not a persisted mounted DOM or browser suite.
+
+No development login, cancellation, upload or fixture mutation was performed. Cancellation
+confirmation/Refresh, dirty Back/Forward/reload, session invalidation, EN/VI and mobile layout
+remain GUI-unverified because the established image-input prerequisite remains unavailable.
+Mocked helper/transport tests are not browser acceptance. Batch, facility and cancellation work
+remain uncommitted; nothing was pushed, merged or deployed.
+
+### Facility acceptance limits
+
+This slice used no development login, authenticated mutation, upload, fixture creation, original-record
+mutation, direct development database write, reset/reseed, service restart or cleanup. Automated
+backend regressions used the separately guarded `_test` database. No new development-preservation
+fingerprint run is claimed; earlier fixture/session disposition is retained. Batch and facility
+changes remain uncommitted on `integration/team-baseline`, with no push/merge/deployment.
+
+No facility browser/visual pass was attempted because the established selected-model image-input
+prerequisite remains unavailable. Helper/transport tests, read-only component harnesses and backend
+tests are not full mounted-component or browser acceptance. File-picker/save-to-disk download,
+creation/submission/review, two-Admin interaction, failure/uncertainty/Refresh, dirty Back/Forward/
+reload, guest return, session refresh/revocation, EN/VI interaction and mobile layout remain
+GUI-unverified. Production private-upload hardening and complete marketplace acceptance remain open.
 
 Do not use exposed group-chat credentials for testing. Create a fresh local-only account instead. Any `devCode` shown in the auth screen comes from the non-production backend response, not a fixed client code.
 

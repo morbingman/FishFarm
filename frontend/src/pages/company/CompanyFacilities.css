@@ -1,0 +1,223 @@
+.company-facilities {
+  --facility-border: #c9d8d2;
+  --facility-ink: #173c32;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding: 2rem 1.25rem 4rem;
+  color: var(--facility-ink);
+  line-height: 1.6;
+}
+.company-facilities * {
+  box-sizing: border-box;
+}
+.company-facilities h1 {
+  font-size: clamp(1.75rem, 4vw, 2.5rem);
+  line-height: 1.2;
+  margin: 0.6rem 0 1rem;
+}
+.company-facilities h2 {
+  font-size: 1.35rem;
+  line-height: 1.35;
+}
+.company-facilities h3 {
+  font-size: 1.1rem;
+}
+.facility-heading {
+  margin-bottom: 1.5rem;
+}
+.company-facilities a {
+  color: #075f47;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+  overflow-wrap: anywhere;
+}
+.company-facilities button,
+.company-facilities input,
+.company-facilities select,
+.company-facilities textarea {
+  font: inherit;
+}
+.company-facilities button {
+  min-height: 44px;
+  padding: 0.6rem 1rem;
+  border: 1px solid #447364;
+  border-radius: 0.4rem;
+  background: #edf6f1;
+  color: #153b30;
+  cursor: pointer;
+  line-height: 1.35;
+}
+.company-facilities button:hover:not(:disabled) {
+  background: #dcefe3;
+}
+.company-facilities button:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.company-facilities :focus-visible {
+  outline: 3px solid #007e9b;
+  outline-offset: 3px;
+}
+.facility-panel,
+.facility-warning,
+.facility-notice,
+.facility-confirmation {
+  margin: 1.25rem 0;
+  padding: 1.25rem;
+  border: 1px solid var(--facility-border);
+  border-radius: 0.65rem;
+  overflow-wrap: anywhere;
+}
+.facility-panel {
+  background: #fff;
+}
+.facility-warning {
+  color: #5b3813;
+  border-color: #c4a371;
+  background: #fff9ed;
+}
+.facility-notice {
+  color: #173c32;
+  background: #edf6f1;
+}
+.facility-confirmation {
+  border: 2px solid #286e56;
+  background: #f3faf6;
+}
+.facility-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem 1rem;
+  margin: 1rem 0;
+}
+.facility-actions a {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+}
+.company-facilities fieldset {
+  min-width: 0;
+  padding: 0;
+  border: 0;
+}
+.company-facilities legend {
+  font-size: 1.2rem;
+  font-weight: 700;
+  margin-bottom: 1rem;
+}
+.facility-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1.1rem;
+  margin-bottom: 1.25rem;
+}
+.facility-form-grid > div {
+  min-width: 0;
+}
+.company-facilities label {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.4rem;
+}
+.company-facilities input:not([type="checkbox"]),
+.company-facilities select,
+.company-facilities textarea {
+  width: 100%;
+  max-width: 100%;
+  min-height: 44px;
+  padding: 0.6rem 0.7rem;
+  border: 1px solid #819d91;
+  border-radius: 0.35rem;
+  background: #fff;
+  color: #173c32;
+}
+.company-facilities textarea {
+  resize: vertical;
+}
+.company-facilities input[type="file"] {
+  white-space: normal;
+}
+.company-facilities input[type="checkbox"] {
+  width: 20px;
+  height: 20px;
+  margin: 0;
+  flex-shrink: 0;
+}
+.facility-checkbox {
+  display: flex !important;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+.facility-wide {
+  grid-column: 1 / -1;
+}
+.facility-basics {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.9rem 1.5rem;
+}
+.facility-basics dt {
+  font-weight: 600;
+}
+.facility-basics dd {
+  margin: 0.2rem 0 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.facility-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--facility-border);
+  border-radius: 0.4rem;
+}
+.company-facilities table {
+  border-collapse: collapse;
+  width: 100%;
+  min-width: 700px;
+  text-align: left;
+}
+.company-facilities caption {
+  padding: 0.7rem;
+  text-align: left;
+  font-weight: 700;
+}
+.company-facilities th,
+.company-facilities td {
+  padding: 0.8rem;
+  vertical-align: top;
+  border-bottom: 1px solid var(--facility-border);
+  overflow-wrap: anywhere;
+}
+.company-facilities th {
+  background: #f0f6f2;
+}
+.facility-pending-documents {
+  padding-left: 1.5rem;
+}
+.facility-pending-documents li {
+  padding: 0.9rem;
+  margin: 0.75rem 0;
+  border: 1px solid var(--facility-border);
+  border-radius: 0.4rem;
+}
+@media (max-width: 640px) {
+  .company-facilities {
+    padding: 1.25rem 0.85rem 3rem;
+  }
+  .facility-panel,
+  .facility-warning,
+  .facility-notice,
+  .facility-confirmation {
+    padding: 1rem;
+  }
+  .facility-form-grid,
+  .facility-basics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .facility-actions {
+    align-items: stretch;
+  }
+  .facility-actions button {
+    flex-grow: 1;
+  }
+}

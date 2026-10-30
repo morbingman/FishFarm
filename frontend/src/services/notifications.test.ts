@@ -184,6 +184,29 @@ describe("safe role-aware mounted notification destinations", () => {
       for (const role of ["User", "Buyer"] as const) expect(safeNotificationLink(link, role)).toBeNull();
     }
   });
+  it("allows public batches for both roles and company batches only for Admin", async () => {
+    const { safeNotificationLink } = await import("./notifications");
+    for (const link of ["#farming", "#farming/BATCH-1", `#farming/${databaseId}`]) {
+      for (const role of ["User", "Buyer", "Admin"] as const) expect(safeNotificationLink(link, role)).toBe(link);
+    }
+    for (const link of ["#company/batches", "#company/batches/BATCH-1", `#company/batches/${databaseId}`]) {
+      expect(safeNotificationLink(link, "Admin")).toBe(link);
+      for (const role of ["User", "Buyer"] as const) expect(safeNotificationLink(link, role)).toBeNull();
+    }
+    for (const link of ["#farming/booking", "#farming/BATCH-1?x=1", "#farming/%42ATCH-1", "#farming/unknown", "#company/batches/new", "#company/batches/BATCH-1/edit", "#company/batches/BATCH-1?x=1", "#admin/batches/BATCH-1"]) {
+      for (const role of ["User", "Buyer", "Admin"] as const) expect(safeNotificationLink(link, role)).toBeNull();
+    }
+  });
+  it("allows facilities only for Admin and never links private content or submission routes", async () => {
+    const { safeNotificationLink } = await import("./notifications");
+    for (const link of ["#company/facilities", "#admin/facilities", `#company/facilities/${databaseId}`, `#admin/facilities/${databaseId}`, `#admin/facilities/${databaseId}/review`]) {
+      expect(safeNotificationLink(link, "Admin")).toBe(link);
+      for (const role of ["User", "Buyer"] as const) expect(safeNotificationLink(link, role)).toBeNull();
+    }
+    for (const link of ["#company/facilities/new", `#company/facilities/${databaseId}/verification`, `#company/facilities/${databaseId}/edit`, `#admin/facilities/${databaseId}/edit`, `#company/facilities/${databaseId}?x=1`, `#company/facilities/%63${"a".repeat(24)}`, `#company/facilities/${databaseId}/verification/documents/${databaseId}/content`, "/uploads/private/document.pdf"]) {
+      for (const role of ["User", "Buyer", "Admin"] as const) expect(safeNotificationLink(link, role)).toBeNull();
+    }
+  });
   it("keeps unsafe, malformed, query-expanded and unmounted historical URLs as text", async () => {
     const { safeNotificationLink } = await import("./notifications");
     for (const link of [null, undefined, "", "javascript:alert(1)", "https://example.test", "//example.test", "/marketplace", " #marketplace", "#marketplace\n", "#marketplace\u0000", "#marketplace\u007f",

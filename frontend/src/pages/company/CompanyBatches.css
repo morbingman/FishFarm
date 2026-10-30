@@ -1,0 +1,21 @@
+.company-batches { line-height: 1.6; }
+.company-batches h1 { font-size: clamp(28px, 4vw, 42px); }
+.company-batches form { margin: 24px 0; }
+.company-batches .batch-wide { grid-column: 1 / -1; }
+.company-batches .batch-field textarea { resize: vertical; }
+.company-batches .batch-field small { display: block; margin-top: 8px; color: #46667b; font-weight: 400; }
+.company-batches .batch-cost-row { margin: 18px 0; background: #f6fbfe; }
+.company-batches .batch-image-row { margin: 18px 0; }
+.company-batches .batch-image-row button { margin-top: 10px; }
+.company-batches fieldset[disabled] { opacity: .75; }
+.company-batches .batch-panel fieldset { margin: 0; }
+.company-batches .batch-notice h2 { font-size: 21px; }
+.company-batches a { color: #006d9d; text-decoration: underline; text-underline-offset: 3px; }
+.company-batches .batch-cancellation { border-color: #d2b9a4; }
+.company-batches .batch-cancellation-warning { padding: 14px; border-left: 4px solid #96501e; background: #fff8ee; }
+.company-batches .batch-cancellation [aria-invalid="true"] { border-color: #a33426; }
+.company-batches .batch-cancellation [role="alert"] { color: #8a231b; }
+.company-batches .batch-cancellation-submit { border: 1px solid #8a231b; background: #8a231b; color: #fff; }
+.company-batches .batch-cancellation-submit:disabled { opacity: .6; }
+.company-batches .batch-cancellation-confirmation:focus { outline: 3px solid #006d9d; outline-offset: 3px; }
+@media (max-width: 650px) { .company-batches fieldset { padding: 16px; } .company-batches .batch-cost-row { padding: 12px; } .company-batches .batch-actions > button { max-width: 100%; white-space: normal; } }

@@ -19,11 +19,12 @@ export function SiteHeader({ language, setLanguage }: { language: Lang; setLangu
         <nav className="ds-nav" aria-label="Main">
           <a href="#home">{vi ? "Trang chủ" : "Home"}</a>
           <a href="#marketplace">{vi ? "Chợ cá" : "Marketplace"}</a>
+          <a href="#farming">{vi ? "Lô cá và cập nhật" : "Batches and updates"}</a>
           {user?.role === "Buyer" && <><a href="#marketplace/cart">{vi ? "Giỏ hàng" : "Cart"}</a><a href="#marketplace/orders">{vi ? "Đơn hàng" : "Orders"}</a></>}
           {user && <a href="#account/profile">{vi ? "Hồ sơ" : "Profile"}</a>}
           {user && <a href="#account/notifications">{vi ? "Thông báo" : "Notifications"}</a>}
           {user && <a href={user.role === "Admin" ? "#admin/disputes" : "#marketplace/disputes"}>{vi ? "Khiếu nại" : "Disputes"}</a>}
-          {user?.role === "Admin" && <><a href="#company/orders">{vi ? "Đơn hàng công ty" : "Company orders"}</a><a href="#company/listings">{vi ? "Danh mục công ty" : "Company catalog"}</a><a href="#admin/queue">{vi ? "Xét duyệt tùy chọn" : "Optional review"}</a><a href="#admin/activity">{vi ? "Hoạt động" : "Activity"}</a><a href="#admin/users">{vi ? "Tài khoản" : "Users"}</a></>}
+          {user?.role === "Admin" && <><a href="#company/orders">{vi ? "Đơn hàng công ty" : "Company orders"}</a><a href="#company/listings">{vi ? "Danh mục công ty" : "Company catalog"}</a><a href="#company/batches">{vi ? "Lô cá công ty" : "Company batches"}</a><a href="#company/facilities">{vi ? "Cơ sở và tuân thủ" : "Facilities and compliance"}</a><a href="#admin/facilities">{vi ? "Xét duyệt cơ sở" : "Facility review"}</a><a href="#admin/queue">{vi ? "Xét duyệt tùy chọn" : "Optional review"}</a><a href="#admin/activity">{vi ? "Hoạt động" : "Activity"}</a><a href="#admin/users">{vi ? "Tài khoản" : "Users"}</a></>}
         </nav>
         <div className="ds-header-right">
           <LangSwitch language={language} setLanguage={setLanguage} />

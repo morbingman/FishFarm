@@ -12,6 +12,25 @@ beforeEach(() => {
 afterEach(() => { vi.unstubAllGlobals(); });
 
 describe("API integration boundary", () => {
+  it("explains cancellation eligibility without promising financial reversal", async () => {
+    const { ApiError, errorMessage } = await import("./api");
+    const error = new ApiError(409, "batch.cancelForbidden");
+    expect(errorMessage(error, "en")).toContain("no sponsorship records");
+    expect(errorMessage(error, "en")).toContain("no refund or payment is performed");
+    expect(errorMessage(error, "vi")).toContain("chưa có bản ghi tài trợ nào");
+    expect(errorMessage(error, "vi")).toContain("không hoàn tiền hoặc thanh toán");
+  });
+  it("describes shared upload errors without inventing a facility or dispute owner", async () => {
+    const { ApiError, errorMessage } = await import("./api");
+    for (const code of ["uploads.alreadyUsed", "uploads.invalidReference"]) {
+      const error = new ApiError(409, code);
+      for (const language of ["en", "vi"] as const) {
+        const text = errorMessage(error, language);
+        expect(text).not.toMatch(/another facility|another dispute|cơ sở khác|khiếu nại khác/);
+        expect(text).toMatch(/Refresh|Làm mới|public URL|URL công khai/);
+      }
+    }
+  });
   it("keeps tokens out of storage and sends only supported signup fields", async () => {
     const fetch = vi.fn().mockImplementation(() => Promise.resolve(response(payload()))); vi.stubGlobal("fetch", fetch);
     const { authApi, api } = await import("./api");

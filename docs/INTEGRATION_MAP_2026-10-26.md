@@ -8,11 +8,278 @@
 **Saved catalog checkpoint:** `3c333f1` — shared company catalog editing and direct publication (2026-10-28; not pushed)
 **Saved review/activity and User-management checkpoint:** `f2d1b37` — optional listing review, recorded activity and Admin account directory/status/session enforcement (2026-10-28; not pushed)
 **Saved account/inbox checkpoint:** `fb562af` — personal notifications, own profile/preferences and dropped chat scope (2026-10-29; not pushed)
+**Saved catalog-lifecycle checkpoint:** `86d2409` — catalog pause/resume/soft-delete and verification limits (local only; not pushed)
 **Purpose:** decide what to keep, adapt, restore, build or defer for each component before changing application code.
 
 This is an implementation guide and decision register, not a claim that integration is complete. The user requested incremental integration and deferred deployment. Recommendations below are not all approved product decisions. No application changes, branch merges or deployment are performed by creating this document.
 
 **Scope decision — 2026-10-28:** chat/messaging is dropped from the project scope, not deferred to a later integration pass. Do not build conversation endpoints or mount chat widgets. Unmounted legacy code and existing schema/migration history are retained; no deletion or database migration is part of this decision. References to outstanding messaging in historical slice records below describe their earlier scope and are superseded by this decision. Notifications and reviews remain separate features.
+
+## Unsponsored-batch cancellation — current integration slice
+
+This bounded frontend-only addition follows the uncommitted batch/facility work and saved
+catalog-lifecycle checkpoint `86d2409` on `integration/team-baseline`. No commit, push, merge,
+deployment, production backend/schema/migration or dependency change is included.
+
+### Connected scope and cancellation semantics
+
+- Only saved Admin `#company/batches/:id` detail offers cancellation. Eligibility is draft,
+  pending_review or open with `sponsorshipCount === 0`; creator attribution is not ownership.
+  The existing Admin endpoint is reused without a new review route or workspace.
+- An explicitly confirmed reason is trimmed and bounded to 1–1,000 characters with the retained
+  validator's Unicode counting semantics. Confirmation identifies saved code/name/status/reason,
+  with no optimistic cancellation. Local reason changes participate in dirty hash/reload protection;
+  confirmed Refresh discards them and rereads the actual record.
+- `POST /v1/admin/batches/:id/cancel` sends only `{note}`. Backend row locking rechecks current
+  status and absence of **all** sponsorship records, not merely paid/active sponsorships. It sets
+  cancelled/time/reason and recorded activity, retaining the row, images, costs, observations and
+  review metadata. Public availability is hidden by cancelled status. No refund/payment, escrow
+  reversal, settlement, marketplace order change, hard deletion or restore operation occurs.
+- Repeated cancellation conflicts. Full-session guards and page/adapter cross-action locks protect
+  local writes; exact acknowledgements require canonical code, cancelled status/time/reason and zero
+  sponsorship count. No automatic 401 or uncertain-transport replay. Accepted writes require an
+  authoritative company-detail reread; failed or unknown outcomes require Refresh/reconciliation.
+- Submission/review/approval/rejection, hard deletion (which has an unexposed harvest prerequisite),
+  multipart batch media and sponsorship booking/history/ledger/harvest/settlement remain separate.
+  No original development-data mutation or live cancellation is part of automated verification.
+
+### Automated regression and acceptance limits
+
+The new cancellation coverage adds 25 cases: three eligibility/reason helper tests, twenty-one
+adapter cases and one shared error-wording regression. Full frontend regression passed
+**844 tests in 23 files**; focused batch/helper/shared transport regression passed 189 cases.
+Frontend TypeScript and production build passed (101 modules).
+Coverage includes the exact protected POST, no automatic replay, malformed acknowledgements,
+Unicode bounds, cross-action decode locking and late results after same-account fresh login,
+account switch, role change or logout. The retained backend again passed **27 unit tests and
+423 isolated e2e tests**, TypeScript/build and lint; cancellation refusal for sponsored batches
+and atomic concurrent cancellation (one 200, one 409) are retained. The known `pg` deprecation
+warning remains. Frontend audit found zero vulnerabilities; tracked/new-source whitespace checks
+passed. No production backend, schema, migration or dependency change was made.
+
+Independent transport review found and re-reviewed one repaired P2: preserved backend-valid
+Unicode review notes caused cancellation acknowledgement and later Refresh decoding to fail.
+The review-note bound now uses retained validator semantics, with maximum/+1 supplementary and
+presentation-selector regression coverage for cancellation and company-detail rereads.
+
+UI recovery review found a second P2: a stale final-confirmation handler could dispatch after
+session change but before rerendering. Opening cancellation confirmation and the common page-action
+entry now synchronously check the live full session before acquiring the lock or sending. This was
+reproduced at actual-transpiled-component handler level; browser reachability of that pre-rerender
+window was not established, and no live exploit is claimed. Narrow re-review passed nine
+actual-transpiled-component cases: eight stale opening/final handlers under generation/ID/role/logout
+changes sent nothing, and one valid duplicate-click flow sent one cancellation plus one authoritative
+reread with no repeat control. Both review findings are repaired and re-reviewed; no remaining scoped
+P1/P2 findings were reported. The in-memory mocked-hook harness is not a persisted mounted/browser suite.
+
+No development login, live cancellation, upload, fixture creation, direct development database
+write, reset/reseed, service restart or cleanup occurred. Backend tests used the separately guarded
+`_test` database. No new preservation-fingerprint run is claimed because no development mutation
+was attempted. Browser cancellation/confirmation/Refresh, dirty Back/Forward/reload, session changes,
+EN/VI interaction and responsive layout remain unverified: the established selected-model image-input
+prerequisite is unavailable. Helper/transport regressions and source review are not GUI acceptance.
+All three current slices remain uncommitted, with no push/merge/deployment.
+
+## Facilities and controlled compliance — preceding integration slice
+
+This frontend-only slice follows the uncommitted batch integration below and saved checkpoint
+`86d2409` on `integration/team-baseline`. Both slices remain uncommitted. Production backend,
+schema, migrations, dependencies and lockfiles are unchanged; no push, merge or deployment occurred.
+The historical §4.23 recommendations are implemented only for supported facility/compliance actions.
+
+### Connected scope and backend constraints
+
+- Admin-only `#company/facilities`, `/new`, `/:id` and `/:id/verification` connect shared list,
+  creation, read-only detail and compliance submission/resubmission. The retained backend has no
+  facility PATCH/PUT/DELETE; scalar editing or deletion is not simulated or added. All Admins share
+  records; there is no creator ownership or separate submitter/reviewer role.
+- `#admin/facilities` locally searches/pages and filters the real unpaginated company directory by
+  embedded verification status. It is not an Admin server queue or platform-wide analytical count.
+  `#admin/facilities/:id/review` loads saved review data. The real recorded `#admin/facilities/:id`
+  alias is supported; route construction remains canonical. Header, guest login-return and safe
+  Admin notification/activity links recognize list/detail/review, never submission or private content.
+- Submissions send 1–20 unique confirmed purpose-matched upload IDs and replace every document.
+  From any prior status they set pending, refresh submission time and clear review time/reviewer.
+  Existing document IDs are verification-document IDs, not upload IDs; GET exposes neither private
+  URLs nor reusable upload IDs. Reloaded resubmissions need replacement references. Removing a local
+  reference does not delete its stored upload; there is no upload lookup/delete/history endpoint.
+- Omitted submission dates become null; omitted inspector/notes retain existing values. Explicit
+  inclusion controls can send empty text to clear inspector/notes. Omitted review fields retain
+  saved data; null-clearing is not invented. Dates are entered/transmitted as UTC. Level none is
+  valid for submission, not sufficient for approval.
+- Review supports explicit approved/rejected/revoked only. Approval requires an explicitly supplied
+  future expiry, effective non-none level and nonempty controlled documents. Rejection/revocation
+  need no invented mandatory reason or prior-status matrix; self-review and repeated approval are
+  supported. Derived current compliance requires approved, non-none, future expiry and all controlled
+  documents. Expiry is a hint, not a new stored status. Resubmission/revocation/expiry can hide otherwise
+  open public batches without changing batch status or cancelling/refunding any order/sponsorship.
+- Controlled uploads accept JPEG/PNG/WebP/GIF/PDF with the default 10 MiB client bound; the backend
+  limit is configurable with no capability endpoint. Private storage URLs in upload responses are
+  validated then discarded. Downloads use resource-owned document IDs and protected content fetches,
+  matching Blob MIME/bytes to metadata before creating temporary download URLs. No public-path fallback,
+  inline preview or raw private new-tab link exists. Legacy uncontrolled/null-metadata docs remain
+  non-downloadable. Temporary URLs are revoked on replacement/view/session invalidation.
+- Page/adapter locks serialize local writes. Full generation/id/role stamps, abort/alive/read-sequence
+  checks hide stale private results. POST/upload calls disable automatic 401 and uncertain transport
+  replay. Accepted writes require authoritative rereads before another action; failures require
+  reconciliation. Unknown uploads require acknowledgement to continue without that file. Unknown
+  creation stays blocked in the mounted page, not durably across leaving/reload; inspect the shared
+  list before creating again. Confirmed-created IDs permanently prevent duplicate creation even when
+  route replacement is refused. Dirty forms/pending references guard hash/reload navigation.
+- Submission/review preflights snapshot retained fields and existing documents for acknowledgement
+  validation. The GET and POST are separate operations, not an atomic version or maker-checker guarantee.
+  Concurrent Admin writes may conservatively fail validation; there is no automatic retry. Production
+  declared-MIME/transient private-upload exposure and file-on-disk availability limitations remain
+  backend hardening work, not solved by controlled metadata or this frontend.
+
+### Automated verification and focused review
+
+Final frontend regression passed **819 tests in 23 files**, including **31 facility helper/transport
+cases** (11 helpers, 20 adapter), two facility-safe-link cases and a shared upload-error wording
+regression. TypeScript and production build passed (101 modules), audit reported zero vulnerabilities,
+tracked whitespace checks and all twenty new batch/facility source-file whitespace checks passed.
+The retained backend passed **27 unit tests in five files and 423 isolated e2e tests in eleven suites**,
+TypeScript/build and lint with zero warnings/errors. The known `pg` concurrent-query deprecation
+warning remains. No production backend or dependency changes were needed.
+
+Independent scoped reviews found two P2 defects, both repaired and re-reviewed:
+
+- UTF-16 text lengths incorrectly rejected backend-valid supplementary-character inputs and retained
+  facility/document records. Helpers, response validators, form counters and preflight guards now use
+  the exact retained validator surrogate-pair/presentation-selector semantics, not invented grapheme
+  counting. Native UTF-16 maxlength barriers were removed. Targeted re-review passed 31 facility tests.
+- Document cleanup depended on the entire display-user object, silently aborting a download after
+  successful same-session token refresh/profile publication. It now depends on real session validity
+  and resource/endpoint changes. A read-only in-memory harness executing the actual transpiled component
+  and API/session dependencies passed fourteen targeted cases: refresh/profile preserve a pending
+  download, while logout/new generation/role downgrade/unmount/reconciliation abort late results and
+  revoke completed URLs. This harness is not a persisted mounted-component suite or browser pass.
+
+No remaining scoped P1/P2 findings were reported. Review transport interruption was resumed from
+retained context without changing model/provider or repeating live operations. Shared upload conflict
+errors describe another resource rather than falsely attributing every conflict to a facility/dispute.
+
+### Acceptance and operational limits
+
+No development login, authenticated mutation, upload or fixture creation was performed for this
+facility slice. No original account/profile/preferences/inbox/catalog/facility records were mutated,
+no direct development database writes, resets/reseeds, migrations, service restarts or cleanup occurred.
+Backend regressions used the separately guarded `_test` database. No new development preservation
+fingerprint run is claimed because no development writes were attempted; prior fixture/session
+history remains retained. Generated ignored build output is not a source/dependency change.
+
+The selected model's established image-input limitation still blocks screenshot-backed acceptance.
+No facility browser pass was attempted. File-picker/save-to-disk downloads, Admin creation/submission/
+review, two-Admin interaction, uncertainty/Refresh, dirty Back/Forward/reload, guest return, session
+refresh/revocation, EN/VI interactions and mobile layout remain GUI-unverified. Helper/transport tests,
+read-only component harnesses, source review and retained backend e2e do not constitute full mounted-
+component or end-to-end browser acceptance. Sponsorship booking/payment/history/ledger/releases/
+harvest/settlement, facility scalar editing/deletion and optional batch lifecycle remain separate.
+Chat remains dropped and deployment deferred.
+
+## Batch browsing, company drafts and recorded updates — preceding integration slice
+
+This bounded frontend slice follows saved catalog-lifecycle checkpoint `86d2409` on
+`integration/team-baseline`. It is uncommitted; no push, merge or deployment is included.
+Backend production source, tests, schema, migrations, dependencies and lockfiles are unchanged.
+The historical batch adaptation recommendations in §4.22–4.24 are only partially implemented
+here; facility/compliance writing and sponsorship transactions remain separate work.
+
+### Connected scope and truthful boundaries
+
+- Public `#farming` and `#farming/:id` load a typed paginated batch list, detail and independent
+  recorded-update feed through credential-free reads. Filters are text, exact species/region,
+  inclusive planned harvest-before and maximum package price; Apply resets server pagination.
+  Empty results have zero available pages, with no fixture or demo substitution. No legacy
+  `farmingStore`, sponsorship history or Portal workspace is mounted.
+- Public visibility requires open status, available shares and current approved controlled
+  facility compliance. Public detail/feed are not an enduring private sponsor history: hidden,
+  fully allocated, expired or revoked-compliance batches can return not-found. Private creator,
+  review, inspector and document fields are excluded from public adapter projections.
+- Shared Admin `#company/batches`, `/new`, `/:id` and `/:id/edit` connect status-filtered company
+  reads, local search/paging, full required-field creation, draft-only changed-field saves,
+  separate direct publication and append-only recorded observations. All Admins share records;
+  creator is attribution, not ownership. Real facilities come from a read-only directory;
+  unavailable or empty directory never creates fictional choices or facility records.
+- Count and weight shares retain backend units: stocked fish divided by fish per share, or
+  expected whole-batch harvest biomass in grams divided by grams per share, rounded down.
+  Whole-batch allocations plus per-share costs multiplied by total shares must exactly match
+  package price multiplied by shares for publication. Contingency is metadata, not an extra
+  automatic charge. Budget arithmetic uses exact integer calculations. Planned biomass/dates
+  are not guaranteed production, yield or profit.
+- Supplied image/cost arrays replace entire collections; omitted arrays retain saved content.
+  The first submitted image is the cover regardless of position. Dates and measurements are
+  nullable in read projections; existing optional scalar null clearing is unsupported by the
+  backend and must not be represented as a successful clear. Switching to count shares is the
+  explicit exception: backend persistence clears expected weight biomass. Batch/update media accepts existing
+  registered purpose-matched URLs or external HTTP(S), not listing/private-document references.
+  External image content is not verified by the backend; no new multipart upload is connected.
+- Publication is a bodyless, separately confirmed draft-to-open action after save/refetch.
+  Backend checks shares, exact costs, at least one image, current approved non-none compliance
+  and controlled documents. Frontend hints are not compliance approval. No publish-and-pay,
+  automatic review or status-progression chain is mounted.
+- Updates record only stage, optional average grams, alive count, note and public photos.
+  Optional absent measurements are not invented zero; an explicitly recorded zero alive count
+  is valid. UTC timestamps are server recording times, not event/measurement dates. Append does
+  not advance status and has no edit/delete. No synthetic growth chart or harvest timeline exists.
+- Session-generation, abort/read-sequence and alive guards hide stale private results; page and
+  adapter locks serialize current writes. Dirty hash/reload guards protect local edits and do
+  not block session changes. Mutation acknowledgements are runtime-validated and followed by
+  authoritative company detail reads before another action. No automatic 401/network write
+  replay. Unknown creation is blocked in that mounted screen, not durably after leaving/reload;
+  inspect the shared list before starting again. An uncertain append requires refreshed-feed
+  inspection and explicit clearing, not replay. Confirmed-created ID permanently disables
+  creation in that mounted page even if canonical navigation is refused.
+- Header/login-return and canonical notification/activity links now recognize the bounded batch
+  destinations. Unsupported query-bearing batch routes stay unavailable. New/edit/review/booking
+  paths are not converted into recorded notification/activity links. Company destinations remain
+  Admin-only; private facility documents remain recorded text, not public navigation.
+
+### Automated verification and focused review
+
+The complete final frontend regression passed **785 tests in 21 files**, including **138 batch
+helper/transport tests** (73 helpers, 65 adapter) and two new batch notification/activity link
+cases. Frontend TypeScript and production build passed (95 modules), dependency audit reported
+zero vulnerabilities and whitespace checks passed. No mounted-component test suite was added.
+The unchanged backend passed **423 isolated e2e tests in eleven suites and 27 unit tests**,
+TypeScript/build and lint with zero warnings/errors. The known `pg` concurrent-query deprecation
+warning remains. Existing e2e isolation guards require the separate `_test` database.
+
+Focused independent reviews identified three P2 defects and their repairs: tied image positions
+could falsely reject valid saves, feed 404 could leave a now-unavailable public detail visible,
+and Refresh on a new draft did not perform its confirmed discard. Image acknowledgements now
+compare complete `(url,position,isMain)` multisets with multiplicity/cover checks, while preserving
+position-order validation. Targeted adapter re-review passed four image-order tests; page code
+re-review confirmed both recovery repairs. No remaining P1/P2 findings were reported in the
+scoped reviews; this is not GUI/concurrency acceptance. The public page now hides detail/feed on visibility-denying 404 and
+offers full detail reload; ordinary feed failures remain independently retryable. New-draft Refresh
+resets form/baseline only after accepted discard and preserves unknown/confirmed-create safeguards.
+Reserved bare/encoded public booking routes are also rejected. Nullable facility region is preserved;
+legacy missing share data does not crash budget display; totals use exact BigInt arithmetic.
+
+### Exclusions and acceptance status
+
+Sponsorship booking/payment, personal sponsorship history and permanent owner tracking,
+escrow/ledger/releases, generic batch progression, harvest/delivery/settlement, facility creation,
+compliance submission/review/private-document viewer, optional batch submit/review/delete/cancel
+and multipart batch uploads are not implemented here. Chat remains dropped.
+
+No authenticated development API mutation, account login, upload, fixture creation, original-record
+mutation, direct development database write, reset/reseed, migration or cleanup was performed in
+this slice. The existing database/container/API were already healthy; no service restart was needed.
+Read-only local HTTP checks observed public list 200 with `items=[]`, `total=0`, `pages=0`, and
+anonymous company batch/facility 401 gates. No new database preservation fingerprint run is claimed,
+since no development writes were attempted; prior checkpoint fixture/session disposition is retained.
+
+Frontend numeric form controls use the retained PostgreSQL Int storage ceiling (2,147,483,647);
+adapters separately validate safe integers rather than claiming all wider values are persistable.
+Dates are entered and transmitted as UTC, not silently interpreted as local time.
+
+The selected model's previously established image-input limitation still blocks screenshot-backed
+browser acceptance. No batch GUI/visual pass was attempted or accepted. Automated helper/transport
+coverage and unchanged backend e2e tests do not constitute mounted-component interaction or end-to-end
+browser acceptance. Admin form/save/publish/update, uncertainty/Refresh, refused canonical navigation,
+dirty Back/Forward/reload, EN/VI interaction and mobile visual layout remain browser-unverified.
 
 ## Catalog pause, resume and soft-delete — implemented on 2026-10-29
 
@@ -749,9 +1016,10 @@ This is a proposed sequence. It prevents missing secondary APIs from blocking a 
 - [x] Adapt shared company catalog forms, public media and direct publication (GUI acceptance limits recorded above).
 - [x] Connect optional internal listing review and real activity screens; remaining acceptance limits are recorded above.
 - [x] Build Admin list/suspend/reactivate and personal notification inbox operations (bounded scope and acceptance limits recorded above).
-- [ ] Integrate profile/prefs and remove client-only password/block/deletion claims.
+- [x] Integrate own profile/preferences without client-only password/block/deletion claims (bounded scope and acceptance limits recorded above).
 - [ ] Build favorites if included in this pass.
-- [ ] Integrate batch/facility/compliance management and real public updates.
+- [x] Connect bounded company batch drafts/publication, public browsing and recorded updates (automated/read-only acceptance only; GUI limits recorded above).
+- [x] Integrate supported facility creation/compliance submission/review and controlled document downloads (automated verification only; GUI limits recorded above; no scalar editing/deletion).
 
 **Gate:** two Admins operate the same resources; writes survive reload; notification failure does not block catalog/order loaders; private evidence remains private.
 
@@ -778,7 +1046,7 @@ pnpm --dir C:/Mythic/Works/Projects/FishFarm/backend lint
 git diff --check
 ```
 
-The frontend now has 645 automated tests in nineteen files covering API/session behavior, account profile/preferences, commerce/dispute/catalog/review/activity/users/inbox transport and rules, catalog lifecycle eligibility and acknowledgements, checkout recovery, buyer/company presentation and guarded hash navigation; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
+The frontend now has 844 automated tests in twenty-three files covering API/session behavior, account profile/preferences, commerce/dispute/catalog/batch/facility/review/activity/users/inbox transport and rules, catalog lifecycle and unsponsored-batch cancellation eligibility and acknowledgements, checkout recovery, buyer/company presentation and guarded hash navigation; run `npm --prefix frontend run test` alongside type/build checks. Browser checks and their limits are recorded at the top; a production build alone does not prove integration. Backend end-to-end tests use isolated `fishfarm_test` (or an explicitly separate `_test` override) and create/clean their own fixtures, never a development database reset.
 
 Preserve all eleven backend end-to-end suites: app, auth, profile/preferences, listings, marketplace, uploads, orders, disputes, batches-facilities, Admin users and notifications. Preserve unit coverage for permissions, session issuance and notification fan-out. Add tests for new endpoints/adapters instead of weakening existing assertions to match remote behavior.
 
@@ -803,4 +1071,4 @@ Preserve all eleven backend end-to-end suites: app, auth, profile/preferences, l
 6. **Engagement order:** recommendation is notifications/Admin users/favorites before full reviews/analytics, after the purchase journey works.
 7. **Individual-fish sponsorship:** possible one-count-share batch, subject to deliberate approval; retain canonical full-prepaid care rather than prototype deposit/balance semantics.
 
-**Current outcome:** auth/public catalog, cart/atomic simulated checkout, buyer lifecycle and company fulfilment are saved in `38f0dd7`; disputes/private evidence in `90c00a0`; shared catalog in `3c333f1`; optional review/activity and Admin User management in `f2d1b37`; personal inbox/read operations, own profile/preferences and dropped chat scope in `fb562af`. Catalog pause/resume/soft-delete controls, API/automated verification and the blocked visual-acceptance report are saved in the local catalog-lifecycle checkpoint dated 2026-10-30. Nothing was pushed, merged or deployed. Existing development records and migration history remain intact. Chat is dropped, not deferred. Favorites, farming/compliance UI, reviews/analytics, password/avatar/self-deactivation and sponsorship transactions/settlement remain separate. Outstanding full GUI journeys, moderation/lifecycle concurrency and production private-upload hardening are not declared solved by passing helper/API tests. The full marketplace acceptance gate is not yet satisfied; deployment remains deferred.
+**Current outcome:** auth/public catalog, cart/atomic simulated checkout, buyer lifecycle and company fulfilment are saved in `38f0dd7`; disputes/private evidence in `90c00a0`; shared catalog in `3c333f1`; optional review/activity and Admin User management in `f2d1b37`; personal inbox/read operations, own profile/preferences and dropped chat scope in `fb562af`; catalog pause/resume/soft-delete and verification limits in `86d2409`. Current uncommitted work connects bounded company batch drafts/direct publication, public batch browsing and recorded observations, supported facility creation/compliance submission/review and controlled document downloads, plus confirmed cancellation of unsponsored batches. Facility scalar editing/deletion has no retained endpoint and remains unavailable; sponsorship transactions are not connected. Nothing was pushed, merged or deployed. Existing development records and migration history remain retained; no development login, upload or writes were used for the batch/facility slices. Chat is dropped, not deferred. Favorites, reviews/analytics, password/avatar/self-deactivation, owner sponsorship history and sponsorship transactions/settlement remain separate. Outstanding full GUI journeys, moderation/lifecycle concurrency and production private-upload hardening are not declared solved by passing helper/API tests. The full marketplace acceptance gate is not yet satisfied; deployment remains deferred.

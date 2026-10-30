@@ -45,12 +45,12 @@ export function takedownReason(reason: string) {
   return value;
 }
 
-// Only destinations mounted for an Admin in this bounded integration slice.
-// Never turn arbitrary recorded URLs, User-only orders or unmounted batch/facility
-// links into navigation. A rejected link remains recorded text in the activity UI.
+// Only mounted Admin destinations are links; document content URLs stay non-navigable.
 export function safeActivityLink(link: string | null | undefined): string | null {
   if (!link || /[\u0000-\u0020\u007f]/.test(link)) return null;
   if (["#company/listings", "#company/orders", "#admin/queue", "#admin/activity", "#admin/disputes", "#admin/users"].includes(link)) return link;
+  if (link === "#company/batches" || /^#company\/batches\/(?:BATCH-\d+|c[a-z0-9]{24})$/.test(link)) return link;
+  if (link === "#company/facilities" || link === "#admin/facilities" || /^#(?:company\/facilities\/c[a-z0-9]{24}|admin\/facilities\/c[a-z0-9]{24}(?:\/review)?)$/.test(link)) return link;
   const match = /^#(?:company\/(?:listing|orders)|admin\/(?:review|disputes|orders))\/([^/?#]+)$/.exec(link);
   return match && routeId(match[1]) ? link : null;
 }

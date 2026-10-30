@@ -38,6 +38,15 @@ describe("bounded internal listing review helpers", () => {
     for (const link of ["#company/listings", "#company/orders", "#admin/queue", "#admin/activity", "#admin/disputes", "#admin/users", "#company/listing/FM-1", "#admin/review/FM-1", "#company/orders/ORD%2F1", "#admin/orders/ORD-1", "#admin/disputes/d%2F1"]) expect(safeActivityLink(link)).toBe(link);
     for (const link of [null, undefined, "", "javascript:alert(1)", "https://example.test", "//example.test", "#marketplace/orders/ORD-1", "#admin/batches/B-1", "#company/facilities/f1", "#admin/users/", "#admin/users/u1", "#admin/users?next=https://example.test", "#admin/users%00", "#admin/review/", "#admin/review/a/extra", "#admin/review/%", "#admin/review/%0A", "#admin/review/%20", "#admin/review/a?next=https://example.test", " #company/orders", "#company/orders\n"]) expect(safeActivityLink(link)).toBeNull();
   });
+  it("allows canonical company batch destinations but not unmounted batch decisions", () => {
+    for (const link of ["#company/batches", "#company/batches/BATCH-1", `#company/batches/c${"a".repeat(24)}`]) expect(safeActivityLink(link)).toBe(link);
+    for (const link of ["#admin/batches", "#admin/batches/BATCH-1", "#company/batches/new", "#company/batches/BATCH-1/edit", "#company/batches/BATCH-1?x=1", "#company/batches/%42ATCH-1", "#company/batches/unknown", "#company/batches/"]) expect(safeActivityLink(link)).toBeNull();
+  });
+  it("allows canonical facility workspaces but never private content or submission links", () => {
+    const id = `c${"a".repeat(24)}`;
+    for (const link of ["#company/facilities", "#admin/facilities", `#company/facilities/${id}`, `#admin/facilities/${id}`, `#admin/facilities/${id}/review`]) expect(safeActivityLink(link)).toBe(link);
+    for (const link of ["#company/facilities/new", `#company/facilities/${id}/verification`, `#company/facilities/${id}/edit`, `#admin/facilities/${id}/edit`, `#company/facilities/${id}?x=1`, `#company/facilities/%63${"a".repeat(24)}`, `#company/facilities/${id}/verification/documents/${id}/content`, "/uploads/private/document.pdf"]) expect(safeActivityLink(link)).toBeNull();
+  });
   it("formats integer VND without conversion and dates explicitly in UTC", () => {
     expect(activityLimits).toEqual([100, 200, 300]);
     expect(reviewMoney(1250000, "en")).toBe("1,250,000 ₫");
