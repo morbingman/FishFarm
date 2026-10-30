@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from "vitest";
-import type { Sponsorship } from "./sponsorshipContracts";
+import type { Sponsorship, SponsorshipLedgerEntry } from "./sponsorshipContracts";
 
 const at = "2026-10-28T00:00:00.000Z";
 const tranches = () => [
@@ -47,6 +47,48 @@ describe("sponsorship transport", () => {
     expect(new Headers(init.headers).get("Authorization")).toBe("Bearer test-token");
     fetch.mockResolvedValueOnce(response({ items: [remote(), remote()], total: 1 }));
     await expect(sponsorshipsApi.mine()).rejects.toMatchObject({ code: "sponsorship.invalidResponse" });
+  });
+
+  it("reads the money ledger with strict rows, pagination and zero-fetch invalid paging", async () => {
+    const ledgerRow = (overrides: Partial<SponsorshipLedgerEntry> = {}): SponsorshipLedgerEntry => ({
+      id: "payment00001", sponsorshipId: "sponsorship0001", shares: 2, sponsorshipStatus: "funded",
+      batchCode: "BATCH-1024", batchTitle: "Pond fish", purpose: "sponsorship_package", method: "e_wallet",
+      amount: 200, state: "paid", createdAt: at, paidAt: at, refundedAt: null, ...overrides,
+    });
+    const fetch = vi.fn(async (_url: string, _init: RequestInit) => response({ items: [ledgerRow()], total: 1 })); vi.stubGlobal("fetch", fetch);
+    await session(fetch);
+    const { sponsorshipsApi } = await import("./sponsorshipsApi");
+    await expect(sponsorshipsApi.ledger()).resolves.toEqual({ items: [ledgerRow()], total: 1 });
+    expect(fetch).toHaveBeenCalledTimes(1);
+    const [url, init] = fetch.mock.calls[0];
+    expect(url).toBe("/v1/me/sponsorships/ledger"); expect(init.method).toBeUndefined(); expect(init.body).toBeUndefined(); expect(init.credentials).toBe("include");
+    fetch.mockClear();
+    await expect(sponsorshipsApi.ledger(2, 50)).resolves.toEqual({ items: [ledgerRow()], total: 1 });
+    expect(fetch.mock.calls[0][0]).toBe("/v1/me/sponsorships/ledger?skip=2&take=50");
+    for (const paging of [[0], [-1], [1.5], [10_001], [undefined, 0], [undefined, 101]] as const) {
+      await expect(sponsorshipsApi.ledger(paging[0], paging[1])).rejects.toBeInstanceOf(Error);
+    }
+    expect(fetch).toHaveBeenCalledTimes(1);
+    for (const value of [
+      { items: [ledgerRow()], total: 0 },
+      { items: [ledgerRow()], total: "many" },
+      { items: [{ ...ledgerRow(), id: "short" }], total: 1 },
+      { items: [{ ...ledgerRow(), purpose: "order_full" }], total: 1 },
+      { items: [{ ...ledgerRow(), state: "ready" }], total: 1 },
+      { items: [{ ...ledgerRow(), paidAt: null }], total: 1 },
+      { items: [{ ...ledgerRow(), refundedAt: at }], total: 1 },
+      { items: [{ ...ledgerRow(), purpose: "refund", state: "refunded", refundedAt: at, paidAt: at }], total: 1 },
+      { items: [{ ...ledgerRow(), purpose: "sponsorship_package", state: "refunded", refundedAt: at, paidAt: null }], total: 1 },
+      { items: [{ ...ledgerRow(), amount: 0 }], total: 1 },
+      { items: [{ ...ledgerRow(), batchCode: "internalbatch01" }], total: 1 },
+      { items: [ledgerRow(), ledgerRow()], total: 1 },
+    ]) {
+      fetch.mockResolvedValueOnce(response(value));
+      await expect(sponsorshipsApi.ledger()).rejects.toMatchObject({ code: "sponsorship.invalidResponse" });
+    }
+    // Counting window starts at mockClear: one paging fetch plus twelve
+    // malformed-response fetches; invalid paging args never reach the wire.
+    expect(fetch).toHaveBeenCalledTimes(13);
   });
 
   it("reads one sponsorship and its reconciled escrow view", async () => {

@@ -1,6 +1,6 @@
 import { api, ApiError, apiSessionStamp, isApiSession } from "./api";
 import { BatchValidationError, isRecord, safeInteger, validBatchDate, validBatchIdentifier, validBatchMediaUrl } from "./batches";
-import type { BatchGrowResult, BatchHarvestResult, EscrowMilestone, EscrowState, PaymentMethod, Sponsorship, SponsorshipEscrow, SponsorshipPage, SponsorshipStatus } from "./sponsorshipContracts";
+import type { BatchGrowResult, BatchHarvestResult, EscrowMilestone, EscrowState, PaymentMethod, Sponsorship, SponsorshipEscrow, SponsorshipLedgerEntry, SponsorshipLedgerPage, SponsorshipPage, SponsorshipStatus } from "./sponsorshipContracts";
 import { paymentMethods } from "./sponsorshipContracts";
 import { canCancelSponsorship, canConfirmDelivery, canPaySponsorship, escrowReconciles, normalizeReservationInput, normalizeSponsorshipReason, retainedSponsorshipTerms, sponsorshipStatuses, snapshotCode } from "./sponsorships";
 
@@ -83,6 +83,28 @@ export function validateSponsorship(value: unknown): Sponsorship {
 }
 function unique<T extends { id: string }>(values: T[]): T[] { if (new Set(values.map(v => v.id)).size !== values.length) fail(); return values; }
 
+const LEDGER_PURPOSES = ["sponsorship_package", "delivery_fee", "refund"] as const;
+const LEDGER_STATES = ["paid", "refunded"] as const;
+const LEDGER_KEYS = ["id", "sponsorshipId", "shares", "sponsorshipStatus", "batchCode", "batchTitle", "purpose", "method", "amount", "state", "createdAt", "paidAt", "refundedAt"];
+
+// §11 owner history: sponsorship payments are the ledger source; the module only
+// ever creates paid or refunded rows, so anything else is a foreign shape.
+function validateLedgerEntry(value: unknown): SponsorshipLedgerEntry {
+  const v = object(value, LEDGER_KEYS);
+  if (typeof v.id !== "string" || v.id.length < 8 || !SPONSORSHIP_ID.test(v.sponsorshipId as string)) fail();
+  if (!safeInteger(v.shares, 1) || typeof v.batchCode !== "string" || !/^BATCH-[1-9]\d*$/.test(v.batchCode) || !text(v.batchTitle, 1, 120)) fail();
+  if (!LEDGER_PURPOSES.includes(v.purpose as typeof LEDGER_PURPOSES[number]) || !text(v.method) || !safeInteger(v.amount, 1)) fail();
+  if (!LEDGER_STATES.includes(v.state as typeof LEDGER_STATES[number]) || !sponsorshipStatuses.includes(v.sponsorshipStatus as SponsorshipStatus)) fail();
+  if (!date(v.createdAt) || !nullableDate(v.paidAt) || !nullableDate(v.refundedAt)) fail();
+  if (v.state === "paid" && (v.paidAt === null || v.refundedAt !== null)) fail();
+  if (v.state === "refunded" && v.refundedAt === null) fail();
+  // Shortfall refunds are refund-purpose rows never marked paid; package and fee
+  // refunds flip the original paid row, keeping paidAt.
+  if (v.purpose === "refund" && v.paidAt !== null) fail();
+  if (v.purpose !== "refund" && v.state === "refunded" && v.paidAt === null) fail();
+  return immutableId(v as unknown as SponsorshipLedgerEntry);
+}
+
 function requestedId(id: string): string {
   if (!SPONSORSHIP_ID.test(id) || /[\s\u0000-\u001f\u007f]/.test(id)) throw new BatchValidationError("id");
   return id;
@@ -110,6 +132,16 @@ export const sponsorshipsApi = {
     const v = object(await api<unknown>("/me/sponsorships", { signal }), ["items", "total"]);
     if (!safeInteger(v.total, 0)) fail();
     const rows = unique(array(v.items).map(validateSponsorship));
+    if (rows.length > v.total) fail();
+    return { items: rows, total: v.total };
+  },
+  ledger: async (skip?: number, take?: number, signal?: AbortSignal): Promise<SponsorshipLedgerPage> => {
+    if (skip !== undefined && (!Number.isSafeInteger(skip) || skip < 1 || skip > 10_000)) throw new BatchValidationError("skip");
+    if (take !== undefined && (!Number.isSafeInteger(take) || take < 1 || take > 100)) throw new BatchValidationError("take");
+    const query = [skip !== undefined ? `skip=${skip}` : "", take !== undefined ? `take=${take}` : ""].filter(Boolean).join("&");
+    const v = object(await api<unknown>(`/me/sponsorships/ledger${query ? `?${query}` : ""}`, { signal }), ["items", "total"]);
+    if (!safeInteger(v.total, 0)) fail();
+    const rows = unique(array(v.items).map(validateLedgerEntry));
     if (rows.length > v.total) fail();
     return { items: rows, total: v.total };
   },

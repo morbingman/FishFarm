@@ -888,6 +888,98 @@ describe('Batch sponsorship (e2e)', () => {
       .expect(409);
   });
 
+  it('lists the sponsor money history across sponsorships with pagination and isolation', async () => {
+    // A harvested sponsorship with a delivery fee: package 100000 paid + fee 10000 paid.
+    const fee = await harvestedSponsorship('ledger', 2, 5000);
+    await request(app.getHttpServer())
+      .post(`/v1/sponsorships/${fee.sponsorshipId}/pay-delivery-fee`)
+      .set(auth(userToken))
+      .send({ paymentMethod: 'e_wallet' })
+      .expect(200);
+    // A funded reservation cancelled before growing: its package payment flips to refunded.
+    const refundBatch = await publishedBatch('ledger-refund', 10);
+    const refunded = await request(app.getHttpServer())
+      .post(`/v1/batches/${refundBatch}/sponsorships`)
+      .set(auth(userToken))
+      .send(reservation({ shares: 1 }))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/v1/sponsorships/${refunded.body.id}/pay`)
+      .set(auth(userToken))
+      .send({ paymentMethod: 'e_wallet' })
+      .expect(200);
+    await request(app.getHttpServer())
+      .post(`/v1/sponsorships/${refunded.body.id}/cancel`)
+      .set(auth(userToken))
+      .send({ reason: 'Ledger refund check' })
+      .expect(200);
+    // A foreign sponsorship whose payments must never appear in this ledger.
+    const foreignBatch = await publishedBatch('ledger-foreign', 10);
+    const foreign = await request(app.getHttpServer())
+      .post(`/v1/batches/${foreignBatch}/sponsorships`)
+      .set(auth(secondUserToken))
+      .send(reservation({ shares: 1 }))
+      .expect(201);
+    await request(app.getHttpServer())
+      .post(`/v1/sponsorships/${foreign.body.id}/pay`)
+      .set(auth(secondUserToken))
+      .send({ paymentMethod: 'e_wallet' })
+      .expect(200);
+
+    await request(app.getHttpServer()).get('/v1/me/sponsorships/ledger').expect(401);
+    await request(app.getHttpServer()).get('/v1/me/sponsorships/ledger').set(auth(adminToken)).expect(403);
+    for (const query of ['?skip=0', '?take=0', '?take=101', '?skip=1.5']) {
+      await request(app.getHttpServer())
+        .get(`/v1/me/sponsorships/ledger${query}`)
+        .set(auth(userToken))
+        .expect(400);
+    }
+
+    const list = await request(app.getHttpServer())
+      .get('/v1/me/sponsorships/ledger?take=100')
+      .set(auth(userToken))
+      .expect(200);
+    const items = list.body.items as Array<Record<string, unknown>>;
+    expect(typeof list.body.total).toBe('number');
+    expect(list.body.total as number).toBeGreaterThanOrEqual(items.length);
+    expect(items.length).toBeGreaterThanOrEqual(3);
+    // Newest first, with only this sponsor's rows.
+    for (let index = 1; index < items.length; index += 1) {
+      expect(Date.parse(items[index].createdAt as string)).toBeLessThanOrEqual(Date.parse(items[index - 1].createdAt as string));
+    }
+    expect(items.some((row) => row.batchCode === foreignBatch)).toBe(false);
+    // Every ledger row carries its batch and sponsorship context.
+    for (const row of items) {
+      expect(typeof row.batchCode).toBe('string');
+      expect(typeof row.batchTitle).toBe('string');
+      expect(typeof row.sponsorshipId).toBe('string');
+      expect(typeof row.shares).toBe('number');
+    }
+    const feeRow = items.find((row) => row.purpose === 'delivery_fee' && row.batchCode === fee.batchCode);
+    expect(feeRow).toMatchObject({ amount: 10000, state: 'paid', shares: 2, sponsorshipStatus: 'ready_for_delivery' });
+    expect(typeof feeRow?.paidAt).toBe('string');
+    const refundedRow = items.find((row) => row.purpose === 'sponsorship_package' && row.batchCode === refundBatch);
+    expect(refundedRow).toMatchObject({ amount: 50000, state: 'refunded' });
+    expect(typeof refundedRow?.refundedAt).toBe('string');
+    const packageRow = items.find((row) => row.purpose === 'sponsorship_package' && row.batchCode === fee.batchCode);
+    expect(packageRow).toMatchObject({ amount: 100000, state: 'paid' });
+
+    // Bounded pagination keeps the total and returns ordered slices.
+    const page = await request(app.getHttpServer())
+      .get('/v1/me/sponsorships/ledger?take=1&skip=1')
+      .set(auth(userToken))
+      .expect(200);
+    expect(page.body.items).toHaveLength(1);
+    expect(page.body.total).toBe(list.body.total);
+    expect(page.body.items[0].id).toBe(items[1].id);
+    const far = await request(app.getHttpServer())
+      .get('/v1/me/sponsorships/ledger?take=1&skip=10000')
+      .set(auth(userToken))
+      .expect(200);
+    expect(far.body.items).toEqual([]);
+    expect(far.body.total).toBe(list.body.total);
+  });
+
   it('restricts sponsorship disputes to eligible owned paid records', async () => {
     const { sponsorshipId, unpaidId } = await growingSponsorship('eligible', 1, 1);
 

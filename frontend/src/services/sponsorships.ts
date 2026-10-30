@@ -48,7 +48,7 @@ export function reservationPayDeadline(record: Pick<Sponsorship, "status" | "cre
 
 /** §11.4: the optional delivery fee charged at harvest sits outside escrow and
  *  must be paid before the sponsor can confirm delivery. */
-export const deliveryFeeOutstanding = (record: Pick<Sponsorship, "status" | "deliveryFee" | "payments">): boolean =>
+export const deliveryFeeOutstanding = (record: Pick<Sponsorship, "status" | "deliveryFee" | "totalAmount" | "payments">): boolean =>
   record.status === "ready_for_delivery"
   && record.deliveryFee > 0
   && !record.payments.some(row => row.purpose === "delivery_fee" && row.state === "paid");

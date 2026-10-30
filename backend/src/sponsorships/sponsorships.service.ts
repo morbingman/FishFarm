@@ -19,7 +19,7 @@ import {
   SponsorshipStatus,
 } from '../generated/prisma/enums.js';
 import { PrismaService } from '../prisma/prisma.service.js';
-import type { CreateSponsorshipDto, HarvestBatchDto, ListSponsorshipsDto, PaySponsorshipDto } from './dto/sponsorship.dto.js';
+import type { CreateSponsorshipDto, HarvestBatchDto, LedgerQueryDto, ListSponsorshipsDto, PaySponsorshipDto } from './dto/sponsorship.dto.js';
 
 /** Escrow split per §11.2/§11.8: 30% stocking, 40% mid-growth, remainder at harvest. */
 const ESCROW_SPLIT = [
@@ -379,6 +379,58 @@ export class SponsorshipsService {
       this.prisma.sponsorship.count({ where }),
     ]);
     return { items, total };
+  }
+
+  /** §11 owner history: the sponsor's money events across all their sponsorships,
+   *  newest first. Payments are the single ledger source — package and delivery-fee
+   *  payments (a funded cancellation flips the original row to refunded) plus the
+   *  refund-purpose rows shortfall issues. Unpaid reservations have no rows. */
+  async ledger(userId: string, query: LedgerQueryDto) {
+    const where: Prisma.PaymentWhereInput = { sponsorship: { sponsorId: userId } };
+    const [rows, total] = await Promise.all([
+      this.prisma.payment.findMany({
+        where,
+        orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
+        skip: query.skip,
+        take: query.take ?? 50,
+        select: {
+          id: true,
+          sponsorshipId: true,
+          purpose: true,
+          method: true,
+          amount: true,
+          state: true,
+          createdAt: true,
+          paidAt: true,
+          refundedAt: true,
+          sponsorship: { select: { shares: true, status: true, batch: { select: { code: true, title: true } } } },
+        },
+      }),
+      this.prisma.payment.count({ where }),
+    ]);
+    return {
+      items: rows.map((row) => {
+        // The where clause guarantees the sponsorship exists; the type follows the
+        // nullable Payment.sponsorshipId column.
+        const sponsorship = row.sponsorship!;
+        return {
+          id: row.id,
+          sponsorshipId: row.sponsorshipId,
+          shares: sponsorship.shares,
+          sponsorshipStatus: sponsorship.status,
+          batchCode: sponsorship.batch.code,
+          batchTitle: sponsorship.batch.title,
+          purpose: row.purpose,
+          method: row.method,
+          amount: row.amount,
+          state: row.state,
+          createdAt: row.createdAt,
+          paidAt: row.paidAt,
+          refundedAt: row.refundedAt,
+        };
+      }),
+      total,
+    };
   }
 
   async one(user: AuthenticatedUser, id: string) {

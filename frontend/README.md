@@ -405,6 +405,40 @@ occurred in this slice. Existing data and the untracked acceptance screenshot we
 no new development preservation-fingerprint run is claimed. Review queue/approval/rejection,
 hard deletion and sponsorship/financial actions remain outside this slice. Chat remains dropped.
 
+### Latest owner ledger verification — 2026-10-31, closing
+
+Milestone-15 slice: the §4.24 owner-history item — a read-only money history across all of a
+sponsor's sponsorships, newest first. Backend surface consumed: `GET /v1/me/sponsorships/ledger`
+(User `batch.sponsor`) with optional `skip` (1–10,000) / `take` (1–100, default 50); one read
+over the Payment ledger filtered to the caller's sponsorships, ordered `createdAt desc, id asc`,
+each entry flattened with shares, sponsorship status and batch code/title. Unpaid reservations
+have no payment rows and never appear; refunds surface as `refunded` rows (funded-cancel flips
+paid package rows, keeping paidAt and setting refundedAt; shortfall refunds are purpose-`refund`
+rows with paidAt null). No schema or migration change.
+
+Frontend changes: `services/sponsorshipContracts.ts` gained `SponsorshipLedgerEntry` /
+`SponsorshipLedgerPage`; `services/sponsorshipsApi.ts` gained `ledger(skip?, take?, signal?)` —
+local paging validation (invalid args throw with zero fetches), exact key-set row validation
+enforcing the state/purpose/date invariants (paid rows carry paidAt and no refundedAt; refunded
+rows carry refundedAt; refund-purpose rows never carry paidAt; duplicate ids rejected); the my-
+sponsorships list effect now loads `mine()` and `ledger(undefined, 50)` together, and
+`pages/marketplace/Sponsorships.tsx` gained a "Money history · newest first, refunds included"
+table below the sponsorships table with batch links, EN/VI purpose/state labels, UTC dates and
+an explicit empty state.
+
+Verification: frontend **1006 tests in 27 files** (new: strict ledger row validation matrix
+covering malformed totals, ids, purposes, states and dates, pagination query construction,
+zero-fetch invalid paging and the corrected fetch-count window), typecheck and production build
+clean. Backend regression: **442 isolated e2e tests in twelve suites** (one new: ledger
+ordering, exact fee/refund/package row shapes and states, foreign-sponsor isolation, guest/Admin
+refusals, four invalid paging params, skip/take pagination with stable totals), 27 unit tests,
+lint clean, build clean, on the guarded `_test` database.
+
+Limits: helper testing plus source review, not browser acceptance — the Money history table and
+its EN/VI strings remain GUI-unverified. No development login, live mutations, uploads, database
+writes or resets occurred. M15 remains uncommitted on `integration/team-baseline`; nothing was
+pushed, merged or deployed. Chat remains dropped.
+
 ### Latest delivery fee verification — 2026-10-31, closing
 
 Milestone-14 slice closing the last §11.4 item: the optional delivery fee charged per share at

@@ -125,3 +125,19 @@ export class ListSponsorshipsDto {
   @Max(100)
   take?: number;
 }
+
+export class LedgerQueryDto {
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(10_000)
+  skip?: number;
+
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  @Max(100)
+  take?: number;
+}

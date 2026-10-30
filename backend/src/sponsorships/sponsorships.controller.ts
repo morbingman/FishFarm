@@ -6,6 +6,7 @@ import type { AuthenticatedUser } from '../auth/types.js';
 import { SponsorshipsService } from './sponsorships.service.js';
 import {
   CreateSponsorshipDto,
+  LedgerQueryDto,
   ListSponsorshipsDto,
   PaySponsorshipDto,
   SponsorshipCancelDto,
@@ -37,6 +38,13 @@ export class SponsorshipsController {
   @ApiOperation({ summary: 'My sponsorships, newest first' })
   mine(@CurrentUser() user: AuthenticatedUser, @Query() query: ListSponsorshipsDto) {
     return this.sponsorships.mine(user.id, query);
+  }
+
+  @Get('me/sponsorships/ledger')
+  @RequirePermissions('batch.sponsor')
+  @ApiOperation({ summary: 'My money history across all sponsorships, newest first (owner history)' })
+  ledger(@CurrentUser() user: AuthenticatedUser, @Query() query: LedgerQueryDto) {
+    return this.sponsorships.ledger(user.id, query);
   }
 
   @Get('sponsorships/:id')

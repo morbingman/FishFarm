@@ -8,7 +8,7 @@ import { disputeLabel, disputeReasons, evidenceTypes, sponsorshipDisputeEligible
 import type { Dispute, DisputeReason } from "@/services/contracts";
 import { batchRoute } from "@/services/batches";
 import { canCancelSponsorship, canConfirmDelivery, canPaySponsorship, deliveryFeeOutstanding, normalizeSponsorshipReason, reservationPayDeadline, retainedSponsorshipTerms, sponsorshipRoute, sponsorshipStatusLabel, parseSponsorshipRoute } from "@/services/sponsorships";
-import { paymentMethods, type PaymentMethod, type Sponsorship, type SponsorshipStatus } from "@/services/sponsorshipContracts";
+import { paymentMethods, type PaymentMethod, type Sponsorship, type SponsorshipLedgerEntry, type SponsorshipStatus } from "@/services/sponsorshipContracts";
 import { useHashTransitionGuard } from "@/services/hashNavigation";
 import { batchUtc } from "@/components/batches/BatchDetails";
 import "./PublicMarketplace.css";
@@ -17,6 +17,8 @@ import "./Orders.css";
 type Confirmation = { action: "pay" | "cancel" | "deliver" | "fee"; id: string; record: string; reason: string; method: PaymentMethod | null; sequence: number; revision: number; hash: string };
 const money = (value: number, vi: boolean) => `${value.toLocaleString(vi ? "vi-VN" : "en-US")} ₫`;
 const fundedAck = (status: SponsorshipStatus) => status === "funded" || status === "growing";
+const ledgerPurposeLabel = (purpose: SponsorshipLedgerEntry["purpose"], vi: boolean) => purpose === "sponsorship_package" ? (vi ? "Package payment" : "Thanh toán gói") : purpose === "delivery_fee" ? (vi ? "Delivery fee" : "Phí giao hàng") : (vi ? "Refund" : "Hoàn tiền");
+const ledgerStateLabel = (state: SponsorshipLedgerEntry["state"], vi: boolean) => state === "paid" ? (vi ? "Paid" : "Đã trả") : (vi ? "Refunded" : "Đã hoàn");
 
 export default function Sponsorships({ sponsorshipId }: { sponsorshipId: string | null }) {
   const { language } = useTranslation();
@@ -25,6 +27,7 @@ export default function Sponsorships({ sponsorshipId }: { sponsorshipId: string 
   const vi = language === "vi";
   const [stamp] = useState(apiSessionStamp);
   const [rows, setRows] = useState<Sponsorship[]>([]);
+  const [ledgerRows, setLedgerRows] = useState<SponsorshipLedgerEntry[]>([]);
   const [record, setRecord] = useState<Sponsorship | null>(null);
   const [method, setMethod] = useState<PaymentMethod>("e_wallet");
   const [reason, setReason] = useState("");
@@ -64,7 +67,7 @@ export default function Sponsorships({ sponsorshipId }: { sponsorshipId: string 
     const abort = new AbortController(); controller.current?.abort(); controller.current = abort;
     const read = ++sequence.current;
     const current = () => alive.current && !abort.signal.aborted && sameSession() && sequence.current === read;
-    reading.current = true; invalidate(); setRows([]); setRecord(null); setDispute(null); setDisputeText(""); setDisputeUploads([]); setLoading(true); setError("");
+    reading.current = true; invalidate(); setRows([]); setLedgerRows([]); setRecord(null); setDispute(null); setDisputeText(""); setDisputeUploads([]); setLoading(true); setError("");
     if (!sameSession()) { reading.current = false; setLoading(false); return () => abort.abort(); }
     const request = sponsorshipId ? Promise.all([
       sponsorshipsApi.detail(sponsorshipId, abort.signal),
@@ -76,7 +79,12 @@ export default function Sponsorships({ sponsorshipId }: { sponsorshipId: string 
         setDispute(existing.find(row => row.kind === "sponsorship" && row.sponsorship?.id === value.id) ?? null);
       }
     })
-      : sponsorshipsApi.mine(abort.signal).then(page => { if (current()) setRows(page.items); });
+      : Promise.all([
+        sponsorshipsApi.mine(abort.signal),
+        sponsorshipsApi.ledger(undefined, 50, abort.signal),
+      ]).then(([page, ledger]) => {
+        if (current()) { setRows(page.items); setLedgerRows(ledger.items); }
+      });
     void request.then(() => { if (current()) { refreshRequired.current = false; attempted.current = false; setNeedsRefresh(false); } })
       .catch(failure => { if (current()) { refreshRequired.current = true; setNeedsRefresh(true); setError(errorMessage(failure, language)); } })
       .finally(() => { if (current()) { reading.current = false; setLoading(false); } });
@@ -191,6 +199,7 @@ export default function Sponsorships({ sponsorshipId }: { sponsorshipId: string 
     {error && <p role="alert" className="batch-notice">{error}</p>}{notice && <p role="status" className="batch-notice">{notice}</p>}
     {needsRefresh && <p className="batch-notice">{tr("Private records and actions are hidden or blocked until a successful authoritative Refresh. Refresh discards local cancellation text.", "Bản ghi riêng tư và thao tác bị ẩn hoặc khóa đến khi Làm mới chính thức thành công. Làm mới bỏ lý do hủy cục bộ.")}</p>}
     {!sponsorshipId && !blocked && <div className="batch-table-wrap"><table><caption>{tr("My reservations and sponsorships", "Đơn giữ chỗ và bảo trợ của tôi")}</caption><thead><tr><th>{tr("Batch", "Lô")}</th><th>{tr("Shares", "Số phần")}</th><th>{tr("Total", "Tổng")}</th><th>{tr("Status", "Trạng thái")}</th><th>{tr("Created · UTC", "Tạo · UTC")}</th></tr></thead><tbody>{rows.length ? rows.map(row => <tr key={row.id}><td><a href={sponsorshipRoute(row.id)}>{row.batch.title}</a><br />{row.batch.code} · {row.batch.species}</td><td>{row.shares}</td><td>{money(row.totalAmount, vi)}</td><td>{sponsorshipStatusLabel(row.status, vi)}{reservationPayDeadline(row) && <><br /><span>{tr("Pay by", "Trả trước")}: {batchUtc(reservationPayDeadline(row)!, "—")}</span></>}</td><td>{batchUtc(row.createdAt, "—")}</td></tr>) : <tr><td colSpan={5}>{tr("No sponsorships recorded on this account.", "Tài khoản này chưa có bảo trợ nào.")}</td></tr>}</tbody></table></div>}
+    {!sponsorshipId && !blocked && <div className="batch-table-wrap"><table><caption>{tr("Money history · newest first, refunds included", "Lịch sử tiền · mới nhất trước, gồm hoàn tiền")}</caption><thead><tr><th>{tr("Batch", "Lô")}</th><th>{tr("Purpose", "Khoản")}</th><th>{tr("Amount", "Số tiền")}</th><th>{tr("State", "Trạng thái")}</th><th>{tr("Created · UTC", "Tạo · UTC")}</th></tr></thead><tbody>{ledgerRows.length ? ledgerRows.map(row => <tr key={row.id}><td><a href={sponsorshipRoute(row.sponsorshipId)}>{row.batchTitle}</a><br />{row.batchCode} · {row.shares} {tr("share(s)", "phần")}</td><td>{ledgerPurposeLabel(row.purpose, vi)}</td><td>{money(row.amount, vi)}</td><td>{ledgerStateLabel(row.state, vi)}</td><td>{batchUtc(row.createdAt, "—")}</td></tr>) : <tr><td colSpan={5}>{tr("No payments recorded yet; unpaid reservations only appear once paid.", "Chưa ghi nhận thanh toán nào; đơn giữ chưa trả chỉ xuất hiện sau khi trả.")}</td></tr>}</tbody></table></div>}
     {sponsorshipId && record && <div>
       <section className="batch-panel"><h2>{record.batch.code} · {sponsorshipStatusLabel(record.status, vi)}</h2><a href={batchRoute("detail", record.batch.code, false)}>{tr("Open public batch detail", "Mở chi tiết lô công khai")}</a><p>{record.shares} × {record.batch.shareUnit} · {money(record.packageAmount, vi)}{record.deliveryFee ? ` + ${money(record.deliveryFee, vi)} ${tr("delivery", "giao hàng")}` : ""}</p><p>{record.batch.title} · {record.batch.species} · {record.batch.location}</p>{record.batch.images[0] && <img src={record.batch.images[0].url} alt={record.batch.title} className="batch-cover" />}<p>{tr("Delivery", "Giao hàng")}: {record.recipientName}, {record.phone}, {record.address}{record.city ? `, ${record.city}` : ""}{record.province ? `, ${record.province}` : ""}{record.deliveryMethod ? ` · ${record.deliveryMethod}` : ""}</p><p>{tr("Reserved", "Đặt lúc")}: {batchUtc(record.createdAt, "—")}{reservationPayDeadline(record) ? ` · ${tr("Pay by", "Trả trước")}: ${batchUtc(reservationPayDeadline(record)!, "—")}` : ""}{record.paidAt ? ` · ${tr("Paid", "Trả lúc")}: ${batchUtc(record.paidAt, "—")}` : ""}{record.cancelledAt ? ` · ${tr("Cancelled", "Hủy lúc")}: ${batchUtc(record.cancelledAt, "—")}` : ""}</p></section>
       <section className="batch-panel"><h2>{tr("Terms snapshot", "Bản ghi điều khoản đã khóa")}</h2><p>{tr("termsVersion", "phiên bản điều khoản")}: {String(record.termsSnapshot.termsVersion ?? "—")} · {tr("contingency", "dự phòng")}: {String(record.termsSnapshot.contingencyPct ?? "—")}%</p><p className="batch-copy">{String(record.termsSnapshot.riskDisclosure ?? "")}</p></section>

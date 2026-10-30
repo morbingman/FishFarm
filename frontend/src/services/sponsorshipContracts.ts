@@ -81,4 +81,21 @@ export type SponsorshipEscrow = {
   reversed: number;
 };
 
+export type SponsorshipLedgerEntry = {
+  id: string;
+  sponsorshipId: string;
+  shares: number;
+  sponsorshipStatus: SponsorshipStatus;
+  batchCode: string;
+  batchTitle: string;
+  purpose: "sponsorship_package" | "delivery_fee" | "refund";
+  method: string;
+  amount: number;
+  state: "paid" | "refunded";
+  createdAt: string;
+  paidAt: string | null;
+  refundedAt: string | null;
+};
+
 export type SponsorshipPage = { items: Sponsorship[]; total: number };
+export type SponsorshipLedgerPage = { items: SponsorshipLedgerEntry[]; total: number };
