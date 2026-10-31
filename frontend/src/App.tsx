@@ -102,8 +102,12 @@ export default function App() {
   else if (companyOrders) page = <Orders key={`${user?.email}:${route}`} company orderId={route.split("/").length === 3 ? route.split("/")[2] : null} />;
   else if (TOP.has(top)) page = <main className="public-market"><h1>{language === "vi" ? "Chức năng chưa khả dụng" : "Not available in this integration slice"}</h1><p>{language === "vi" ? "Chức năng này đang được tích hợp. Không có dữ liệu hay giao dịch mô phỏng." : "This feature is still being integrated. No demo records or simulated transactions are used."}</p><a href="#marketplace">{language === "vi" ? "Xem chợ cá" : "Browse marketplace"}</a></main>;
   else page = <main className="public-market"><h1>{language === "vi" ? "Không tìm thấy trang" : "Page not found"}</h1><a href="#home">Home</a></main>;
+  // The auth screens are standalone layouts with their own brand and topbar
+  // (Auth.css); the sticky site header above them duplicates that chrome and
+  // pushes the form past the viewport, so it is skipped there.
+  const authScreen = top === "login" || gated;
   return <LanguageContext.Provider value={{ language, setLanguage }}>
-    <SiteHeader language={language} setLanguage={setLanguage} />
+    {!authScreen && <SiteHeader language={language} setLanguage={setLanguage} />}
     {sessionError && <div className="public-market" role="alert">{sessionError} <button onClick={() => setRetry((n) => n + 1)}>{language === "vi" ? "Thử lại" : "Retry session"}</button></div>}
     <Suspense fallback={<p role="status">{language === "vi" ? "Đang tải…" : "Loading…"}</p>}>{page}</Suspense>
   </LanguageContext.Provider>;

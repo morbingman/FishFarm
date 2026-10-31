@@ -8,7 +8,9 @@
 .auth-app {
   --auth-border: var(--color-market-line);
   color: var(--color-market-navy);
-  min-height: 100dvh;
+  /* 58px bottom padding included: min-height + padding must equal exactly
+     100dvh or every auth screen scrolls by that amount. */
+  min-height: calc(100dvh - 58px);
   background: white;
   display: grid;
   grid-template-columns: 44% 56%;

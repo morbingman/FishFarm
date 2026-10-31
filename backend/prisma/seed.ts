@@ -1,5 +1,8 @@
 import 'dotenv/config';
 import * as argon2 from 'argon2';
+import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
+import { randomUUID } from 'node:crypto';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { PrismaClient } from '../src/generated/prisma/client.js';
 
@@ -174,7 +177,7 @@ async function seedListings(admins: SeededUser[]) {
       name: 'Betta Halfmoon Blue',
       species: 'Betta',
       breed: 'Halfmoon',
-      price: 38,
+      price: 250_000,
       sizeCm: 6,
       images: [PHOTOS[3]],
       mainIndex: 0,
@@ -186,7 +189,7 @@ async function seedListings(admins: SeededUser[]) {
       name: 'Arowana Silver 28 cm',
       species: 'Arowana',
       breed: 'Silver',
-      price: 260,
+      price: 2_500_000,
       sizeCm: 28,
       images: [PHOTOS[4]],
       mainIndex: 0,
@@ -198,7 +201,7 @@ async function seedListings(admins: SeededUser[]) {
       name: 'Kohaku Koi, 40 cm',
       species: 'Koi',
       breed: 'Kohaku',
-      price: 720,
+      price: 4_200_000,
       sizeCm: 40,
       images: [PHOTOS[0], PHOTOS[1]],
       mainIndex: 0,
@@ -211,7 +214,7 @@ async function seedListings(admins: SeededUser[]) {
       name: 'Ginrin Chagoi',
       species: 'Koi',
       breed: 'Chagoi',
-      price: 310,
+      price: 3_600_000,
       sizeCm: 35,
       images: [PHOTOS[2]],
       mainIndex: 0,
@@ -224,7 +227,7 @@ async function seedListings(admins: SeededUser[]) {
       name: 'Oranda Goldfish Pair',
       species: 'Goldfish',
       breed: 'Oranda',
-      price: 95,
+      price: 600_000,
       sizeCm: 12,
       images: [PHOTOS[4]],
       mainIndex: 0,
@@ -237,7 +240,7 @@ async function seedListings(admins: SeededUser[]) {
       name: 'Discus Pigeon Blood',
       species: 'Discus',
       breed: 'Pigeon Blood',
-      price: 120,
+      price: 900_000,
       sizeCm: 14,
       images: [PHOTOS[5]],
       mainIndex: 0,
@@ -251,7 +254,7 @@ async function seedListings(admins: SeededUser[]) {
       name: 'Kohaku Grow-out Reservation, 25–30 cm',
       species: 'Koi',
       breed: 'Kohaku',
-      price: 450,
+      price: 2_400_000,
       sizeCm: 25,
       images: [PHOTOS[1], PHOTOS[2]],
       mainIndex: 0,
@@ -537,7 +540,57 @@ async function seedBatch(users: Map<string, SeededUser>, author: SeededUser) {
   console.log(`  sponsorship ${sponsorship.id} — ${sponsorship.shares} shares`);
 }
 
-async function seedFarmVerification() {
+/**
+ * The public batch list only shows batches whose facility has current
+ * compliance with real uploaded documents (batches.service
+ * currentComplianceWhere + documents with an upload), so demo verification
+ * documents must be backed by actual Upload rows and files — rows with a
+ * null uploadId would hide the seeded batch from #farming.
+ */
+const DEMO_PDF = Buffer.from(
+  `%PDF-1.4
+1 0 obj << /Type /Catalog /Pages 2 0 R >> endobj
+2 0 obj << /Type /Pages /Kids [3 0 R] /Count 1 >> endobj
+3 0 obj << /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R /Resources << >> >> endobj
+4 0 obj << /Length 52 >> stream
+BT /F1 24 Tf 72 720 Td (FishFarm demo document) Tj ET
+endstream endobj
+trailer << /Root 1 0 R /Size 5 >>
+%%EOF
+`,
+  'utf8',
+);
+
+async function seedFarmVerification(admin: SeededUser) {
+  const { resolvePrivateUploadDir } = await import('../src/uploads/upload.config.js');
+  const privateDir = resolvePrivateUploadDir(process.env.UPLOAD_DIR);
+  await mkdir(privateDir, { recursive: true });
+  const documents: { type: string; name: string }[] = [
+    { type: 'business_registration', name: 'business.pdf' },
+    { type: 'owner_identity', name: 'identity.pdf' },
+    { type: 'land_use_rights', name: 'lease.pdf' },
+    { type: 'environmental_permit', name: 'water-permit.pdf' },
+    { type: 'veterinary_records', name: 'quarantine.pdf' },
+    { type: 'site_photos', name: 'site.pdf' },
+    { type: 'bank_account', name: 'bank.pdf' },
+  ];
+  const uploads: { id: string; url: string }[] = [];
+  for (const document of documents) {
+    const filename = `${randomUUID()}.pdf`;
+    await writeFile(join(privateDir, filename), DEMO_PDF);
+    uploads.push(
+      await prisma.upload.create({
+        data: {
+          ownerId: admin.id,
+          url: `/uploads/private/${filename}`,
+          mimeType: 'application/pdf',
+          sizeBytes: DEMO_PDF.byteLength,
+          purpose: 'farm_document',
+        },
+        select: { id: true, url: true },
+      }),
+    );
+  }
   await prisma.farmVerification.create({
     data: {
       facilityId: FACILITY_ID,
@@ -551,36 +604,11 @@ async function seedFarmVerification() {
       reviewedAt: new Date('2026-09-20T00:00:00.000Z'),
       reviewedBy: 'Company Admin',
       documents: {
-        create: [
-          {
-            type: 'business_registration',
-            url: 'https://storage.fishfarm.local/demo/fishfarm/business.pdf',
-          },
-          {
-            type: 'owner_identity',
-            url: 'https://storage.fishfarm.local/demo/fishfarm/identity.pdf',
-          },
-          {
-            type: 'land_use_rights',
-            url: 'https://storage.fishfarm.local/demo/fishfarm/lease.pdf',
-          },
-          {
-            type: 'environmental_permit',
-            url: 'https://storage.fishfarm.local/demo/fishfarm/water-permit.pdf',
-          },
-          {
-            type: 'veterinary_records',
-            url: 'https://storage.fishfarm.local/demo/fishfarm/quarantine.pdf',
-          },
-          {
-            type: 'site_photos',
-            url: 'https://storage.fishfarm.local/demo/fishfarm/site.zip',
-          },
-          {
-            type: 'bank_account',
-            url: 'https://storage.fishfarm.local/demo/fishfarm/bank.pdf',
-          },
-        ],
+        create: documents.map((document, index) => ({
+          type: document.type,
+          uploadId: uploads[index].id,
+          url: uploads[index].url,
+        })),
       },
     },
   });
@@ -600,7 +628,7 @@ async function seedOrders(
       code: 'ORD-10021',
       listingCode: 'FM-19544',
       quantity: 1,
-      shippingFee: 18,
+      shippingFee: 30_000,
       status: 'completed',
       paymentStatus: 'paid',
       deliveryMethod: 'Domestic overnight',
@@ -615,7 +643,7 @@ async function seedOrders(
       code: 'ORD-10022',
       listingCode: 'FM-18877',
       quantity: 2,
-      shippingFee: 12,
+      shippingFee: 25_000,
       status: 'shipped',
       paymentStatus: 'paid',
       deliveryMethod: 'Domestic overnight',
@@ -641,7 +669,7 @@ async function seedOrders(
       code: 'ORD-10024',
       listingCode: 'FM-19102',
       quantity: 1,
-      shippingFee: 15,
+      shippingFee: 35_000,
       status: 'paid',
       paymentStatus: 'paid',
       deliveryMethod: 'Domestic overnight',
@@ -653,7 +681,7 @@ async function seedOrders(
       code: 'ORD-10025',
       listingCode: 'FM-18420',
       quantity: 3,
-      shippingFee: 10,
+      shippingFee: 20_000,
       status: 'cancelled',
       paymentStatus: 'refunded',
       deliveryMethod: 'Domestic overnight',
@@ -767,7 +795,7 @@ async function main() {
 
   await seedNotifications(users);
   await seedActivity(users);
-  await seedFarmVerification();
+  await seedFarmVerification(users.get('admin@fishmarket.demo')!);
 
   console.log('Seeding batch sponsorship…');
   await seedBatch(users, admins[0]);
