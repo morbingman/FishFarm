@@ -163,6 +163,7 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
     expectedHarvestWeightG: tr("Expected whole-batch harvest biomass · grams", "Sinh khối thu hoạch dự kiến toàn lô · gam"), packagePricePerShare: tr("Package price per share · integer VND", "Giá gói mỗi phần · số nguyên VND"), contingencyPct: tr("Contingency percentage · 0–100", "Tỷ lệ dự phòng · 0–100"),
     riskDisclosure: tr("Risk disclosure · 20–4,000 characters", "Công bố rủi ro · 20–4.000 ký tự"), termsVersion: tr("Terms version", "Phiên bản điều khoản"), facilityId: tr("Existing facility", "Cơ sở hiện có"), images: tr("Public batch image URLs", "URL ảnh lô công khai"), costs: tr("Cost lines", "Dòng chi phí"),
     averageWeightG: tr("Average weight · grams, optional", "Khối lượng trung bình · gam, tùy chọn"), countAlive: tr("Count alive · optional", "Số cá còn sống · tùy chọn"), note: tr("Note · optional", "Ghi chú · tùy chọn"), photoUrls: tr("Public update photo URLs", "URL ảnh cập nhật công khai"), stage: tr("Recorded stage", "Giai đoạn ghi nhận"),
+    actualCount: tr("Surviving fish count (harvest)", "Số cá còn sống (thu hoạch)"), actualWeightG: tr("Actual whole-batch biomass · grams (harvest)", "Sinh khối thực tế toàn lô · gam (thu hoạch)"), deliveryFeePerShare: tr("Delivery fee per share", "Phí giao mỗi phần"),
   };
   const failureMessage = (failure: unknown) => failure instanceof BatchValidationError ? tr("Check field: ", "Kiểm tra trường: ") + (labels[failure.field] ?? (failure.field.startsWith("costs") ? labels.costs : failure.field)) : errorMessage(failure, language);
   useHashTransitionGuard(() => {
@@ -305,13 +306,15 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
       else if (action === "update") { const ack = await batchesApi.addUpdate(id!, updateInput!); updateId = ack.id; }
       else if (action === "grow") {
         const ack = await sponsorshipsApi.companyGrow(batch!.id);
-        if (ack.batch.id !== batch!.id || ack.batch.code !== batch!.id || ack.batch.status !== "growing") throw new Error("Unexpected growing acknowledgement");
-        id = ack.batch.id;
+        // The grow/harvest endpoints identify the batch by code; the row id is
+        // the server cuid, so only the code is compared against the open record.
+        if (ack.batch.code !== batch!.id || ack.batch.status !== "growing") throw new Error("Unexpected growing acknowledgement");
+        id = ack.batch.code;
       }
       else if (action === "harvest") {
         const ack = await sponsorshipsApi.companyHarvest(batch!.id, harvestInput!);
-        if (ack.batch.id !== batch!.id || ack.batch.code !== batch!.id || ack.batch.status !== "harvested" || ack.harvest.batchId !== batch!.id || ack.harvest.status !== "published" || !ack.harvest.publishedAt) throw new Error("Unexpected harvest acknowledgement");
-        id = ack.batch.id;
+        if (ack.batch.code !== batch!.id || ack.batch.status !== "harvested" || ack.harvest.status !== "published" || !ack.harvest.publishedAt) throw new Error("Unexpected harvest acknowledgement");
+        id = ack.batch.code;
       }
       else {
         const ack = action === "publish" ? await batchesApi.publish(id!) : creating ? await batchesApi.create(input as BatchInput) : await batchesApi.save(id!, input!);
@@ -432,11 +435,11 @@ export default function CompanyBatches({ mode, batchId }: { mode: "list" | "new"
       <p>{tr("Publishing the harvest moves this Growing batch to Harvested and every funded sponsorship to Ready for delivery. The server releases the mid-growth escrow tranche, computes mortality and per-share yield, and refunds any shortfall from the held harvest tranche (30% of each package); a shortfall refund never exceeds that held tranche. An optional delivery fee per share (§11.4) is charged to every growing sponsorship at harvest, outside the escrow; sponsors pay it themselves before confirming delivery. Buyers confirm delivery themselves in their sponsorship records and can file one dispute from growing onward.", "Công bố thu hoạch chuyển lô Đang nuôi sang Đã thu hoạch và mỗi bảo trợ đã thanh toán sang Sẵn sàng giao. Máy chủ nhả khoản ký quỹ giữa vụ, tính tỷ lệ chết và sản lượng mỗi phần, và hoàn khoản thiếu hụt từ khoản ký quỹ thu hoạch đang giữ (30% mỗi gói); hoàn tiền thiếu hụt không vượt khoản đang giữ. Phí giao hàng theo phần (tùy chọn, §11.4) được tính cho mọi bảo trợ đang nuôi khi thu hoạch, ngoài quỹ; nhà tài trợ tự trả trước khi xác nhận nhận hàng. Người mua tự xác nhận giao hàng trong bản ghi bảo trợ và có thể mở một khiếu nại từ giai đoạn nuôi.")}</p>
       <fieldset disabled={blocked || dirty || !!confirm}><legend>{tr("Actual harvest result", "Kết quả thu hoạch thực tế")}</legend>
         <div className="batch-form-grid">
-          <div className="batch-field"><label htmlFor="batch-harvest-count">{tr("Surviving fish count · integer", "Số cá còn sống · số nguyên")}</label><input id="batch-harvest-count" type="number" required min={1} max={1000000000} step={1} value={harvestForm.actualCount} onChange={event => setHarvestForm(value => ({ ...value, actualCount: event.target.value }))} /></div>
+          <div className="batch-field"><label htmlFor="batch-harvest-count">{tr("Surviving fish count · integer, required for every batch", "Số cá còn sống · số nguyên, bắt buộc với mọi lô")}</label><input id="batch-harvest-count" type="number" required min={1} max={1000000000} step={1} value={harvestForm.actualCount} onChange={event => setHarvestForm(value => ({ ...value, actualCount: event.target.value }))} /></div>
           {visible.shareUnitType === "weight" && <div className="batch-field"><label htmlFor="batch-harvest-weight">{tr("Actual whole-batch biomass · grams, integer", "Sinh khối thực tế toàn lô · gam, số nguyên")}</label><input id="batch-harvest-weight" type="number" required min={1} max={2000000000} step={1} value={harvestForm.actualWeightG} onChange={event => setHarvestForm(value => ({ ...value, actualWeightG: event.target.value }))} /></div>}
           <div className="batch-field"><label htmlFor="batch-harvest-fee">{tr("Delivery fee per share · optional, integer VND", "Phí giao mỗi phần · tùy chọn, số nguyên VND")}</label><input id="batch-harvest-fee" type="number" min={0} max={1000000000} step={1} value={harvestForm.deliveryFeePerShare} onChange={event => setHarvestForm(value => ({ ...value, deliveryFeePerShare: event.target.value }))} /></div>
         </div>
-        <p>{tr("Weight-share batches require the whole-batch biomass in grams; count-share batches use the surviving fish count only. Leave the delivery fee empty or 0 to charge nothing; a fee is charged once to every growing sponsorship and is not part of the escrow. This publication is a single write with no automatic retry; a failed or uncertain outcome requires Refresh, never replay.", "Phần khối lượng bắt buộc nhập sinh khối toàn lô theo gam; phần số con chỉ dùng số cá còn sống. Để trống hoặc 0 để không tính phí giao hàng; phí được tính một lần cho mọi bảo trợ đang nuôi và không thuộc quỹ ký quỹ. Đây là một thao tác ghi duy nhất, không tự gửi lại; kết quả thất bại hoặc chưa rõ cần Làm mới, không bao giờ gửi lại.")}</p>
+        <p>{tr("The surviving fish count is required for every batch — the server computes the mortality rate from it, whatever the share unit. Weight-share batches additionally require the whole-batch biomass in grams. Leave the delivery fee empty or 0 to charge nothing; a fee is charged once to every growing sponsorship and is not part of the escrow. This publication is a single write with no automatic retry; a failed or uncertain outcome requires Refresh, never replay.", "Số cá còn sống bắt buộc với mọi lô — máy chủ tính tỷ lệ chết từ số này, bất kể loại đơn vị phần. Lô theo khối lượng bắt buộc nhập thêm sinh khối toàn lô theo gam. Để trống hoặc 0 để không tính phí giao hàng; phí được tính một lần cho mọi bảo trợ đang nuôi và không thuộc quỹ ký quỹ. Đây là một thao tác ghi duy nhất, không tự gửi lại; kết quả thất bại hoặc chưa rõ cần Làm mới, không bao giờ gửi lại.")}</p>
         <button disabled={blocked || dirty || !!confirm} onClick={event => askHarvest(event.currentTarget)}>{tr("Review harvest publication", "Kiểm tra trước khi công bố thu hoạch")}</button>
       </fieldset>
     </section>}

@@ -6,13 +6,30 @@ import { LogoMark } from "./LogoMark";
 import { LangSwitch, type Lang } from "@/hooks/useTranslation";
 import { signOut, useUser } from "@/services/session";
 import { errorMessage } from "@/services/api";
+import { notificationsApi } from "@/services/notificationsApi";
 
 export function SiteHeader({ language, setLanguage }: { language: Lang; setLanguage: (l: Lang) => void }) {
   const user = useUser();
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
   const [openGroup, setOpenGroup] = useState<string | null>(null);
+  const [unread, setUnread] = useState(0);
   const vi = language === "vi";
+  // Header unread badge: one cheap server read on mount and after every hash
+  // navigation (marking read in the inbox, new dispute decisions, …). A failed
+  // read just leaves the last count — the badge must never break the header.
+  useEffect(() => {
+    if (!user) { setUnread(0); return; }
+    const controller = new AbortController();
+    const read = () => {
+      notificationsApi.list({ read: "unread", page: 1, limit: 1 }, controller.signal)
+        .then((page) => { if (!controller.signal.aborted) setUnread(page.unreadTotal); })
+        .catch(() => undefined);
+    };
+    read();
+    window.addEventListener("hashchange", read);
+    return () => { controller.abort(); window.removeEventListener("hashchange", read); };
+  }, [user?.email, user?.role]);
   // The nine admin tools read as a wall of links; they collapse into three
   // dropdown groups. Close on outside click, Escape, and after navigating.
   useEffect(() => {
@@ -43,7 +60,7 @@ export function SiteHeader({ language, setLanguage }: { language: Lang; setLangu
           <a href="#marketplace">{vi ? "Chợ cá" : "Marketplace"}</a>
           <a href="#farming">{vi ? "Lô cá và cập nhật" : "Batches and updates"}</a>
           {user?.role === "Buyer" && <><a href="#marketplace/cart">{vi ? "Giỏ hàng" : "Cart"}</a><a href="#marketplace/orders">{vi ? "Đơn hàng" : "Orders"}</a><a href="#marketplace/sponsorships">{vi ? "Bảo trợ của tôi" : "My sponsorships"}</a></>}
-          {user && <a href="#account/notifications">{vi ? "Thông báo" : "Notifications"}</a>}
+          {user && <a href="#account/notifications">{vi ? "Thông báo" : "Notifications"}{unread > 0 && <span className="nav-unread-badge">{unread > 9 ? "9+" : unread}</span>}</a>}
           {user && <a href={user.role === "Admin" ? "#admin/disputes" : "#marketplace/disputes"}>{vi ? "Khiếu nại" : "Disputes"}</a>}
           {user?.role === "Admin" && <>
             {group("selling", vi ? "Bán hàng" : "Selling", [

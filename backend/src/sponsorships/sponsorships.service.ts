@@ -691,7 +691,9 @@ export class SponsorshipsService {
         bodyKey: 'notifications.admin.batchGrowing.body',
         link: `#company/batches/${code}`,
       });
-      return updated;
+      // Same envelope as harvest ({ batch, harvest }) — the company GUI validates
+      // the wrapped shape, not the bare batch row.
+      return { batch: updated };
     });
   }
 

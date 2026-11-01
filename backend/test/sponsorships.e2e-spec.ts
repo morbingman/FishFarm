@@ -476,7 +476,8 @@ describe('Batch sponsorship (e2e)', () => {
       .post(`/v1/company/batches/${batchCode}/grow`)
       .set(auth(adminToken))
       .expect(200);
-    expect(response.body.status).toBe('growing');
+    // Same { batch } envelope as harvest, which the company GUI validates.
+    expect(response.body.batch.status).toBe('growing');
 
     const batch = await prisma.growOutBatch.findUniqueOrThrow({ where: { code: batchCode } });
     expect(batch.status).toBe('growing');
@@ -1272,7 +1273,7 @@ describe('Batch sponsorship (e2e)', () => {
       .post(`/v1/company/batches/${code}/grow`)
       .set(auth(adminToken))
       .expect(200);
-    expect(grown.body.status).toBe('growing');
+    expect(grown.body.batch.status).toBe('growing');
     const expiredRow = await prisma.sponsorship.findUniqueOrThrow({ where: { id: stale.body.id as string } });
     expect(expiredRow.status).toBe('cancelled');
     expect(expiredRow.cancelledAt).toBeTruthy();

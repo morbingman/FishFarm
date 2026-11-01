@@ -76,6 +76,22 @@
 .ribbon-header .ds-nav a.on::after {
   display: none;
 }
+/* Unread-notification count on the header Notifications link. */
+.ribbon-header .ds-nav .nav-unread-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 17px;
+  height: 17px;
+  margin-left: 6px;
+  padding: 0 4px;
+  border-radius: 9px;
+  background: #0e7bb8;
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1;
+}
 .ribbon-header .nav-indicator {
   position: absolute;
   top: 0;
