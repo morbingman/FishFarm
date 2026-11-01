@@ -4,10 +4,10 @@ import { batchStageLabel, batchStatusLabel } from "@/services/batches";
 import "./BatchDetails.css";
 
 type Batch = PublicBatch | CompanyBatch;
+// One app-wide UTC format (same as orders/notifications) instead of raw ISO.
 export function batchUtc(value: string | null | undefined, missing: string) {
-  if (!value) return missing;
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? missing : date.toISOString().replace("T", " ").replace("Z", " UTC");
+  if (!value || !Number.isFinite(Date.parse(value))) return missing;
+  return `${new Date(value).toLocaleString("en-GB", { timeZone: "UTC", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false })} UTC`;
 }
 
 export function BatchUpdateFeed({ updates }: { updates: RecordedBatchUpdate[] }) {

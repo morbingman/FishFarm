@@ -162,6 +162,7 @@ type SeedListing = {
   depositPct?: number;
   expectedReadyDate?: Date;
   preorderPolicy?: string;
+  stock?: number;
 };
 
 type SeededListing = { id: string; price: number; saleMode: 'in_stock' | 'pre_order'; depositPct: number | null };
@@ -297,7 +298,7 @@ async function seedListings(admins: SeededUser[]) {
             origin: 'Vietnam — farm bred',
             health: 'Excellent — vet certified',
             price: item.price,
-            quantity: 2,
+            quantity: item.stock ?? 12,
             negotiable: false,
             location: '128 Nguyen Van Huong, Thao Dien',
             region: 'Ho Chi Minh City',
@@ -502,12 +503,28 @@ async function seedBatch(users: Map<string, SeededUser>, author: SeededUser) {
       city: 'Ho Chi Minh City',
       province: 'Ho Chi Minh City',
       deliveryMethod: 'Domestic overnight',
+      // Same shape the reserve service writes: the frontend validates that the
+      // snapshot carries the batch code and the risk disclosure text.
       termsSnapshot: {
-        termsVersion: '2026-10-18',
-        shareUnit: '5 kg',
+        code: 'BATCH-1024',
+        title: 'Kohaku Grow-out — Autumn 2026',
+        species: 'Koi',
+        breed: 'Kohaku',
+        location: 'Long An',
+        region: 'Long An',
         shareUnitType: 'weight',
+        shareUnit: '5 kg',
+        shareQuantity: 5000,
+        totalShares: 40,
         packagePricePerShare: 2_400_000,
         contingencyPct: 10,
+        riskDisclosure:
+          'Fish farming carries mortality and weather risk. A 10% contingency is built into the package. If the harvest falls short, undelivered value is refunded pro rata from escrow, or the sponsor may choose partial delivery plus a refund. Total loss is refunded in full.',
+        termsVersion: '2026-10-18',
+        expectedHarvestDate: new Date('2027-04-15T00:00:00.000Z'),
+        farmVerified: true,
+        inspectedAt: new Date('2026-09-20T00:00:00.000Z'),
+        inspector: 'Company Admin',
         harvestWindow: { from: '2027-04-15', to: '2027-05-15' },
         shortfallPolicy: 'pro_rata_refund',
         totalLossPolicy: 'full_refund',

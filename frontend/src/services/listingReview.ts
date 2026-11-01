@@ -48,6 +48,8 @@ export function takedownReason(reason: string) {
 // Only mounted Admin destinations are links; document content URLs stay non-navigable.
 export function safeActivityLink(link: string | null | undefined): string | null {
   if (!link || /[\u0000-\u0020\u007f]/.test(link)) return null;
+  // Public batch pages are admin-viewable and recorded as activity targets.
+  if (link === "#farming" || /^#farming\/(?:BATCH-\d+|c[a-z0-9]{24})$/.test(link)) return link;
   if (["#company/listings", "#company/orders", "#admin/queue", "#admin/activity", "#admin/disputes", "#admin/users"].includes(link)) return link;
   if (/^#admin\/batches\/BATCH-[1-9]\d*$/.test(link)) return link;
   if (link === "#company/batches" || /^#company\/batches\/(?:BATCH-\d+|c[a-z0-9]{24})$/.test(link)) return link;

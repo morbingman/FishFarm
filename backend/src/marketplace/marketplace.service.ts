@@ -126,6 +126,9 @@ export class MarketplaceService {
           { companyName: { contains: query, mode: 'insensitive' } },
           { draft: { location: { contains: query, mode: 'insensitive' } } },
           { draft: { region: { contains: query, mode: 'insensitive' } } },
+          // The card-visible listing code ("FM-18420") must be searchable too —
+          // partial matches ("19544") land here via contains.
+          { code: { contains: query, mode: 'insensitive' } },
         ],
       });
     }

@@ -6,7 +6,7 @@ sells and farms the fish itself, so there is one company store rather than a mul
 marketplace.
 
 This repository contains the NestJS API and the React frontend. The API is the source of truth for
-business rules; the frontend is currently a standalone prototype using mock data (see
+business rules; the frontend is integrated with it and calls it through the dev proxy (see
 [Project status](#project-status)).
 
 ## Stack
@@ -59,13 +59,13 @@ settings accordingly.
 ```bash
 cd frontend
 pnpm install
-pnpm dev                    # http://localhost:8443
+pnpm dev                    # http://localhost:5173
 ```
 
-Open **http://localhost:8443**.
+Open **http://localhost:5173**.
 
-The Vite dev server uses port **8443** with `strictPort`; set `PORT` when starting it only if that
-port is already taken. The API's `CORS_ORIGINS` already allows 8443 and 5173.
+The Vite dev server defaults to port **5173** and proxies `/v1` and `/uploads` to
+`http://127.0.0.1:4000`; if that port is already taken Vite picks the next one.
 
 ## Demo accounts
 
@@ -92,13 +92,18 @@ Implemented in the API:
 - Commerce: cart, checkout with atomic stock reservation and idempotent retries, order history,
   the company order queue and fulfilment, simulated payments, pre-order deposits with a 7-day
   balance window, and cancellations that refund and return stock.
+- Batch sponsorship (§11): open grow-out batches, per-share reservations with a 24-hour payment
+  window, one-time package payment into milestone escrow (stocking/mid-growth/harvest tranches),
+  harvest with a separate delivery fee, delivery confirmation, cancellation refunds and the
+  owner money-history ledger.
 
-Not implemented yet: reviews, favourites, company analytics, and the batch-sponsorship
-flow. Chat/messaging was dropped from project scope on 2026-10-28; it is not a pending feature.
+Not implemented yet: reviews, favourites and company analytics. Chat/messaging was dropped from
+project scope on 2026-10-28; it is not a pending feature.
 
-**Frontend note:** the React app is the Figma Make prototype. It runs entirely on the in-memory
-mock store (`frontend/src/store.ts`) and does not call the API yet, so the site is fully clickable
-but changes are not persisted. Wiring it to the API is the next integration step.
+**Frontend note:** the React app is integrated with the API end to end — catalog, cart/checkout,
+orders and disputes, §11 batch sponsorship and the company tools all read and write real data.
+Legacy prototype screens remain unmounted; unfinished routes show unavailable/access-denied
+states rather than demo records.
 
 ## Structure
 

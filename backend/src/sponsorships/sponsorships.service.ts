@@ -53,6 +53,73 @@ const SPONSOR_INCLUDE = {
 
 const ACTIVE_STATUSES: SponsorshipStatus[] = [SponsorshipStatus.pending_payment, SponsorshipStatus.funded, SponsorshipStatus.growing];
 
+type SponsorshipRow = Prisma.SponsorshipGetPayload<{ include: typeof SPONSOR_INCLUDE }>;
+
+/**
+ * API-facing sponsorship shape. The frontend validates responses against an
+ * exact key allowlist, so storage-only columns (sponsorId, payment provider
+ * metadata, image ordering fields) are stripped here rather than leaked.
+ */
+function serializeSponsorship(row: SponsorshipRow) {
+  return {
+    id: row.id,
+    batchId: row.batchId,
+    shares: row.shares,
+    packageAmount: row.packageAmount,
+    deliveryFee: row.deliveryFee,
+    totalAmount: row.totalAmount,
+    status: row.status,
+    recipientName: row.recipientName,
+    phone: row.phone,
+    address: row.address,
+    city: row.city,
+    province: row.province,
+    deliveryMethod: row.deliveryMethod,
+    termsSnapshot: row.termsSnapshot,
+    paidAt: row.paidAt,
+    growingAt: row.growingAt,
+    readyAt: row.readyAt,
+    deliveredAt: row.deliveredAt,
+    settledAt: row.settledAt,
+    cancelledAt: row.cancelledAt,
+    refundedAt: row.refundedAt,
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+    sponsor: row.sponsor,
+    batch: {
+      ...row.batch,
+      images: row.batch.images.map((image) => ({ id: image.id, url: image.url })),
+    },
+    payments: row.payments.map((payment) => ({
+      id: payment.id,
+      purpose: payment.purpose,
+      method: payment.method,
+      amount: payment.amount,
+      state: payment.state,
+      createdAt: payment.createdAt,
+      paidAt: payment.paidAt,
+      refundedAt: payment.refundedAt,
+    })),
+    escrowReleases: row.escrowReleases.map((tranche) => ({
+      id: tranche.id,
+      milestone: tranche.milestone,
+      amount: tranche.amount,
+      state: tranche.state,
+      releasedAt: tranche.releasedAt,
+      createdAt: tranche.createdAt,
+    })),
+    adjustments: row.adjustments.map((adjustment) => ({
+      id: adjustment.id,
+      kind: adjustment.kind,
+      amount: adjustment.amount,
+      reason: adjustment.reason,
+      status: adjustment.status,
+      createdAt: adjustment.createdAt,
+      appliedAt: adjustment.appliedAt,
+    })),
+  };
+}
+
 /** §11.4: unpaid reservations expire 24h after reservation; shares return to the pool. */
 const RESERVATION_TTL_MS = 24 * 60 * 60 * 1000;
 
@@ -241,12 +308,12 @@ export class SponsorshipsService {
         userId: user.id,
         type: NotificationType.status,
         titleKey: 'notifications.buyer.sponsorshipReserved.title',
-        titleParams: { code: batch.code },
+        titleParams: { code: batch.code, shares },
         bodyKey: 'notifications.buyer.sponsorshipReserved.body',
         bodyParams: { shares, total: packageAmount },
         link: `#marketplace/sponsorships/${sponsorship.id}`,
       });
-      return sponsorship;
+      return serializeSponsorship(sponsorship);
     });
   }
 
@@ -269,7 +336,7 @@ export class SponsorshipsService {
         if (replay.sponsorship.sponsorId !== user.id) {
           throw new AppException('sponsorship.forbidden', HttpStatus.FORBIDDEN);
         }
-        return replay.sponsorship;
+        return serializeSponsorship(replay.sponsorship);
       }
       const sponsorship = await tx.sponsorship.findUnique({ where: { id }, include: { batch: true } });
       if (!sponsorship) throw new AppException('sponsorship.notFound', HttpStatus.NOT_FOUND);
@@ -291,6 +358,14 @@ export class SponsorshipsService {
       // A batch that already reached growing puts the fresh payment straight into growing
       // and releases its stocking tranche immediately (§11.4: funded → growing).
       const growing = sponsorship.batch.status === BatchStatus.growing;
+      // The harvest tranche absorbs the rounding remainder so tranches sum
+      // exactly; it is written directly in the create because the response is
+      // the update's in-memory snapshot — a follow-up tranche correction would
+      // never be visible to the caller.
+      const allocated = ESCROW_SPLIT.reduce(
+        (sum, { pct }) => sum + Math.floor((sponsorship.packageAmount * pct) / 100),
+        0,
+      );
       const paid = await tx.sponsorship.update({
         where: { id },
         data: {
@@ -314,20 +389,11 @@ export class SponsorshipsService {
                 amount: Math.floor((sponsorship.packageAmount * pct) / 100),
                 state: EscrowState.held,
               })),
-              { milestone: EscrowMilestone.harvest, amount: 0, state: EscrowState.held },
+              { milestone: EscrowMilestone.harvest, amount: sponsorship.packageAmount - allocated, state: EscrowState.held },
             ],
           },
         },
         include: SPONSOR_INCLUDE,
-      });
-      // The harvest tranche absorbs the rounding remainder so tranches sum exactly.
-      const allocated = ESCROW_SPLIT.reduce(
-        (sum, { pct }) => sum + Math.floor((sponsorship.packageAmount * pct) / 100),
-        0,
-      );
-      await tx.escrowRelease.update({
-        where: { sponsorshipId_milestone: { sponsorshipId: id, milestone: EscrowMilestone.harvest } },
-        data: { amount: sponsorship.packageAmount - allocated },
       });
       if (growing) {
         await tx.escrowRelease.updateMany({
@@ -354,7 +420,7 @@ export class SponsorshipsService {
         bodyParams: { total: sponsorship.packageAmount },
         link: `#marketplace/sponsorships/${id}`,
       });
-      return paid;
+      return serializeSponsorship(paid);
     });
   }
 
@@ -378,7 +444,7 @@ export class SponsorshipsService {
       }),
       this.prisma.sponsorship.count({ where }),
     ]);
-    return { items, total };
+    return { items: items.map(serializeSponsorship), total };
   }
 
   /** §11 owner history: the sponsor's money events across all their sponsorships,
@@ -443,7 +509,7 @@ export class SponsorshipsService {
     if (sponsorship.sponsorId !== user.id) {
       throw new AppException('sponsorship.forbidden', HttpStatus.FORBIDDEN);
     }
-    return sponsorship;
+    return serializeSponsorship(sponsorship);
   }
 
   async escrow(user: AuthenticatedUser, id: string) {
@@ -455,7 +521,14 @@ export class SponsorshipsService {
     return {
       sponsorshipId: sponsorship.id,
       packageAmount: sponsorship.packageAmount,
-      tranches: releases,
+      tranches: releases.map((tranche) => ({
+        id: tranche.id,
+        milestone: tranche.milestone,
+        amount: tranche.amount,
+        state: tranche.state,
+        releasedAt: tranche.releasedAt,
+        createdAt: tranche.createdAt,
+      })),
       held,
       released,
       reversed,
@@ -550,7 +623,7 @@ export class SponsorshipsService {
         bodyParams: funded ? { total: sponsorship.packageAmount } : { shares: sponsorship.shares },
         link: `#marketplace/sponsorships/${id}`,
       });
-      return cancelled;
+      return serializeSponsorship(cancelled);
     });
   }
 
@@ -857,7 +930,7 @@ export class SponsorshipsService {
         link: `#marketplace/sponsorships/${id}`,
       });
       const result = await tx.sponsorship.findUniqueOrThrow({ where: { id }, include: SPONSOR_INCLUDE });
-      return result;
+      return serializeSponsorship(result);
     });
   }
 
@@ -881,7 +954,7 @@ export class SponsorshipsService {
         if (replay.sponsorship.sponsorId !== user.id) {
           throw new AppException('sponsorship.forbidden', HttpStatus.FORBIDDEN);
         }
-        return replay.sponsorship;
+        return serializeSponsorship(replay.sponsorship);
       }
       const sponsorship = await tx.sponsorship.findUnique({ where: { id }, include: { batch: true } });
       if (!sponsorship) throw new AppException('sponsorship.notFound', HttpStatus.NOT_FOUND);
@@ -929,7 +1002,7 @@ export class SponsorshipsService {
         bodyParams: { total: sponsorship.deliveryFee },
         link: `#marketplace/sponsorships/${id}`,
       });
-      return paid;
+      return serializeSponsorship(paid);
     });
   }
 
@@ -950,7 +1023,7 @@ export class SponsorshipsService {
       }),
       this.prisma.sponsorship.count({ where }),
     ]);
-    return { items, total };
+    return { items: items.map(serializeSponsorship), total };
   }
 
   async companySponsors(batchCode: string) {
@@ -976,6 +1049,6 @@ export class SponsorshipsService {
       include: SPONSOR_INCLUDE,
       orderBy: { createdAt: 'asc' },
     });
-    return { batch: { id: batch.id, code: batch.code }, items };
+    return { batch: { id: batch.id, code: batch.code }, items: items.map(serializeSponsorship) };
   }
 }

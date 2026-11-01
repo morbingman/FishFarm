@@ -278,7 +278,7 @@ describe("company-only review metadata rendering", () => {
   it("escapes reviewer/note, renders UTC and explicitly explains prior retained attribution", () => {
     const batch = company(); batch.reviewedBy = "<script>reviewer</script>"; batch.reviewNote = "<img src=x onerror=alert(1)>";
     const html = renderToStaticMarkup(createElement(details(), { batch, includeCompanyReview: true }));
-    expect(html).toContain("2026-10-28 00:00:00.000 UTC"); expect(html).toContain("&lt;script&gt;reviewer&lt;/script&gt;"); expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
+    expect(html).toContain("28/10/2026, 00:00:00 UTC"); expect(html).toContain("&lt;script&gt;reviewer&lt;/script&gt;"); expect(html).toContain("&lt;img src=x onerror=alert(1)&gt;");
     expect(html).not.toContain("<script>"); expect(html).toContain("retain the prior reviewer and review time"); expect(html).toContain("not approval of the current submission");
   });
   it("does not display review metadata by default or for a public projection, even with explicit opt-in", () => {

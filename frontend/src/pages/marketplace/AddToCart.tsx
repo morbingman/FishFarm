@@ -42,7 +42,10 @@ export function AddToCart({ listing }: { listing: MarketplaceListing }) {
   }
   return <div className="commerce"><form onSubmit={(event) => { void add(event); }}>
     <label htmlFor="purchase-quantity">{tr("Quantity to add", "Số lượng thêm")}</label>{" "}
-    <input id="purchase-quantity" type="number" min={1} max={Math.max(1, listing.quantity)} step={1} required value={quantity} disabled={busy || listing.quantity < 1} onChange={(event) => setQuantity(event.target.valueAsNumber)} />
+    {/* Native min/max validation fires before onSubmit, so its bubble is the
+       only feedback for 0 or an over-stock number — surface the same message
+       as an app-level alert instead (visible and testable). */}
+    <input id="purchase-quantity" type="number" min={1} max={Math.max(1, listing.quantity)} step={1} required value={quantity} disabled={busy || listing.quantity < 1} onChange={(event) => { setError(""); setQuantity(event.target.valueAsNumber); }} onInvalid={(event) => { event.preventDefault(); setError(tr("Choose a quantity within available stock.", "Chọn số lượng trong giới hạn có sẵn.")); }} />
     <button className="commerce-primary" disabled={busy || listing.quantity < 1} type="submit">{busy ? tr("Adding…", "Đang thêm…") : listing.quantity < 1 ? tr("Out of stock", "Hết hàng") : tr("Add to cart", "Thêm vào giỏ")}</button>
   </form>{message && <p role="status">{message}</p>}{error && <p role="alert">{error}</p>}
     <a href="#marketplace/cart">{tr("View cart", "Xem giỏ hàng")}</a>

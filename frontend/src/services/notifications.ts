@@ -124,7 +124,9 @@ export function safeNotificationLink(link: string | null | undefined, role: "Use
     return /^#(?:company\/listing\/(?:FM-\d+|c[a-z0-9]{24})|(?:company|admin)\/orders\/ORD-\d+|admin\/review\/(?:FM-\d+|c[a-z0-9]{24})|admin\/disputes\/c[a-z0-9]{24})$/.test(link) ? link : null;
   }
   if (role !== "User" && role !== "Buyer") return null;
-  if (["#marketplace/orders", "#marketplace/disputes"].includes(link)) return link;
+  if (["#marketplace/orders", "#marketplace/disputes", "#marketplace/sponsorships"].includes(link)) return link;
+  // §11 sponsorships: the list and the owner's detail page are both buyer routes.
+  if (/^#marketplace\/sponsorships\/c[a-z0-9]{24}$/.test(link)) return link;
   return /^#marketplace\/(?:orders\/ORD-\d+(?:\/dispute)?|disputes\/c[a-z0-9]{24})$/.test(link) ? link : null;
 }
 export const notificationDate = reviewDate;
