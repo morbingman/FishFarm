@@ -9,6 +9,9 @@
 .ds-header.ribbon-header.integration-header .ds-header-in { height: auto; min-height: 72px; flex-wrap: wrap; padding-block: 12px; }
 .ds-header.ribbon-header.integration-header .ds-nav { display: flex; flex-wrap: wrap; min-width: 0; height: auto; }
 .integration-user { max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* The username doubles as the profile link; keep it quiet until hover. */
+a.integration-user { color: inherit; text-decoration: none; border-radius: 8px; }
+a.integration-user:hover { text-decoration: underline; }
 @media (max-width: 760px) {
   .integration-header .ds-brand { padding-right: 0; }
   .integration-header .ds-brand::after { display: none; }

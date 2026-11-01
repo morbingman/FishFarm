@@ -1,19 +1,17 @@
 .company-facilities {
-  --facility-border: #c9d8d2;
-  --facility-ink: #173c32;
-  max-width: 1180px;
-  margin: 0 auto;
-  padding: 2rem 1.25rem 4rem;
+  /* Retinted from a leftover green palette to the site's blue theme so this
+     page stops reading as a different app; semantic warning/confirmation
+     colors keep their meaning. */
+  --facility-border: #d4e9f3;
+  --facility-ink: #003152;
+  /* Width, outer padding and the h1 treatment come from the shared
+     .public-market chrome (see filters.css) so this page's title block
+     matches the marketplace and admin pages exactly. */
   color: var(--facility-ink);
   line-height: 1.6;
 }
 .company-facilities * {
   box-sizing: border-box;
-}
-.company-facilities h1 {
-  font-size: clamp(1.75rem, 4vw, 2.5rem);
-  line-height: 1.2;
-  margin: 0.6rem 0 1rem;
 }
 .company-facilities h2 {
   font-size: 1.35rem;
@@ -23,10 +21,10 @@
   font-size: 1.1rem;
 }
 .facility-heading {
-  margin-bottom: 1.5rem;
+  margin-bottom: 28px;
 }
 .company-facilities a {
-  color: #075f47;
+  color: #1d5878;
   text-decoration: underline;
   text-underline-offset: 0.18em;
   overflow-wrap: anywhere;
@@ -40,15 +38,15 @@
 .company-facilities button {
   min-height: 44px;
   padding: 0.6rem 1rem;
-  border: 1px solid #447364;
+  border: 1px solid #b9d7e7;
   border-radius: 0.4rem;
-  background: #edf6f1;
-  color: #153b30;
+  background: #f6fbfe;
+  color: #003152;
   cursor: pointer;
   line-height: 1.35;
 }
 .company-facilities button:hover:not(:disabled) {
-  background: #dcefe3;
+  background: #e2f2fa;
 }
 .company-facilities button:disabled {
   opacity: 0.55;
@@ -77,8 +75,8 @@
   background: #fff9ed;
 }
 .facility-notice {
-  color: #173c32;
-  background: #edf6f1;
+  color: #003152;
+  background: #f6fbfe;
 }
 .facility-confirmation {
   border: 2px solid #286e56;
@@ -92,9 +90,24 @@
   margin: 1rem 0;
 }
 .facility-actions a {
+  /* Match the unified compact action-button look (sl-btn ghost) so link and
+     button controls in the same row read as one family. */
   display: inline-flex;
-  min-height: 44px;
+  height: 34px;
+  min-height: 34px;
   align-items: center;
+  padding: 0 12px;
+  border: 1px solid #d4e9f3;
+  border-radius: 8px;
+  background: #fff;
+  color: #003152;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+}
+.facility-actions a:hover {
+  background: #f6fbfe;
+  border-color: #008bc5;
 }
 .company-facilities fieldset {
   min-width: 0;
@@ -127,10 +140,10 @@
   max-width: 100%;
   min-height: 44px;
   padding: 0.6rem 0.7rem;
-  border: 1px solid #819d91;
+  border: 1px solid #b9d7e7;
   border-radius: 0.35rem;
   background: #fff;
-  color: #173c32;
+  color: #003152;
 }
 .company-facilities textarea {
   resize: vertical;
@@ -189,7 +202,7 @@
   overflow-wrap: anywhere;
 }
 .company-facilities th {
-  background: #f0f6f2;
+  background: #f6fbfe;
 }
 .facility-pending-documents {
   padding-left: 1.5rem;
@@ -220,4 +233,46 @@
   .facility-actions button {
     flex-grow: 1;
   }
+}
+
+/* List-mode filter row: same quiet one-row bar as the shared filters.css
+   pattern; placed after the generic input rules so it wins equal-specificity
+   ties within this sheet. */
+.facility-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border: 1px solid #d4e9f3;
+  border-radius: 12px;
+  background: #f6fbfe;
+  margin-bottom: 1.25rem;
+}
+.facility-filter > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.facility-filter label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: #46667b;
+  white-space: nowrap;
+}
+.facility-filter input:not([type="checkbox"]),
+.facility-filter select {
+  width: auto;
+  min-height: 34px;
+  height: 34px;
+  padding: 5px 10px;
+  font-size: 13px;
+}
+@media (max-width: 640px) {
+  .facility-filter label { white-space: normal; }
 }

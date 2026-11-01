@@ -126,7 +126,9 @@ export default function AdminUsers() {
   const pages = visible ? Math.max(1, Math.ceil(visible.total / visible.limit)) : 1;
   const stateVisible = sameSession() && stateSession === sessionKey;
   return <main className="public-market commerce admin-users">
-    <nav className="admin-users-navigation" aria-label={tr("Admin users navigation", "Điều hướng tài khoản Admin")}><a href="#company/listings">{tr("Company catalog", "Danh mục công ty")}</a><a href="#company/orders">{tr("Company orders", "Đơn hàng công ty")}</a><a href="#admin/activity">{tr("Recent activity", "Hoạt động gần đây")}</a></nav>
+    {/* One back button instead of a row of sibling links — the site header's
+       dropdowns already reach every admin tool. */}
+    <a className="back-pill" href="#company/listings">← {tr("Company catalog", "Danh mục công ty")}</a>
     <h1>{tr("Admin · User accounts", "Admin · Tài khoản người dùng")}</h1>
     <p>{tr("View User and Admin accounts. Only User accounts can be suspended or reactivated. All Admin accounts are protected in both directions.", "Xem tài khoản User và Admin. Chỉ tài khoản User có thể tạm khóa hoặc kích hoạt lại. Mọi tài khoản Admin được bảo vệ theo cả hai chiều.")}</p>
     <p>{tr("Suspension revokes all sessions for that User. Reactivation permits a new sign-in; it does not restore old sessions. No account deletion, timed suspension, provisioning or role changes are available.", "Tạm khóa thu hồi toàn bộ phiên của User đó. Kích hoạt lại cho phép đăng nhập mới; không khôi phục phiên cũ. Không hỗ trợ xóa tài khoản, khóa theo thời hạn, tạo tài khoản hay đổi vai trò.")}</p>
@@ -137,7 +139,7 @@ export default function AdminUsers() {
       <label>{tr("Rows per server page", "Dòng mỗi trang máy chủ")}<select value={limit} onChange={event => setLimit(Number(event.target.value))}>{[10, 25, 50, 100].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
       <button type="submit">{tr("Apply search / filters", "Áp dụng tìm kiếm / bộ lọc")}</button>
     </fieldset></form>
-    <button disabled={busy || loading || !!confirm || !sameSession()} onClick={refresh}>{tr("Refresh", "Làm mới")}</button>
+    <button className="sl-btn sl-btn-ghost sm" disabled={busy || loading || !!confirm || !sameSession()} onClick={refresh}>{tr("Refresh", "Làm mới")}</button>
     {!sameSession() && <p role="alert">{tr("An active Admin session is required.", "Cần phiên Admin đang hoạt động.")}</p>}
     {stateVisible && error && <p role="alert" className="commerce-alert">{error}</p>}
     {stateVisible && notice && <p role="status" className="commerce-alert">{notice}</p>}

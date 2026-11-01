@@ -146,6 +146,27 @@ export const domainApi = {
   sponsorships: unavailable, sponsor: unavailable, paySponsorship: unavailable, uploadImage: unavailable,
 };
 
+// Backend ValidationPipe rejections carry a details array of message codes
+// (custom DTO messages) or English sentences (default class-validator text).
+// Custom codes are translated; anything else falls back to the generic 400 copy.
+const validationMessages: Record<string, [string, string]> = {
+  "validation.email": ["Enter a valid email address.", "Email không hợp lệ."],
+  "validation.passwordLength": ["Password must be 8–128 characters.", "Mật khẩu phải có 8–128 ký tự."],
+  "validation.passwordWeak": ["Password needs at least one letter and one number.", "Mật khẩu cần ít nhất một chữ cái và một chữ số."],
+  "validation.nameLength": ["Name must be 1–80 characters.", "Họ tên phải từ 1–80 ký tự."],
+  "validation.tooLong": ["A field exceeds its maximum length.", "Một trường thông tin vượt độ dài tối đa."],
+};
+
+function validationDetails(error: ApiError, vi: boolean): string | null {
+  if (!Array.isArray(error.details)) return null;
+  const parts: string[] = [];
+  for (const row of error.details) {
+    const message = validationMessages[row as string]?.[vi ? 1 : 0];
+    if (message) parts.push(message);
+  }
+  return parts.length ? parts.join(" ") : null;
+}
+
 export function errorMessage(error: unknown, language: "en" | "vi") {
   const vi = language === "vi";
   if (!(error instanceof ApiError)) return vi ? "Không thể kết nối. Vui lòng thử lại." : "Unable to connect. Please try again.";
@@ -195,7 +216,11 @@ export function errorMessage(error: unknown, language: "en" | "vi") {
   if (error.code.includes("invalidCredentials")) return vi ? "Email hoặc mật khẩu không đúng." : "Incorrect email or password.";
   if (error.code.includes("emailTaken") || error.code.includes("emailExists")) return vi ? "Email đã được đăng ký." : "This email is already registered.";
   if (error.status === 404) return vi ? "Không tìm thấy dữ liệu." : "The requested record was not found.";
-  if (error.status === 400) return vi ? `Kiểm tra thông tin đã nhập (${error.code}).` : `Please check your input (${error.code}).`;
+  if (error.status === 400) {
+    const details = validationDetails(error, vi);
+    if (details) return details;
+    return vi ? `Kiểm tra thông tin đã nhập (${error.code}).` : `Please check your input (${error.code}).`;
+  }
   if (error.status === 401) return vi ? "Đăng nhập không hợp lệ hoặc đã hết hạn." : "Invalid credentials or expired session.";
   return vi ? `Yêu cầu thất bại (${error.code}).` : `Request failed (${error.code}).`;
 }

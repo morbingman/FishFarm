@@ -108,7 +108,7 @@ export default function AccountDetails({ mode }: { mode: "profile" | "settings" 
     </nav>
     <h1>{mode === "profile" ? tr("Your profile", "Hồ sơ của bạn") : tr("Notification preferences", "Tùy chọn thông báo")}</h1>
     <p>{tr("Your account details are read from the server. Email, role and account status cannot be changed here.", "Thông tin tài khoản được đọc từ máy chủ. Không thể thay đổi email, vai trò hay trạng thái tài khoản tại đây.")}</p>
-    <button disabled={loading || busy || !sameSession()} onClick={refresh}>{tr("Refresh", "Làm mới")}</button>
+    <button className="sl-btn sl-btn-ghost sm" disabled={loading || busy || !sameSession()} onClick={refresh}>{tr("Refresh", "Làm mới")}</button>
     {!sameSession() && <p role="alert">{tr("An active User or Admin session is required.", "Cần phiên User hoặc Admin đang hoạt động.")}</p>}
     {sameSession() && error != null && <p role="alert" className="commerce-alert">{accountErrorMessage(error, language)} {needsRefresh && tr("The write may have completed. No automatic retry is sent; select Refresh before another save.", "Máy chủ có thể đã lưu. Không tự động gửi lại; chọn Làm mới trước khi lưu tiếp.")}</p>}
     {sameSession() && saved && <p role="status" className="commerce-alert">{tr("The server acknowledged your save.", "Máy chủ đã xác nhận lưu.")} {loading || needsRefresh ? tr("Reading the current record before another save.", "Đang đọc bản ghi hiện tại trước khi lưu tiếp.") : tr("The current server record is shown below.", "Bản ghi máy chủ hiện tại hiển thị bên dưới.")}</p>}

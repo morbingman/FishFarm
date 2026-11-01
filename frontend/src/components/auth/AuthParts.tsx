@@ -112,6 +112,7 @@ export function Field({
   type = "text",
   error,
   autoComplete,
+  maxLength,
   onValue,
   defaultValue,
 }: {
@@ -122,6 +123,7 @@ export function Field({
   type?: string;
   error?: string;
   autoComplete?: string;
+  maxLength?: number;
   onValue?: (value: string) => void;
 }) {
   const [visible, setVisible] = useState(false);
@@ -139,6 +141,7 @@ export function Field({
           type={password && visible ? "text" : type}
           placeholder={placeholder}
           autoComplete={autoComplete}
+          maxLength={maxLength}
           defaultValue={defaultValue}
           onChange={(e) => onValue?.(e.target.value)}
           aria-invalid={!!error}

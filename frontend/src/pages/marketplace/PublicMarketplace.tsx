@@ -15,6 +15,11 @@ export default function PublicMarketplace() {
   const [query, setQuery] = useState("");
   const [search, setSearch] = useState("");
   const [page, setPage] = useState(1);
+  // Server-side filter params (ListMarketplaceDto): sort order, size bucket
+  // and stock availability. Empty string means "no filter".
+  const [sort, setSort] = useState("recommended");
+  const [size, setSize] = useState("");
+  const [available, setAvailable] = useState("");
   const [items, setItems] = useState<HomeListing[]>([]);
   const [total, setTotal] = useState(0);
   const [detail, setDetail] = useState<PublicFish | null>(null);
@@ -43,6 +48,9 @@ export default function PublicMarketplace() {
       pageSize: "20",
       q: search,
     });
+    if (sort !== "recommended") params.set("sort", sort);
+    if (size) params.set("size", size);
+    if (available) params.set("available", available);
     const request = code
       ? domainApi.listing(code, controller.signal).then((data) => {
           if (!controller.signal.aborted) setDetail(data);
@@ -58,13 +66,13 @@ export default function PublicMarketplace() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [code, page, search, reload]);
+  }, [code, page, search, reload, sort, size, available]);
   return (
     <>
       <main className="public-market">
         <div className="public-market-heading">
           <div>
-            <a href="#home">← {tr("Trang chủ", "Home")}</a>
+            {!code && <a href="#home">← {tr("Trang chủ", "Home")}</a>}
             <h1>
               {code ? tr("Chi tiết cá", "Fish details") : t("Marketplace")}
             </h1>
@@ -99,6 +107,36 @@ export default function PublicMarketplace() {
               onChange={(e) => setQuery(e.target.value)}
               placeholder={tr("Tìm cá, loài, giống hoặc khu vực…", "Search fish, species, breed, or location…")}
             />
+            <label htmlFor="public-fish-sort">{tr("Sắp xếp", "Sort")}</label>
+            <select
+              id="public-fish-sort"
+              value={sort}
+              onChange={(e) => { setSort(e.target.value); setPage(1); }}
+            >
+              <option value="recommended">{tr("Đề xuất", "Recommended")}</option>
+              <option value="price_asc">{tr("Giá thấp → cao", "Price low → high")}</option>
+              <option value="price_desc">{tr("Giá cao → thấp", "Price high → low")}</option>
+              <option value="newest">{tr("Mới nhất", "Newest")}</option>
+            </select>
+            <label htmlFor="public-fish-size">{tr("Kích thước", "Size")}</label>
+            <select
+              id="public-fish-size"
+              value={size}
+              onChange={(e) => { setSize(e.target.value); setPage(1); }}
+            >
+              <option value="">{tr("Mọi kích thước", "All sizes")}</option>
+              <option value="under15">{tr("Dưới 15 cm", "Under 15 cm")}</option>
+              <option value="15plus">{tr("Từ 15 cm", "15 cm and above")}</option>
+            </select>
+            <label htmlFor="public-fish-available">{tr("Tình trạng", "Availability")}</label>
+            <select
+              id="public-fish-available"
+              value={available}
+              onChange={(e) => { setAvailable(e.target.value); setPage(1); }}
+            >
+              <option value="">{tr("Tất cả", "All")}</option>
+              <option value="true">{tr("Còn hàng", "In stock only")}</option>
+            </select>
             <Button type="submit">{t("Search")}</Button>
           </form>
         )}

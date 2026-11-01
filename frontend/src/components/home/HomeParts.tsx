@@ -10,12 +10,13 @@ export function Logo({ light = false }: { light?: boolean }) {
   return <a href="#home" className="home-parts-view-2" aria-label="Fishmarket home"><LogoMark /><span className={light ? "text-white" : "text-[#003152]"}>FISHMARKET</span></a>;
 }
 export function Button({ children, variant = "primary", className = "", type = "button", onClick }: {
-  children: ReactNode; variant?: "primary" | "secondary" | "light"; className?: string; type?: "button" | "submit"; onClick?: () => void;
+  children: ReactNode; variant?: "primary" | "secondary" | "light" | "outline"; className?: string; type?: "button" | "submit"; onClick?: () => void;
 }) {
   const styles = {
     primary: "bg-[#003152] text-white shadow-lg hover:bg-[#214d68]",
     secondary: "border border-[#d4e9f3] bg-white text-[#003152] hover:border-[#003152]",
     light: "bg-white text-[#003152] shadow-lg hover:bg-[#eaf6fc]",
+    outline: "border border-white/80 bg-white/10 text-white hover:bg-white/25",
   };
   return <UiButton variant="plain" type={type} onClick={onClick} className={`inline-flex h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-bold transition-all focus:outline-none focus:ring-4 focus:ring-[#003152]/20 ${styles[variant]} ${className}`}>{children}</UiButton>;
 }
@@ -36,8 +37,8 @@ export function Hero() {
     <div className="home-video-layout"><div className="hero-copy home-video-copy">
       <span className="home-parts-view-27">{vi ? "Danh mục cá của công ty" : "Company-operated fish catalog"}</span>
       <h1>{vi ? "Khám phá." : "Discover."}<br />{vi ? "Cá chất lượng." : "Quality fish."}</h1>
-      <p>{vi ? "Xem cá đang bán, thông tin chăm sóc và giá cả từ công ty của chúng tôi." : "Explore available fish, care information, and prices from our company."}</p>
-      <div className="home-video-actions"><Button variant="light" onClick={() => { window.location.hash = "marketplace"; }}>{vi ? "Khám phá chợ cá" : "Explore Marketplace"}</Button></div>
+      <p>{vi ? "Xem cá đang bán và giá cả từ công ty của chúng tôi." : "Explore available fish and prices from our company."}</p>
+      <div className="home-video-actions"><Button variant="light" onClick={() => { window.location.hash = "marketplace"; }}>{vi ? "Khám phá chợ cá" : "Explore Marketplace"}</Button><Button variant="outline" onClick={() => { window.location.hash = "farming"; }}>{vi ? "Xem lô nuôi" : "See grow-out batches"}</Button></div>
     </div></div>
   </section>;
 }
@@ -58,5 +59,26 @@ export function ListingCard({ item }: { item: MarketplaceListing }) {
 }
 export function Footer() {
   const { language } = useTranslation();
-  return <footer id="about" className="home-parts-view-106"><div className="home-parts-view-107"><div><Logo light /><p className="home-parts-view-108">{language === "vi" ? "Danh mục cá của công ty." : "Our company fish catalog."}</p></div><nav aria-label="Footer"><a href="#marketplace" className="home-parts-view-114">{language === "vi" ? "Chợ cá" : "Marketplace"}</a></nav></div><div className="home-parts-view-115"><p className="home-parts-view-116">© 2026 FISHMARKET</p></div></footer>;
+  const vi = language === "vi";
+  // The grid expects four columns; every link targets a real route, and the
+  // "good to know" note repeats the honest simulated-payments wording used
+  // elsewhere instead of inventing contact details.
+  return <footer id="about" className="home-parts-view-106"><div className="home-parts-view-107">
+    <div><Logo light /><p className="home-parts-view-108">{vi ? "Danh mục cá của công ty." : "Our company fish catalog."}</p></div>
+    <nav aria-label="Footer" className="home-parts-view-113">
+      <p className="home-parts-view-117">{vi ? "Khám phá" : "Explore"}</p>
+      <a href="#marketplace" className="home-parts-view-114">{vi ? "Chợ cá" : "Marketplace"}</a>
+      <a href="#farming" className="home-parts-view-114">{vi ? "Lô nuôi và cập nhật" : "Batches and updates"}</a>
+      <a href="#home" className="home-parts-view-114">{vi ? "Trang chủ" : "Home"}</a>
+    </nav>
+    <nav aria-label={vi ? "Tài khoản" : "Account"} className="home-parts-view-113">
+      <p className="home-parts-view-117">{vi ? "Tài khoản" : "Account"}</p>
+      <a href="#login" className="home-parts-view-114">{vi ? "Đăng nhập" : "Sign in"}</a>
+      <a href="#login" className="home-parts-view-114">{vi ? "Tạo tài khoản" : "Create account"}</a>
+    </nav>
+    <div className="mt-5">
+      <p className="home-parts-view-117">{vi ? "Cần biết" : "Good to know"}</p>
+      <p className="home-parts-view-118">{vi ? "Toàn bộ thanh toán và hoàn tiền trong bản tích hợp này là mô phỏng — không có giao dịch thật nào diễn ra." : "All payments and refunds in this integration are simulated — no real money moves."}</p>
+    </div>
+  </div><div className="home-parts-view-115"><p className="home-parts-view-116">© 2026 FISHMARKET</p></div></footer>;
 }

@@ -11,8 +11,23 @@
 .batch-form-grid label, .company-batches .batch-field label { display: block; font-weight: 700; margin-bottom: 8px; }
 .batch-form-grid input, .batch-form-grid select, .company-batches .batch-field input, .company-batches .batch-field select, .company-batches .batch-field textarea { width: 100%; min-width: 0; padding: 10px 12px; border: 1px solid #b9d7e7; border-radius: 8px; background: #fff; color: #003152; font: inherit; box-sizing: border-box; }
 .batch-actions { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin: 18px 0; }
-.batch-card-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
+.batch-card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 20px; }
 .batch-card { border: 1px solid #d4e9f3; border-radius: 16px; padding: 20px; overflow-wrap: anywhere; }
+/* Card/panel action links get the same bordered treatment as commerce
+   buttons — plain underlined text read as inconsistent next to them. */
+.public-market .batch-card > a, .public-market .batch-panel > a, .public-market .batch-actions > a {
+  display: inline-block;
+  padding: 9px 16px;
+  border: 1px solid #bcd8e6;
+  border-radius: 999px;
+  background: #f2f9fd;
+  color: #1d5878;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 1px 3px #0031520a;
+}
+.public-market .batch-card > a:hover, .public-market .batch-panel > a:hover, .public-market .batch-actions > a:hover { background: #e2f2fa; border-color: #8fc2da; text-decoration: none; }
 .batch-card > img { width: 100%; aspect-ratio: 4 / 3; object-fit: cover; border-radius: 10px; }
 .batch-card h2 { font-size: 23px; margin: 12px 0; }
 @media (max-width: 650px) { .batch-form-grid { grid-template-columns: minmax(0, 1fr); } .batch-filter-form fieldset { padding: 16px; } }

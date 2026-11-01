@@ -112,10 +112,12 @@ export default function BatchReview({ batchId }: { batchId: string | null }) {
   const filtered = rows.filter(value => [value.id, value.title, value.species, value.createdBy?.name ?? ""].some(text => text.toLowerCase().includes(search.trim().toLowerCase())));
   const pages = Math.max(1, Math.ceil(filtered.length / 10)), selected = Math.min(page, pages);
   return <main className="public-market company-batches">
-    <nav className="batch-actions" aria-label={tr("Batch review navigation", "Điều hướng xét duyệt lô")}><a href={batchReviewRoute()}>{tr("Pending batch review queue", "Hàng đợi lô chờ xét duyệt")}</a><a href="#company/batches">{tr("Company batches", "Lô công ty")}</a><a href="#admin/activity">{tr("Recorded activity", "Hoạt động ghi nhận")}</a></nav>
+    {/* One back button instead of a row of sibling links — the site header's
+       dropdowns already reach every admin tool. */}
+    {batchId ? <a className="back-pill" href={batchReviewRoute()}>← {tr("Pending batch review queue", "Hàng đợi lô chờ xét duyệt")}</a> : <a className="back-pill" href="#company/batches">← {tr("Company batches", "Lô công ty")}</a>}
     <h1>{batchId ? tr("Review a saved company batch", "Xét duyệt lô công ty đã lưu") : tr("Optional batch review queue", "Hàng đợi xét duyệt lô tùy chọn")}</h1>
     <p>{tr("All Admins share batches and may review their own submissions. Review is optional; direct draft publication remains available. This screen has no withdrawal, deletion, sponsorship or financial actions.", "Mọi Admin dùng chung lô và có thể xét duyệt lô mình gửi. Xét duyệt là tùy chọn; vẫn có thể xuất bản trực tiếp bản nháp. Trang không có rút yêu cầu, xóa, bảo trợ hay thao tác tài chính.")}</p>
-    <button disabled={loading || busy} onClick={refresh}>{tr("Refresh server data", "Làm mới dữ liệu máy chủ")}</button>
+    <button className="sl-btn sl-btn-ghost sm" disabled={loading || busy} onClick={refresh}>{tr("Refresh server data", "Làm mới dữ liệu máy chủ")}</button>
     {loading && <p role="status">{tr("Reading private server records…", "Đang đọc bản ghi máy chủ riêng tư…")}</p>}{busy && <p role="status">{tr("Sending one decision and reconciling the saved record…", "Đang gửi một quyết định và đối chiếu bản ghi đã lưu…")}</p>}
     {error && <p role="alert" className="batch-notice">{error}</p>}{notice && <p role="status" className="batch-notice">{notice}</p>}
     {needsRefresh && <p className="batch-notice">{tr("Private records and decisions are hidden or blocked until a successful authoritative Refresh. Refresh discards local rejection text.", "Dữ liệu riêng tư và quyết định bị ẩn hoặc khóa đến khi Làm mới chính thức thành công. Làm mới bỏ ghi chú từ chối cục bộ.")}</p>}

@@ -1,6 +1,7 @@
 import "./Auth.css";
 import { useState, type FormEvent } from "react";
 import { LogoMark } from "@/components/layout/LogoMark";
+import { LangSwitch } from "@/hooks/useTranslation";
 import { Action, Field } from "@/components/auth/AuthParts";
 import { authApi, errorMessage } from "@/services/api";
 import { useUser } from "@/services/session";
@@ -19,7 +20,7 @@ import { parseFacilityRoute } from "@/services/facilities";
 import type { Lang } from "@/hooks/useTranslation";
 
 type Screen = "login" | "register" | "forgot" | "reset" | "verify";
-export default function Auth({ language }: { language: Lang; setLanguage: (l: Lang) => void }) {
+export default function Auth({ language, setLanguage }: { language: Lang; setLanguage: (l: Lang) => void }) {
   const [screen, setScreen] = useState<Screen>("login");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -54,7 +55,7 @@ export default function Auth({ language }: { language: Lang; setLanguage: (l: La
         await authApi.register({ email: data.email.trim().toLowerCase(), password: data.password, name: data.name.trim(), phone: data.phone.trim(), location: data.location.trim() });
         setEmail(data.email.trim().toLowerCase());
         go("verify");
-        setNotice(tr("Account created. You can verify your email or browse now.", "Đã tạo tài khoản. Bạn có thể xác minh email hoặc xem chợ cá."));
+        setNotice(tr("Account created. Request a verification code below to finish setup, or skip and browse.", "Đã tạo tài khoản. Yêu cầu mã xác minh bên dưới để hoàn tất, hoặc bỏ qua và xem chợ cá."));
       } else if (screen === "forgot") {
         const result = await authApi.forgotPassword(data.email.trim().toLowerCase());
         setEmail(data.email.trim().toLowerCase()); go("reset");
@@ -66,7 +67,10 @@ export default function Auth({ language }: { language: Lang; setLanguage: (l: La
         setNotice(tr("Password reset. Sign in with your new password.", "Đã đặt lại mật khẩu. Đăng nhập với mật khẩu mới."));
       } else {
         await authApi.verifyEmail(email, data.code);
-        setNotice(tr("Email verified.", "Email đã được xác minh."));
+        // Verification succeeds silently otherwise — the reviewer reported
+        // being left on the same screen with no sense anything happened.
+        setNotice(tr("Email verified. Redirecting…", "Email đã được xác minh. Đang chuyển trang…"));
+        setTimeout(redirect, 1500);
       }
     } catch (err) { setError(errorMessage(err, language)); }
     finally { setBusy(false); }
@@ -81,7 +85,10 @@ export default function Auth({ language }: { language: Lang; setLanguage: (l: La
       <a className="auth-brand" href="#home"><LogoMark />FISHMARKET</a>
       <div className="auth-visual-content"><h2>{tr("Great fish. One company.", "Cá chất lượng. Một công ty.")}</h2><p>{tr("Browse our company catalog and manage your account securely.", "Khám phá danh mục của công ty và quản lý tài khoản an toàn.")}</p></div>
     </aside>
-    <section className="auth-workspace"><main className={`auth-main ${screen === "register" ? "auth-wide" : ""}`}>
+    <section className="auth-workspace"><div className="auth-topbar">
+      <a href="#home">← {tr("Back to home", "Về trang chủ")}</a>
+      <div className="auth-topbar-right"><LangSwitch language={language} setLanguage={setLanguage} tone="light" /></div>
+    </div><main className={`auth-main ${screen === "register" ? "auth-wide" : ""}`}>
       <h1>{titles[screen]}</h1>
       {notice && <p className="auth-notice" role="status">{notice}</p>}
       {error && <p className="auth-error" role="alert">{error}</p>}
@@ -89,11 +96,11 @@ export default function Auth({ language }: { language: Lang; setLanguage: (l: La
         <fieldset disabled={busy} className="integration-auth-fields">
           {["login", "register", "forgot"].includes(screen) && <Field label={tr("Email Address", "Địa chỉ email")} name="email" type="email" autoComplete="email" />}
           {screen === "register" && <>
-            <Field label={tr("Full Name", "Họ tên")} name="name" autoComplete="name" />
-            <Field label={tr("Phone Number", "Số điện thoại")} name="phone" type="tel" autoComplete="tel" />
-            <Field label={tr("Location", "Khu vực")} name="location" autoComplete="address-level2" />
+            <Field label={tr("Full Name", "Họ tên")} name="name" autoComplete="name" maxLength={80} />
+            <Field label={tr("Phone Number", "Số điện thoại")} name="phone" type="tel" autoComplete="tel" maxLength={32} />
+            <Field label={tr("Location", "Khu vực")} name="location" autoComplete="address-level2" maxLength={120} />
           </>}
-          {["reset", "verify"].includes(screen) && <><p>{email}</p><Field label={tr("6-digit code", "Mã 6 chữ số")} name="code" autoComplete="one-time-code" /></>}
+          {["reset", "verify"].includes(screen) && <><p>{email}</p><Field label={tr("6-digit code", "Mã 6 chữ số")} name="code" autoComplete="one-time-code" />{screen === "verify" && <p>{tr("No real email is sent here: press \"Request verification code\" below and the 6-digit code appears in the notice — type it above to finish verifying.", "Ở đây không gửi email thật: nhấn \"Yêu cầu mã xác minh\" bên dưới, mã 6 chữ số sẽ hiện trong thông báo — nhập mã ở trên để hoàn tất xác minh.")}</p>}</>}
           {["login", "register", "reset"].includes(screen) && <Field label={tr("Password", "Mật khẩu")} name="password" type="password" autoComplete={screen === "login" ? "current-password" : "new-password"} />}
           {["register", "reset"].includes(screen) && <><Field label={tr("Confirm Password", "Xác nhận mật khẩu")} name="confirm" type="password" autoComplete="new-password" /><p>{tr("Use 8–128 characters with a letter and a number. New accounts are Users only.", "Dùng 8–128 ký tự gồm chữ và số. Tài khoản mới chỉ có vai trò User.")}</p></>}
           <Action type="submit" disabled={busy}>{busy ? tr("Please wait…", "Vui lòng đợi…") : titles[screen]}</Action>
@@ -104,7 +111,7 @@ export default function Auth({ language }: { language: Lang; setLanguage: (l: La
         {screen === "verify" && <><Action secondary disabled={busy} onClick={() => {
           setBusy(true); setError("");
           void authApi.verifyEmail(email).then((result) => setNotice(tr("Verification code issued.", "Mã xác minh đã được tạo.") + (result.devCode ? ` ${tr("Local development code:", "Mã phát triển cục bộ:")} ${result.devCode}` : ""))).catch((err: unknown) => setError(errorMessage(err, language))).finally(() => setBusy(false));
-        }}>{tr("Request verification code", "Yêu cầu mã xác minh")}</Action><Action onClick={redirect}>{tr("Browse now", "Xem chợ cá ngay")}</Action></>}
+        }}>{tr("Request verification code", "Yêu cầu mã xác minh")}</Action><Action onClick={redirect}>{tr("Skip for now — browse the marketplace", "Bỏ qua — xem chợ cá ngay")}</Action></>}
         {screen !== "login" && <Action secondary disabled={busy} onClick={() => go("login")}>{tr("Back to sign in", "Quay lại đăng nhập")}</Action>}
       </div>
     </main></section>

@@ -8,13 +8,12 @@
 .auth-app {
   --auth-border: var(--color-market-line);
   color: var(--color-market-navy);
-  /* 58px bottom padding included: min-height + padding must equal exactly
-     100dvh or every auth screen scrolls by that amount. */
-  min-height: calc(100dvh - 58px);
+  /* Exactly 100dvh: the old 58px bottom padding reserved space for a fixed
+     flow-nav bar that is no longer rendered, leaving a blank white strip. */
+  min-height: 100dvh;
   background: white;
   display: grid;
   grid-template-columns: 44% 56%;
-  padding-bottom: 58px;
 }
 .auth-app button,
 .auth-app a,
@@ -38,7 +37,7 @@
 .auth-visual {
   position: relative;
   overflow: hidden;
-  min-height: calc(100dvh - 58px);
+  min-height: 100dvh;
   background: var(--color-market-navy);
   color: white;
   display: flex;
@@ -995,7 +994,6 @@
 @media (max-width: 700px) {
   .auth-app {
     display: block;
-    padding-bottom: 64px;
   }
   .auth-visual {
     min-height: 235px;

@@ -12,9 +12,28 @@
   gap: 20px;
   margin-bottom: 28px;
 }
-.public-market-heading a {
+/* Back/return links sit alone next to the page title; a quiet 13px text link
+   was too easy to miss, so they render as a visible pill button instead. */
+.public-market .public-market-heading a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  align-self: flex-start;
+  flex-shrink: 0;
+  padding: 9px 16px;
+  border: 1px solid #bcd8e6;
+  border-radius: 999px;
+  background: #f2f9fd;
+  color: #1d5878;
   font-size: 13px;
-  color: #356783;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 1px 3px #0031520a;
+}
+.public-market .public-market-heading a:hover {
+  background: #e2f2fa;
+  border-color: #8fc2da;
+  text-decoration: none;
 }
 .public-market-heading h1 {
   font-size: clamp(28px, 4vw, 42px);
@@ -69,6 +88,26 @@
 .public-market-pages button:disabled {
   opacity: 0.4;
   cursor: default;
+}
+/* Sponsorship page tabs — same quiet pill look as the heading links so the
+   page matches the rest of the marketplace instead of reading as bare text. */
+.sponsorship-tabs a {
+  display: inline-flex;
+  align-items: center;
+  padding: 9px 16px;
+  border: 1px solid #bcd8e6;
+  border-radius: 999px;
+  background: #f2f9fd;
+  color: #1d5878;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 1px 3px #0031520a;
+}
+.sponsorship-tabs a:hover {
+  background: #e2f2fa;
+  border-color: #8fc2da;
+  text-decoration: none;
 }
 .public-fish-detail {
   display: grid;

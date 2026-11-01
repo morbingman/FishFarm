@@ -118,7 +118,7 @@ export default function Orders({ orderId, company = false }: { orderId: string |
     } finally { locked.current = false; if (alive.current) setBusy(false); }
   }
   return <main className="public-market commerce orders">
-    <a href={orderId ? history : "#marketplace"}>← {orderId ? company ? tr("Company orders", "Đơn hàng công ty") : tr("Your orders", "Đơn hàng của bạn") : tr("Marketplace", "Chợ cá")}</a>
+    <a className="back-pill" href={orderId ? history : "#marketplace"}>← {orderId ? company ? tr("Company orders", "Đơn hàng công ty") : tr("Your orders", "Đơn hàng của bạn") : tr("Marketplace", "Chợ cá")}</a>
     <h1>{company ? orderId ? tr("Company order fulfilment", "Xử lý đơn hàng công ty") : tr("Company orders", "Đơn hàng công ty") : orderId ? tr("Order details and tracking", "Chi tiết và theo dõi đơn hàng") : tr("Your orders", "Đơn hàng của bạn")}</h1>
     {company && <p>{tr("All Admins operate this shared company queue. Only confirmed server transitions change an order; attribution does not restrict access to its creator.", "Mọi Admin cùng xử lý danh sách đơn của công ty. Chỉ chuyển trạng thái xác nhận từ máy chủ mới thay đổi đơn; không giới hạn theo người tạo.")}</p>}
     <p>{tr("Company fulfilment updates come from the server. Payments and refunds in this local integration are simulated, not real money transfers.", "Cập nhật giao hàng của công ty đến từ máy chủ. Thanh toán và hoàn tiền trong bản tích hợp cục bộ là mô phỏng, không chuyển tiền thật.")}</p>
@@ -126,7 +126,7 @@ export default function Orders({ orderId, company = false }: { orderId: string |
       {!orderId && <label htmlFor="orders-filter">{tr("Order status", "Trạng thái đơn")} <select id="orders-filter" value={filter} onChange={(event) => { setNotice(""); setFilter(event.target.value as OrderFilter); }}>
         {orderFilters.map((status) => <option key={status} value={status}>{status === "all" ? tr("All orders", "Tất cả đơn") : orderLabel(status, language)}</option>)}
       </select></label>}
-      <button disabled={busy || loading} onClick={() => { setNotice(""); setReload((n) => n + 1); }}>{tr("Refresh", "Làm mới")}</button>
+      <button className="sl-btn sl-btn-ghost sm" disabled={busy || loading} onClick={() => { setNotice(""); setReload((n) => n + 1); }}>{tr("Refresh", "Làm mới")}</button>
     </div>
     {error && <p role="alert" className="commerce-alert">{error}</p>}
     {notice && <p role="status" className="commerce-alert">{notice}</p>}

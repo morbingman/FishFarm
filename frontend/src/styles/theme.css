@@ -845,12 +845,14 @@ html body .buy-header-main,
 html body .buy-nav > div {
   max-width: var(--container);
 }
+/* The auth screens render without the site header, so nothing is subtracted:
+   the workspace must fill the full dynamic viewport or a blank strip shows. */
 html body .auth-app {
   padding-bottom: 0;
-  min-height: calc(100dvh - var(--header-h));
+  min-height: 100dvh;
 }
 html body .auth-visual {
-  min-height: calc(100dvh - var(--header-h));
+  min-height: 100dvh;
 }
 html body .auth-brand {
   display: none;

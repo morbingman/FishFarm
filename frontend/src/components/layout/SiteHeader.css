@@ -353,3 +353,47 @@
     translate: 0 0;
   }
 }
+
+/* Admin nav dropdown groups — the trigger mimics a nav link so it sits
+   seamlessly in the row; menus reuse the existing ribbon-inline-menu card. */
+.ribbon-header .ds-nav .nav-group {
+  position: relative;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+.ribbon-header .ds-nav .nav-group-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 40px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 12px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 650;
+  white-space: nowrap;
+  color: #637180;
+  cursor: pointer;
+}
+.ribbon-header .ds-nav .nav-group-trigger:hover,
+.ribbon-header .ds-nav .nav-group-trigger[aria-expanded="true"] {
+  color: #003152;
+  background: #f6fbfe;
+}
+.ribbon-header .ds-nav .nav-group-caret {
+  font-size: 9px;
+  translate: 0 -1px;
+}
+.ribbon-header .ds-nav .nav-group .ribbon-inline-menu {
+  top: calc(100% + 6px);
+  left: 0;
+  max-height: 60vh;
+  padding: 8px;
+  border: 1px solid #d4e9f3;
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 12px 30px #00315214;
+}

@@ -795,7 +795,7 @@ export default function CompanyFacilities({
   }
   if (!sessionValid)
     return (
-      <main className="company-facilities">
+      <main className="public-market company-facilities">
         <h1>{heading}</h1>
         <p role="alert">
           {tr(
@@ -806,17 +806,16 @@ export default function CompanyFacilities({
       </main>
     );
   return (
-    <main className="company-facilities" aria-busy={busy || loading}>
+    <main className="public-market company-facilities" aria-busy={busy || loading}>
       <header className="facility-heading">
-        <a
-          href={facilityRoute(
-            mode === "review" || mode === "review-list"
-              ? "review-list"
-              : "list",
-          )}
-        >
-          {tr("Shared facility directory", "Danh mục cơ sở dùng chung")}
-        </a>
+        {(mode === "review" || mode === "review-list") && (
+          <a
+            className="back-pill"
+            href={facilityRoute("list")}
+          >
+            ← {tr("Facility directory", "Danh mục cơ sở dùng chung")}
+          </a>
+        )}
         <h1>{heading}</h1>
         <p>
           {tr(
@@ -831,7 +830,7 @@ export default function CompanyFacilities({
             {tr("Create facility", "Tạo cơ sở")}
           </a>
         )}
-        <button type="button" disabled={busy || loading} onClick={refresh}>
+        <button type="button" className="sl-btn sl-btn-ghost sm" disabled={busy || loading} onClick={refresh}>
           {tr(
             "Refresh · discard local changes",
             "Làm mới · bỏ thay đổi cục bộ",
@@ -982,7 +981,7 @@ export default function CompanyFacilities({
               )}
             </p>
           )}
-          <div className="facility-form-grid">
+          <div className="facility-form-grid facility-filter">
             <div>
               <label htmlFor="facility-search">
                 {tr(

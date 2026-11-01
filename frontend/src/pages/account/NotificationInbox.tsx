@@ -128,7 +128,7 @@ export default function NotificationInbox() {
       <label>{tr("Rows per server page", "Dòng mỗi trang máy chủ")}<select value={limit} onChange={event => setLimit(Number(event.target.value))}>{[10, 25, 50, 100].map(value => <option key={value} value={value}>{value}</option>)}</select></label>
       <button type="submit">{tr("Apply filters", "Áp dụng bộ lọc")}</button>
     </fieldset></form>
-    <div className="notification-actions"><button disabled={busy || loading || !!confirmation || !sameSession()} onClick={refresh}>{tr("Refresh", "Làm mới")}</button><button disabled={blocked || !visible || visible.unreadTotal === 0} onClick={event => {
+    <div className="notification-actions"><button className="sl-btn sl-btn-ghost sm" disabled={busy || loading || !!confirmation || !sameSession()} onClick={refresh}>{tr("Refresh", "Làm mới")}</button><button className="sl-btn sl-btn-primary sm" disabled={blocked || !visible || visible.unreadTotal === 0} onClick={event => {
       if (locked.current || blocked || !visible) return;
       opener.current = event.currentTarget; setConfirmation(key);
     }}>{tr("Mark all read…", "Đánh dấu tất cả đã đọc…")}</button></div>
@@ -147,7 +147,7 @@ export default function NotificationInbox() {
           <h2>{notificationText(item.titleKey, item.titleParams, language)}</h2>
           <p className="notification-body">{notificationText(item.bodyKey, item.bodyParams, language)}</p>
           {item.readAt && <p><small>{tr("Read at", "Đọc lúc")}: <time dateTime={item.readAt} title={item.readAt}>{notificationDate(item.readAt, language)}</time></small></p>}
-          <div className="notification-actions">{destination && <a href={destination}>{tr("Open destination", "Mở trang đích")}</a>}<button disabled={blocked || item.readAt !== null} aria-label={`${tr("Mark read", "Đánh dấu đã đọc")} · ${item.id}`} onClick={() => void act(item)}>{item.readAt === null ? tr("Mark read", "Đánh dấu đã đọc") : tr("Already read", "Đã đọc")}</button></div>
+          <div className="notification-actions">{destination && <a href={destination}>{tr("Open destination", "Mở trang đích")}</a>}<button className="sl-btn sl-btn-ghost sm" disabled={blocked || item.readAt !== null} aria-label={`${tr("Mark read", "Đánh dấu đã đọc")} · ${item.id}`} onClick={() => void act(item)}>{item.readAt === null ? tr("Mark read", "Đánh dấu đã đọc") : tr("Already read", "Đã đọc")}</button></div>
           {item.link !== null && !destination && <p className="notification-recorded-link">{tr("Recorded destination · unavailable here", "Đích được ghi nhận · chưa khả dụng tại đây")}: <code>{item.link}</code></p>}
           <small className="notification-id">{item.id}</small>
         </li>;
@@ -158,7 +158,7 @@ export default function NotificationInbox() {
       <h2 id="notification-confirm-title">{tr("Mark your entire inbox read?", "Đánh dấu toàn bộ hộp thư của bạn đã đọc?")}</h2>
       <p><strong>{user?.email}</strong></p>
       <p>{tr("This marks all currently unread personal notifications across every page and type, not just the filtered results. Existing read timestamps are preserved. Notifications arriving after the update may remain unread.", "Thao tác đánh dấu mọi thông báo cá nhân đang chưa đọc trên tất cả trang và loại, không chỉ kết quả đã lọc. Giữ nguyên thời điểm đã đọc cũ. Thông báo đến sau khi cập nhật có thể vẫn chưa đọc.")}</p>
-      <div className="notification-actions"><button disabled={busy || loading || needsRefresh} onClick={() => void act(null)}>{busy ? tr("Submitting…", "Đang gửi…") : tr("Confirm · Mark entire inbox read", "Xác nhận · Đánh dấu toàn bộ hộp thư đã đọc")}</button><button disabled={busy} onClick={cancel}>{tr("Keep unchanged", "Giữ nguyên")}</button></div>
+      <div className="notification-actions"><button className="sl-btn sl-btn-primary sm" disabled={busy || loading || needsRefresh} onClick={() => void act(null)}>{busy ? tr("Submitting…", "Đang gửi…") : tr("Confirm · Mark entire inbox read", "Xác nhận · Đánh dấu toàn bộ hộp thư đã đọc")}</button><button className="sl-btn sl-btn-ghost sm" disabled={busy} onClick={cancel}>{tr("Keep unchanged", "Giữ nguyên")}</button></div>
     </section>}
   </main>;
 }

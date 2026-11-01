@@ -13,12 +13,16 @@ import { useHashTransitionGuard } from "@/services/hashNavigation";
 import { batchUtc } from "@/components/batches/BatchDetails";
 import "./PublicMarketplace.css";
 import "./Orders.css";
+// The markup below reuses the batch panel/table/notice classes; import their
+// stylesheets or the whole page renders as unstyled text.
+import "../farming/PublicBatches.css";
+import "../../components/batches/BatchDetails.css";
 
 type Confirmation = { action: "pay" | "cancel" | "deliver" | "fee"; id: string; record: string; reason: string; method: PaymentMethod | null; sequence: number; revision: number; hash: string };
 const money = (value: number, vi: boolean) => `${value.toLocaleString(vi ? "vi-VN" : "en-US")} ₫`;
 const fundedAck = (status: SponsorshipStatus) => status === "funded" || status === "growing";
-const ledgerPurposeLabel = (purpose: SponsorshipLedgerEntry["purpose"], vi: boolean) => purpose === "sponsorship_package" ? (vi ? "Package payment" : "Thanh toán gói") : purpose === "delivery_fee" ? (vi ? "Delivery fee" : "Phí giao hàng") : (vi ? "Refund" : "Hoàn tiền");
-const ledgerStateLabel = (state: SponsorshipLedgerEntry["state"], vi: boolean) => state === "paid" ? (vi ? "Paid" : "Đã trả") : (vi ? "Refunded" : "Đã hoàn");
+const ledgerPurposeLabel = (purpose: SponsorshipLedgerEntry["purpose"], vi: boolean) => purpose === "sponsorship_package" ? (vi ? "Thanh toán gói" : "Package payment") : purpose === "delivery_fee" ? (vi ? "Phí giao hàng" : "Delivery fee") : (vi ? "Hoàn tiền" : "Refund");
+const ledgerStateLabel = (state: SponsorshipLedgerEntry["state"], vi: boolean) => state === "paid" ? (vi ? "Đã trả" : "Paid") : (vi ? "Đã hoàn" : "Refunded");
 
 export default function Sponsorships({ sponsorshipId }: { sponsorshipId: string | null }) {
   const { language } = useTranslation();
@@ -190,8 +194,8 @@ export default function Sponsorships({ sponsorshipId }: { sponsorshipId: string 
     } finally { locked.current = false; if (current()) setBusy(false); }
   }
   if (!sameSession()) return <main className="public-market"><h1>{tr("My sponsorships", "Bảo trợ của tôi")}</h1><p role="alert">{tr("An active User session is required. Sponsorship records are private.", "Cần phiên User đang hoạt động. Bản ghi bảo trợ là riêng tư.")}</p></main>;
-  return <main className="public-market">
-    <nav className="batch-actions" aria-label={tr("Sponsorship navigation", "Điều hướng bảo trợ")}><a href={sponsorshipRoute()}>{tr("My sponsorships", "Bảo trợ của tôi")}</a><a href="#farming">{tr("Open batches", "Lô đang mở")}</a><a href="#marketplace/orders">{tr("My orders", "Đơn hàng của tôi")}</a></nav>
+  return <main className="public-market public-batches">
+    <nav className="batch-actions sponsorship-tabs" aria-label={tr("Sponsorship navigation", "Điều hướng bảo trợ")}><a href={sponsorshipRoute()}>{tr("My sponsorships", "Bảo trợ của tôi")}</a><a href="#farming">{tr("Open batches", "Lô đang mở")}</a><a href="#marketplace/orders">{tr("My orders", "Đơn hàng của tôi")}</a></nav>
     <h1>{sponsorshipId ? tr("Sponsorship detail", "Chi tiết bảo trợ") : tr("My sponsorships", "Bảo trợ của tôi")}</h1>
     <p>{tr("Sponsoring pays the full cost of care up front for a share of the harvest in kind — not an investment and not a cash return. Payments are held in milestone escrow and disclosed risk applies. Unpaid reservations expire 24 hours after reservation and their shares return to the pool.", "Bảo trợ trả trước toàn bộ chi phí chăm sóc để nhận một phần cá khi thu hoạch theo hiện vật — không phải đầu tư hay hoàn tiền bằng tiền. Khoản trả được giữ trong quỹ theo cột mốc và có rủi ro đã công bố. Đơn giữ chưa trả hết hạn sau 24 giờ và số phần được trả lại còn dự trữ.")}</p>
     <button disabled={loading || busy} onClick={refresh}>{tr("Refresh server data", "Làm mới dữ liệu máy chủ")}</button>

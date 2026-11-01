@@ -126,3 +126,98 @@
 .home-view-42 {
   @apply min-w-0 flex-1 bg-transparent text-sm outline-none;
 }
+/* Landing-page polish: how-it-works strip, dark company band, species chips,
+   live stats, CTA band. */
+.home-steps-section {
+  @apply py-24;
+}
+.home-step-card {
+  @apply rounded-2xl border border-[#d4e9f3] bg-white p-7 shadow-[0_14px_34px_-22px_rgba(0,49,82,0.4)] transition hover:shadow-[0_20px_44px_-22px_rgba(0,49,82,0.5)];
+}
+.home-step-badge {
+  @apply grid h-12 w-12 place-items-center rounded-full bg-[#003152] text-base font-extrabold text-white;
+}
+.home-company-section {
+  @apply bg-[#003152] py-24 text-white;
+}
+.home-company-heading {
+  @apply text-3xl font-extrabold tracking-tight md:text-4xl;
+}
+.home-company-sub {
+  @apply mt-4 max-w-xl text-[#a9cbdd];
+}
+.home-company-grid {
+  @apply mt-12 grid items-start gap-10 md:grid-cols-[1.4fr_1fr];
+}
+/* Text halves are short and balanced; the stat cards form a full-width row
+   underneath so neither side towers over the other. */
+.home-company-grid > div:last-child {
+  @apply md:justify-self-end md:text-right;
+}
+.home-company-name {
+  @apply text-xl font-extrabold;
+}
+.home-company-about {
+  @apply mt-4 leading-7 text-[#cfe4f1];
+}
+.home-company-location {
+  @apply mt-3 text-sm font-bold text-[#a9cbdd];
+}
+.home-chips {
+  @apply mt-5 flex flex-wrap gap-2 md:justify-end;
+}
+.home-chip {
+  @apply rounded-full border border-white/25 bg-white/10 px-4 py-1.5 text-sm font-bold text-white;
+}
+.home-stats {
+  @apply mt-10 grid gap-4 sm:grid-cols-3;
+}
+.home-stat {
+  @apply rounded-2xl border border-white/15 bg-white/10 p-6 text-center;
+}
+.home-stat-value {
+  @apply text-3xl font-extrabold tracking-tight;
+}
+.home-stat-label {
+  @apply mt-1 text-sm text-[#a9cbdd];
+}
+/* CTA band: dark, with a decorative filmstrip of shipped fish photos
+   scrolling left in a seamless loop behind a half-fading navy veil. The
+   animation is pure CSS; prefers-reduced-motion users see a static strip. */
+.home-cta {
+  @apply relative overflow-hidden border-y border-white/10 bg-[#003152] py-24 text-white md:py-32;
+}
+.home-cta-slides {
+  @apply absolute inset-0 flex w-max;
+  animation: home-cta-marquee 36s linear infinite;
+}
+.home-cta-strip {
+  @apply flex h-full;
+}
+.home-cta-slide {
+  @apply h-full w-[440px] max-w-none object-cover;
+}
+.home-cta-veil {
+  @apply absolute inset-0 bg-[#003152]/70;
+}
+.home-cta-inner {
+  @apply relative;
+}
+.home-cta h2 {
+  @apply text-3xl font-extrabold tracking-tight md:text-4xl;
+}
+.home-cta p {
+  @apply mt-4 max-w-xl text-[#cfe4f1];
+}
+.home-cta-actions {
+  @apply mt-8 flex flex-wrap gap-3;
+}
+@keyframes home-cta-marquee {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .home-cta-slides {
+    animation: none;
+  }
+}

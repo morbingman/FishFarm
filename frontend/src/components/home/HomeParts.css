@@ -339,8 +339,19 @@
 .home-parts-view-113 {
   @apply mt-5 space-y-3;
 }
+/* Footer nav links stack vertically with spacing instead of running together. */
+.home-parts-view-113 a {
+  @apply block w-fit;
+}
 .home-parts-view-114 {
   @apply text-sm text-[#97bbcd] transition hover:text-white;
+}
+/* Footer column headings and the simulated-payments note. */
+.home-parts-view-117 {
+  @apply text-sm font-extrabold uppercase tracking-wide text-white;
+}
+.home-parts-view-118 {
+  @apply mt-1 text-sm leading-6 text-[#97bbcd];
 }
 .home-parts-view-115 {
   @apply border-t border-white/10;

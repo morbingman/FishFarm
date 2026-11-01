@@ -1,0 +1,158 @@
+/* Unified compact filter/search bars.
+   The pages each grew their own filter markup (fieldset grids, stacked
+   labels, oversized inputs); these scoped overrides give every bar the same
+   quiet one-row look: small inline labels, 34px controls, subtle container.
+
+   Every class is doubled (.x.x) on purpose: component CSS is injected later
+   than this global file, so equal-specificity page rules would otherwise win
+   the tie and re-stack the labels. */
+
+.public-market-search.public-market-search,
+.notification-toolbar.notification-toolbar > fieldset:first-of-type,
+.admin-users-toolbar.admin-users-toolbar > fieldset:first-of-type,
+.batch-filter-form.batch-filter-form,
+.catalog-filter.catalog-filter {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 10px 14px;
+  border: 1px solid #d4e9f3;
+  border-radius: 12px;
+  background: #f6fbfe;
+  margin: 14px 0;
+  min-width: 0;
+}
+
+/* Small inline labels sitting LEFT of their control instead of stacked. */
+.public-market-search.public-market-search > label,
+.notification-toolbar.notification-toolbar fieldset label,
+.admin-users-toolbar.admin-users-toolbar fieldset label,
+.batch-filter-form.batch-filter-form label,
+.catalog-filter.catalog-filter label,
+.orders .commerce-actions label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 12px;
+  font-weight: 650;
+  color: #46667b;
+  white-space: nowrap;
+}
+
+/* Compact controls — same 34px height everywhere. */
+.public-market-search.public-market-search input,
+.public-market-search.public-market-search select,
+.notification-toolbar.notification-toolbar fieldset select,
+.admin-users-toolbar.admin-users-toolbar fieldset input,
+.admin-users-toolbar.admin-users-toolbar fieldset select,
+.batch-filter-form.batch-filter-form input,
+.batch-filter-form.batch-filter-form select,
+.catalog-filter.catalog-filter input,
+.catalog-filter.catalog-filter select,
+.orders .commerce-actions select {
+  /* min-height must be restated: theme.css gives .pt-select/.sl-field
+     controls min-height: var(--control-h) (40px), which would override a
+     height-only compaction. */
+  height: 34px;
+  min-height: 34px;
+  padding: 5px 10px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.catalog-filter.catalog-filter input { min-width: 200px; }
+
+/* Compact buttons inside the bars so Apply/Reset/Refresh don't tower over
+   the controls next to them. */
+.notification-toolbar.notification-toolbar fieldset button,
+.admin-users-toolbar.admin-users-toolbar fieldset button,
+.batch-filter-form.batch-filter-form button,
+.orders .commerce-actions button {
+  padding: 7px 14px;
+  font-size: 13px;
+  border-radius: 8px;
+}
+.catalog-filter.catalog-filter a {
+  display: inline-flex;
+  align-items: center;
+  border: 1px solid #bcd8e6;
+  background: #f2f9fd;
+  color: #1d5878;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  border-radius: 999px;
+  padding: 7px 14px;
+}
+.catalog-filter.catalog-filter a:hover { background: #e2f2fa; border-color: #8fc2da; }
+
+/* Batch filter form: the fieldset grid becomes one wrapping row of inline
+   label+control pairs; legend reads as a small caption, not a box heading. */
+.batch-filter-form.batch-filter-form fieldset {
+  display: contents;
+  border: 0;
+  padding: 0;
+  margin: 0;
+}
+.batch-filter-form.batch-filter-form legend {
+  font-size: 12px;
+  font-weight: 700;
+  color: #46667b;
+  padding: 0;
+}
+.batch-filter-form.batch-filter-form .batch-form-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+}
+.batch-filter-form.batch-filter-form .batch-form-grid > div {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.batch-filter-form.batch-filter-form .batch-actions { margin: 0; gap: 10px; }
+
+@media (max-width: 650px) {
+  .public-market-search.public-market-search > label,
+  .notification-toolbar.notification-toolbar fieldset label,
+  .admin-users-toolbar.admin-users-toolbar fieldset label,
+  .batch-filter-form.batch-filter-form label,
+  .catalog-filter.catalog-filter label {
+    white-space: normal;
+  }
+  .catalog-filter.catalog-filter input { min-width: 0; flex: 1 1 100%; }
+}
+
+/* Single back button at the top of secondary pages: one arrow, outline pill,
+   no underline — replaces the old rows of underlined nav links. Class is
+   doubled and element-qualified so page rules like `.company-batches a
+   { text-decoration: underline }` can't win a cascade tie. */
+a.back-pill.back-pill {
+  display: inline-flex;
+  align-items: center;
+  align-self: flex-start;
+  width: fit-content;
+  padding: 9px 16px;
+  border: 1px solid #bcd8e6;
+  border-radius: 999px;
+  background: #f2f9fd;
+  color: #1d5878;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  box-shadow: 0 1px 3px #0031520a;
+}
+a.back-pill.back-pill:hover { background: #e2f2fa; border-color: #8fc2da; }
+
+/* One title treatment for every page that shares the .public-market chrome,
+   whether the h1 sits inside a .public-market-heading wrapper or directly
+   after the back pill. Element+class beats page rules like
+   `.company-facilities h1` without needing per-page overrides. */
+main.public-market h1 {
+  font-size: clamp(28px, 4vw, 42px);
+  font-weight: 800;
+  letter-spacing: -0.035em;
+  margin: 12px 0;
+}

@@ -114,12 +114,12 @@ export default function Disputes({ admin, disputeId, orderId }: { admin: boolean
     finally { locked.current = false; if (alive.current) setBusy(false); }
   }
   return <main className="public-market commerce orders">
-    <a href={orderId ? `#marketplace/orders/${encodeURIComponent(orderId)}` : disputeId ? disputeLink(admin) : admin ? "#company/orders" : "#marketplace/orders"}>← {tr("Back", "Quay lại")}</a>
+    <a className="back-pill" href={orderId ? `#marketplace/orders/${encodeURIComponent(orderId)}` : disputeId ? disputeLink(admin) : admin ? "#company/orders" : "#marketplace/orders"}>← {tr("Back", "Quay lại")}</a>
     <h1>{admin ? tr("Company dispute review", "Xét duyệt khiếu nại công ty") : orderId ? tr("Report an order issue", "Báo cáo vấn đề đơn hàng") : tr("Your disputes", "Khiếu nại của bạn")}</h1>
     <p>{tr("One dispute per order or sponsorship. Decisions are recorded by the company; resolving a dispute does not automatically refund, replace or complete the order.", "Mỗi đơn hoặc bảo trợ chỉ có một khiếu nại. Công ty ghi nhận quyết định; giải quyết khiếu nại không tự động hoàn tiền, thay cá hoặc hoàn tất đơn.")}</p>
     <div className="commerce-actions">
       {admin && !disputeId && <label>{tr("Dispute status", "Trạng thái khiếu nại")}<select value={status} disabled={busy} onChange={event => setStatus(event.target.value as "all" | DisputeStatus)}><option value="all">{tr("All", "Tất cả")}</option>{disputeStatuses.map(value => <option key={value} value={value}>{disputeLabel(value, language)}</option>)}</select></label>}
-      <button disabled={loading || busy} onClick={() => { setNotice(""); setReload(value => value + 1); }}>{tr("Refresh", "Làm mới")}</button>
+      <button className="sl-btn sl-btn-ghost sm" disabled={loading || busy} onClick={() => { setNotice(""); setReload(value => value + 1); }}>{tr("Refresh", "Làm mới")}</button>
     </div>
     {error && <p role="alert" className="commerce-alert">{error}</p>}{notice && <p role="status" className="commerce-alert">{notice}</p>}
     {needsRefresh && <p>{tr("Actions are disabled until Refresh reconciles the server record.", "Thao tác bị khóa đến khi làm mới bản ghi máy chủ.")}</p>}
