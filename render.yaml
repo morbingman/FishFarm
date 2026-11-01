@@ -8,7 +8,7 @@ services:
     runtime: node
     plan: free
     rootDir: backend
-    buildCommand: npm i -g pnpm@12 && pnpm install --frozen-lockfile && pnpm build && pnpm db:migrate:deploy
+    buildCommand: npm i -g pnpm@12 && pnpm install --frozen-lockfile && pnpm build && pnpm db:migrate:deploy && pnpm db:seed
     startCommand: node dist/main.js
     healthCheckPath: /health
     envVars:
@@ -30,6 +30,9 @@ services:
         value: "10485760"
       - key: CORS_ORIGINS
         sync: false
+      # TEMPORARY — one-time seed deploy; revert after this deploy succeeds.
+      - key: ALLOW_DEMO_SEED
+        value: "1"
 
 databases:
   - name: fishfarm-db
