@@ -1,0 +1,30 @@
+# Netlify build — frontend only. The NestJS API lives on Render (render.yaml);
+# the two redirects below reverse-proxy /v1 and /uploads to it so the browser
+# stays same-origin (the frontend calls /v1 relative — no CORS involved).
+# NOTE: if the Render service ends up with a different URL than
+# fishfarm-api.onrender.com, update both `to` targets.
+[build]
+  base = "frontend"
+  command = "npm run build"
+  publish = "dist"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+[[redirects]]
+  from = "/v1/*"
+  to = "https://fishfarm-api.onrender.com/v1/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/uploads/*"
+  to = "https://fishfarm-api.onrender.com/uploads/:splat"
+  status = 200
+  force = true
+
+# SPA fallback (the app is hash-routed; this covers stray direct paths)
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
